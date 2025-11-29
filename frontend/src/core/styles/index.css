@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* 可选：给 body 一个更舒服的背景色（也可以不写） */
+body {
+  @apply bg-slate-50 text-slate-900;
+}
