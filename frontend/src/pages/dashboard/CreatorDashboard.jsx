@@ -23,9 +23,9 @@ export default function DashboardHome() {
           <nav className="flex-1 px-2 py-3 space-y-1 text-sm">
             <SidebarItem label="Overview" active />
             <div className="mt-4 border-t border-slate-800 pt-3" />
-            <SidebarItem label="Network Graph" />
-            <SidebarItem label="Centrality Metrics" />
-            <SidebarItem label="Predictive Analysis " />
+            <SidebarItem label="Network Graph" to ="/dashborad/network" />
+            <SidebarItem label="Centrality Metrics" to ="/dashborad/network" />
+            <SidebarItem label="Predictive Analysis " to ="/dashborad/network"/>
           </nav>
 
           <div className="px-4 py-3 bg-slate-950/40 border-t border-slate-800 text-xs text-slate-400">
