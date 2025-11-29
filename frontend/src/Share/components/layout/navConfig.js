@@ -7,15 +7,15 @@ export const NAV_ITEMS = {
   ],
 
   creator: [
-    { label: "Home", path: "/" },
+    { label: "Dashboard", path: "/dashboard/creator" },
     { label: "Analyze", path: "/analytics" },
-    { label: "Enquire", path: "/creator/enquire" },
+    { label: "Customer Support", path: "/creator/enquire" },
   ],
 
   business: [
-    { label: "Home", path: "/" },
+    { label: "Dashboard", path: "/dashboard/business" },
     { label: "Analyze", path: "/analytics" },
-    { label: "Enquire", path: "/business/enquire" },
+    { label: "Customer Support", path: "/business/enquire" },
   ],
 
   admin: [
