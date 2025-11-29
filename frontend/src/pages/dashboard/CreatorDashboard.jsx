@@ -76,10 +76,10 @@ export default function DashboardHome() {
 
 
             <div className="space-y-4">
-              <Panel title="latest video">
+              <Panel title="Latest Video">
                 <ul className="divide-y divide-slate-100 text-sm">
                   <CreatorRow
-                    name="TechLab Studio"
+                    name="Sony Music"
                     metric="+12,430 subs"
                     badge="Gaming / Tech"
                   />
