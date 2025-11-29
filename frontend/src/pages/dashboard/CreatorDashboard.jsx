@@ -31,7 +31,7 @@ export default function DashboardHome() {
           <div className="px-4 py-3 bg-slate-950/40 border-t border-slate-800 text-xs text-slate-400">
             <p className="font-medium text-slate-200">Tip</p>
             <p className="mt-1">
-              Use filters on each card to focus on a specific niche or region.
+              MY Use filters on each card to focus on a specific niche or region.
             </p>
           </div>
         </aside>
