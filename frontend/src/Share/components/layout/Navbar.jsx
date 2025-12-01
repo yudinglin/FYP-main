@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { Link, NavLink } from "react-router-dom";
 import { useAuth } from "../../../core/context/AuthContext";
 import { NAV_ITEMS } from "./navConfig";
@@ -6,8 +7,16 @@ import { NAV_ITEMS } from "./navConfig";
 export default function Navbar() {
   const auth = useAuth() || {};
   const { user, logout } = auth;
+  const navigate = useNavigate();
 
   const role = user?.role?.toLowerCase() || "unregistered";
+
+  const dashboardPath = {
+    creator: "/dashboard",
+    business: "/dashboard/business",
+    admin: "/dashboard/admin",
+  }[role] || "/";
+
 
   // Select the current character from the menu; if not found, go back.
   const rawMenu =
@@ -53,12 +62,12 @@ export default function Navbar() {
                 </Link>
               ) : (
                 <NavLink
-                  key={item.label}
-                  to={item.path}
-                  className="hover:text-gray-900"
-                >
-                  {item.label}
-                </NavLink>
+                key={item.label}
+                to={item.label === "Dashboard" ? dashboardPath : item.path}
+                className="hover:text-gray-900"
+              >
+                {item.label}
+              </NavLink>
               )
             )}
           </nav>
@@ -88,15 +97,16 @@ export default function Navbar() {
                     Profile
                   </Link>
 
-                  <button
-                    onClick={() => {
-                      logout();
-                      setOpen(false);
-                    }}
-                    className="w-full text-left block px-4 py-2 hover:bg-gray-100"
-                  >
-                    Logout
-                  </button>
+                 <button
+                  onClick={() => {
+                    logout();
+                    setOpen(false);
+                    navigate("/"); // redirect to Landing page
+                  }}
+                  className="w-full text-left block px-4 py-2 hover:bg-gray-100"
+                >
+                  Logout
+                </button>
                 </div>
               )}
             </div>

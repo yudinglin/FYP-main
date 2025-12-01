@@ -1,10 +1,10 @@
 -- -----------------------------------------------------------------------------
 -- Database & defaults
 -- -----------------------------------------------------------------------------
-CREATE DATABASE IF NOT EXISTS sociosith
+CREATE DATABASE IF NOT EXISTS youanalyze
   DEFAULT CHARACTER SET utf8mb4
   DEFAULT COLLATE utf8mb4_unicode_ci;
-USE sociosith;
+USE youanalyze;
 
 SET NAMES utf8mb4;
 SET time_zone = '+00:00';

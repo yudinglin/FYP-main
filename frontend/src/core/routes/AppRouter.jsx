@@ -11,13 +11,16 @@ import Login from "../../pages/auth/Login.jsx";
 import Register from "../../pages/auth/Register.jsx";
 import PlansPage from "../../pages/UnregisteredUser/PlansPage.jsx";
 
-import DashboardHome from "../../pages/dashboard/DashboardHome.jsx";
 import CreatorDashboard from "../../pages/dashboard/CreatorDashboard.jsx";
 import BusinessDashboard from "../../pages/dashboard/BusinessDashboard.jsx";
 import AdminDashboard from "../../pages/dashboard/AdminDashboard.jsx";
 
 import AnalyticsOverview from "../../pages/analytics/AnalyticsOverview.jsx";
 import Profile from "../../pages/profile/Profile.jsx";
+
+import NetworkGraph from "../../pages/Creator/NetworkGraph.jsx";
+import CentralityMetrics from "../../pages/Creator/CentralityMetrics.jsx";
+import PredictiveAnalysis from "../../pages/Creator/PredictiveAnalysis.jsx";
 
 export default function AppRouter() {
   return (
@@ -72,15 +75,31 @@ export default function AppRouter() {
         path="/dashboard"
         element={
           <MainLayout>
-            <DashboardHome />
+            <CreatorDashboard />
           </MainLayout>
         }
       />
       <Route
-        path="/dashboard/creator"
+        path="/dashboard/network"
         element={
           <MainLayout>
-            <CreatorDashboard />
+            <NetworkGraph />
+          </MainLayout>
+        }
+      />
+      <Route
+        path="/dashboard/centrality"
+        element={
+          <MainLayout>
+            <CentralityMetrics />
+          </MainLayout>
+        }
+      />
+      <Route
+        path="/dashboard/predictive"
+        element={
+          <MainLayout>
+            <PredictiveAnalysis />
           </MainLayout>
         }
       />
