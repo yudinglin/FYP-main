@@ -49,7 +49,7 @@ export function AuthProvider({ children }) {
     localStorage.setItem("ya_user", JSON.stringify(data.user));
 
     setLoading(false);
-    return true;
+    return data.user;
   }
 
 

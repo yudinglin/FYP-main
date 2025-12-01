@@ -10,7 +10,7 @@ export async function login(email, password) {
     if (token) localStorage.setItem("ya_token", token);
     if (user) localStorage.setItem("ya_user", JSON.stringify(user));
   }
-  return res;
+  return user;
 }
 
 export async function register(email, password, username) {

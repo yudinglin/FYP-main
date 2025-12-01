@@ -16,8 +16,27 @@ export default function Login() {
     setError("");
     setBusy(true);
     try {
-      await login(email, password);
-      navigate("/dashboard");
+      const loginuser = await login(email, password);
+      if (!loginuser || !loginuser.role) 
+      {
+      throw new Error("1011");
+      }
+      const role = loginuser.role;
+      if (role == "creator")
+      {
+        navigate("/dashboard");
+      }
+      else if (role == "business")
+      { 
+        navigate("/dashboard/business");
+      }
+      else if (role == "admin")
+      {
+        navigate("/dashboard/admin");
+      }
+      else{
+        navigate("*");
+      }
     } catch (err) {
       setError(err.message || "Login failed");
     } finally {

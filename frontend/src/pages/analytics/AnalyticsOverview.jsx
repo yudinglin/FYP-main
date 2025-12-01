@@ -17,8 +17,8 @@ export default function AnalyticsOverview() {
       <div className="max-w-7xl mx-auto px-6 pb-10 space-y-6">
         {/* 1. Channel interaction graph */}
         <AnalyticsCard
-          label="Network graph #1"
-          title="Creator–creator interaction network"
+          label="graph #1"
+          title="Network graph "
           badge="Channel-level graph"
           description={
             <>
@@ -38,8 +38,8 @@ export default function AnalyticsOverview() {
 
         {/* 2. Brand–creator campaign graph */}
         <AnalyticsCard
-          label="Network graph #2"
-          title="Brand–creator campaign network"
+          label="graph #2"
+          title="Centrality Metrics"
           badge="Campaign view"
           description={
             <>
@@ -58,8 +58,8 @@ export default function AnalyticsOverview() {
 
         {/* 3. Community / cluster overview */}
         <AnalyticsCard
-          label="Network graph #3"
-          title="Community cluster overview"
+          label="graph #3"
+          title="Predictive Analysis"
           badge="Community view"
           description={
             <>
