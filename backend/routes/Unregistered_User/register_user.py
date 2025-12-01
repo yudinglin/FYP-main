@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from Entity.UserAccount import UserAccount
+from models.UserAccount import UserAccount
 from db import get_connection
 
 register_bp = Blueprint('register_bp', __name__)

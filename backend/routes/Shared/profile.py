@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from Entity.UserAccount import UserAccount
+from models.UserAccount import UserAccount
 
 profile_bp = Blueprint("profile", __name__, url_prefix="/api")
 
@@ -9,7 +9,7 @@ profile_bp = Blueprint("profile", __name__, url_prefix="/api")
 @jwt_required()
 def get_profile():
     email_from_token = get_jwt_identity()
-    user = UserAccount.find_by_email(email)
+    user = UserAccount.find_by_email(email_from_token)
     if not user:
         return jsonify({"message": "User not found"}), 404
 

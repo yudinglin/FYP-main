@@ -8,7 +8,7 @@ export default function CreatorDashboard() {
     <div className="min-h-[calc(100vh-72px)] bg-slate-50">
       <div className="max-w-7xl mx-auto px-6 py-6">
         <h1 className="text-2xl font-semibold text-slate-900">
-          Welcome back
+          Welcome back Creator
         </h1>
         <p className="mt-1 text-sm text-slate-500 max-w-2xl">
           High-level overview of your YouTube channels, campaigns and network performance. Use the panels below to drill down into creator, business, or admin metrics.

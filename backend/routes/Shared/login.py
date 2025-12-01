@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import create_access_token
-from Entity.UserAccount import UserAccount
+from models.UserAccount import UserAccount
 
 login_bp = Blueprint('login_bp', __name__)
 

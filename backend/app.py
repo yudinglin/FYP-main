@@ -6,9 +6,9 @@ from dotenv import load_dotenv
 import os
 
 # import blueprint
-from Controller.Unregistered_User.registered_user_controller import register_bp
-from Controller.Shared.login_controller import login_bp
-from Controller.Shared.profile_controller import profile_bp  
+from routes.Unregistered_User.register_user import register_bp
+from routes.Shared.login import login_bp
+from routes.Shared.profile import profile_bp  
 
 load_dotenv()
 
