@@ -22,10 +22,10 @@ def register():
         return jsonify({"message": "First and last name required"}), 400
 
     enum_role = {
-        "Content Creator": "CREATOR",
-        "Business": "BUSINESS",
-        "System Admin": "ADMIN",
-    }.get(role, "CREATOR")
+        "creator": "creator",
+        "business": "business",
+        "admin": "admin",
+    }.get(role, "creator")
 
 
     if UserAccount.find_by_email(email):
