@@ -70,6 +70,14 @@ export default function Navbar() {
               </NavLink>
               )
             )}
+            {role !== "admin" && (
+              <NavLink
+                to="/contact-support"
+                className="hover:text-gray-900"
+              >
+                Contact Support
+              </NavLink>
+            )}
           </nav>
 
           {/* avatar */}

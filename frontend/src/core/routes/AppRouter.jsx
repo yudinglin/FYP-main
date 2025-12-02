@@ -6,6 +6,7 @@ import AuthLayout from "../../Share/layouts/AuthLayout.jsx";
 import Landing from "../../pages/misc/Landing.jsx";
 import NotFound from "../../pages/misc/NotFound.jsx";
 import AboutUs from "../../pages/misc/AboutUs.jsx";
+import ContactSupport from "../../pages/misc/ContactSupport";
 
 import Login from "../../pages/auth/Login.jsx";
 import Register from "../../pages/auth/Register.jsx";
@@ -50,6 +51,15 @@ export default function AppRouter() {
       element={
         <MainLayout>
           <AboutUs />
+        </MainLayout>
+      }
+    />
+    {/* ContactSupport Page */}
+      <Route
+      path="/contact-support"
+      element={
+        <MainLayout>
+          <ContactSupport />
         </MainLayout>
       }
     />

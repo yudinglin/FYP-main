@@ -9,13 +9,11 @@ export const NAV_ITEMS = {
   creator: [
     { label: "Dashboard", path: "/dashboard/creator" },
     { label: "Analyze", path: "/analytics" },
-    { label: "Customer Support", path: "/creator/enquire" },
   ],
 
   business: [
     { label: "Dashboard", path: "/dashboard/business" },
     { label: "Analyze", path: "/analytics" },
-    { label: "Customer Support", path: "/business/enquire" },
   ],
 
   admin: [
