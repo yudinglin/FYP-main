@@ -1,16 +1,15 @@
 // src/pages/analytics/AnalyticsOverview.jsx
+import { Link } from "react-router-dom";
 
 export default function AnalyticsOverview() {
   return (
     <div className="min-h-[calc(100vh-72px)] bg-slate-50">
       <div className="max-w-7xl mx-auto px-6 py-6">
         <h1 className="text-2xl font-semibold text-slate-900">
-          Analytics overview
+          Analytics Overview for Creators
         </h1>
         <p className="mt-1 text-sm text-slate-500 max-w-3xl">
-          Track subscriber growth, interaction patterns and community structure
-          across your YouTube network. Below are three key network graph views
-          that the system will generate for you.
+          Monitor your channel performance, community interactions, and growth trends. Click on any card below to dive into detailed analytics and insights tailored to your content.
         </p>
       </div>
 
@@ -18,72 +17,69 @@ export default function AnalyticsOverview() {
         {/* 1. Channel interaction graph */}
         <AnalyticsCard
           label="graph #1"
-          title="Network graph "
-          badge="Channel-level graph"
+          title="Network Graph"
+          badge="Channel-level view"
           description={
             <>
-              Visualise how creators in your portfolio interact with each other
-              through mentions, collabs and shared audiences. Useful for
-              identifying{" "}
-              <span className="font-semibold">high-influence hubs</span> and
-              potential collaboration paths.
+              See how your channel interacts with others through comments, collaborations, and mentions. Identify <span className="font-semibold">top influencer connections</span> and potential collaboration opportunities.
             </>
           }
           highlights={[
-            "Nodes = individual creator channels",
-            "Edges = comments, mentions, collab videos, shared audience",
-            "Colour by niche / language, size by centrality score",
+            "Nodes = your channel and connected creators",
+            "Edges = comments, mentions, collab videos, shared audiences",
+            "Colour by niche/language, size by centrality score",
           ]}
+          link="/dashboard/network"
         />
 
         {/* 2. Brand–creator campaign graph */}
         <AnalyticsCard
           label="graph #2"
           title="Centrality Metrics"
-          badge="Campaign view"
+          badge="Collaboration insights"
           description={
             <>
-              Map the relationships between{" "}
-              <span className="font-semibold">brands and creators</span> across
-              all active and historical campaigns. Helps business users see
-              which creators are already associated with competing brands.
+              Understand your position within your creator network. See which creators you share audiences with and discover <span className="font-semibold">new collaboration paths</span> to grow your reach.
             </>
           }
           highlights={[
-            "Bipartite graph: brands on one side, creators on the other",
-            "Edge weight = campaign budget / impressions",
-            "Filter by time range, region or industry",
+            "Bipartite graph: your channel vs other creators",
+            "Edge weight = engagement strength / shared audience",
+            "Filter by niche, language, or region",
           ]}
+          link="/dashboard/centrality"
         />
 
         {/* 3. Community / cluster overview */}
         <AnalyticsCard
           label="graph #3"
           title="Predictive Analysis"
-          badge="Community view"
+          badge="Community growth"
           description={
             <>
-              High-level view of{" "}
-              <span className="font-semibold">communities / clusters</span> in
-              your network based on viewer behaviour. Good for strategic
-              planning and cross-vertical expansion.
+              Get a high-level view of your audience communities. See how clusters of viewers behave, helping you plan content strategy, engagement, and cross-channel growth.
             </>
           }
           highlights={[
-            "Each node = a community / cluster of channels",
+            "Each node = a community / cluster of viewers",
             "Position & distance reflect similarity between clusters",
-            "Colours can represent growth rate, risk level, or language",
+            "Colours show growth rate, engagement, or audience type",
           ]}
+          link="/dashboard/predictive"
         />
       </div>
     </div>
   );
 }
 
+// ------------------------- Helper -------------------------
 
-function AnalyticsCard({ label, title, badge, description, highlights }) {
+function AnalyticsCard({ label, title, badge, description, highlights, link }) {
   return (
-    <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-5 flex flex-col lg:flex-row gap-4">
+    <Link
+      to={link}
+      className="rounded-2xl bg-white shadow-sm border border-slate-100 p-5 flex flex-col lg:flex-row gap-4 hover:shadow-lg transition"
+    >
       <div className="flex-1 min-w-[220px]">
         <p className="text-[11px] font-medium uppercase tracking-wide text-sky-500">
           {label}
@@ -112,7 +108,7 @@ function AnalyticsCard({ label, title, badge, description, highlights }) {
       <div className="w-full lg:w-80 xl:w-96">
         <ChartPlaceholder />
       </div>
-    </section>
+    </Link>
   );
 }
 
