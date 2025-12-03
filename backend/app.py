@@ -9,6 +9,8 @@ import os
 from routes.Unregistered_User.register_user import register_bp
 from routes.Shared.login import login_bp
 from routes.Shared.profile import profile_bp 
+from controllers.YouTube.channels_list import channels_bp
+from controllers.YouTube.videos_list import videos_bp
 
 
 load_dotenv()
@@ -25,6 +27,8 @@ jwt = JWTManager(app)
 app.register_blueprint(register_bp)
 app.register_blueprint(login_bp)
 app.register_blueprint(profile_bp)   
+app.register_blueprint(channels_bp)
+app.register_blueprint(videos_bp)
 
 
 @app.route('/api/ping')

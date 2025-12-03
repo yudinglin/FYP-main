@@ -1,8 +1,59 @@
 // frontend/src/pages/dashboard/CreatorDashboard.jsx
-import React, { useContext } from "react";
-import { Link } from "react-router-dom"; // for SPA routing
+import React, { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 
 export default function CreatorDashboard() {
+  const [subscribers, setSubscribers] = useState(null);
+  const [viewCount, setViewCount] = useState(null);
+  const [totalLikes, setTotalLikes] = useState(null);
+  const [totalComments, setTotalComments] = useState(null);
+
+  // load if erro ( can remove)
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  useEffect(() => {
+    async function fetchStats() {
+      setLoading(true);
+      setError(null);
+
+      try {
+        // change URL manul
+        const channelUrl = localStorage.getItem("channelUrl");
+        // change // to %3 
+        const q = encodeURIComponent(channelUrl);
+
+        // 1) channels.list 
+        const res1 = await fetch(
+          `http://localhost:5000/api/youtube/channels.list?url=${q}`
+        );
+        if (!res1.ok) {
+          throw new Error("channels.list request failed");
+        }
+        const data1 = await res1.json();
+        setSubscribers(data1.subscriberCount);
+        setViewCount(data1.viewCount);
+
+        // 2) videos.list 
+        const res2 = await fetch(
+          `http://localhost:5000/api/youtube/videos.list?url=${q}`
+        );
+        if (!res2.ok) {
+          throw new Error("videos.list request failed");
+        }
+        const data2 = await res2.json();
+        setTotalLikes(data2.totalLikes);
+        setTotalComments(data2.totalComments);
+      } catch (err) {
+        console.error("Error loading YouTube stats:", err);
+        setError(err.message || "Failed to load stats");
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchStats();
+  }, []);
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-slate-50">
@@ -39,10 +90,46 @@ export default function CreatorDashboard() {
 
         <main className="flex-1 space-y-6">
           <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-            <StatCard label="Total subscribers" value="128,930" change="+4.2%" changeLabel="last 30 days" />
-            <StatCard label="View count" value="Top 3%" change="↑" changeLabel="within selected niche" />
-            <StatCard label="Total likes" value="18" change="+6" changeLabel="vs previous month" />
-            <StatCard label="Total comments" value="2.3M h" change="+12.4%" changeLabel="organic traffic" />
+<StatCard
+              label="Total subscribers"
+              value={
+                loading ? "Loading..."
+                : error ? "--"
+                : subscribers?.toLocaleString() ?? "--"
+              }
+              change=""
+              changeLabel=""
+            />
+            <StatCard
+              label="View count"
+              value={
+                loading ? "Loading..."
+                : error ? "--"
+                : viewCount?.toLocaleString() ?? "--"
+              }
+              change=""
+              changeLabel=""
+            />
+            <StatCard
+              label="Total likes"
+              value={
+                loading ? "Loading..."
+                : error ? "--"
+                : totalLikes?.toLocaleString() ?? "--"
+              }
+              change=""
+              changeLabel=""
+            />
+            <StatCard
+              label="Total comments"
+              value={
+                loading ? "Loading..."
+                : error ? "--"
+                : totalComments?.toLocaleString() ?? "--"
+              }
+              change=""
+              changeLabel=""
+            />
           </section>
 
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -174,5 +261,3 @@ function CommunityBadge({ name, value }) {
     </div>
   );
 }
-
-
