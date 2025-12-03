@@ -8,7 +8,8 @@ import os
 # import blueprint
 from routes.Unregistered_User.register_user import register_bp
 from routes.Shared.login import login_bp
-from routes.Shared.profile import profile_bp  
+from routes.Shared.profile import profile_bp 
+
 
 load_dotenv()
 
