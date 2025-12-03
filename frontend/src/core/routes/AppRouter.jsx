@@ -17,6 +17,7 @@ import BusinessDashboard from "../../pages/dashboard/BusinessDashboard.jsx";
 import AdminDashboard from "../../pages/dashboard/AdminDashboard.jsx";
 
 import AnalyticsOverview from "../../pages/analytics/AnalyticsOverview.jsx";
+import BusinessAnalyticsOverview from "../../pages/analytics/BusinessAnalyticsOverview.jsx";
 import Profile from "../../pages/profile/Profile.jsx";
 
 import NetworkGraph from "../../pages/Creator/NetworkGraph.jsx";
@@ -134,6 +135,15 @@ export default function AppRouter() {
         element={
           <MainLayout>
             <AnalyticsOverview />
+          </MainLayout>
+        }
+      />
+
+      <Route
+        path="/analytics/business"
+        element={
+          <MainLayout>
+            <BusinessAnalyticsOverview />
           </MainLayout>
         }
       />

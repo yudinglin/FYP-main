@@ -13,7 +13,7 @@ export const NAV_ITEMS = {
 
   business: [
     { label: "Dashboard", path: "/dashboard/business" },
-    { label: "Analyze", path: "/analytics" },
+    { label: "Analyze", path: "/analytics/business" },
   ],
 
   admin: [

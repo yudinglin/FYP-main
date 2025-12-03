@@ -9,9 +9,8 @@ export default function BusinessDashboard() {
             <h1>Welcome back Business User</h1>
           </h1>
           <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-            High-level overview of your YouTube channels, campaigns and
-            network performance. Use the panels below to drill down into
-            creator, business or admin metrics.
+            High-level overview of your industry, creators, campaigns, and network performance. 
+            Use the panels below to analyze market trends, creator influence, and campaign forecasting.
           </p>
         </div>
 
@@ -24,60 +23,63 @@ export default function BusinessDashboard() {
             <nav className="flex-1 px-2 py-3 space-y-1 text-sm">
               <SidebarItem label="Overview" active />
               <div className="mt-4 border-t border-slate-800 pt-3" />
-              <SidebarItem label="Network Graph" to ="/dashborad/network" />
-              <SidebarItem label="Centrality Metrics" to ="/dashborad/network" />
-              <SidebarItem label="Predictive Analysis " to ="/dashborad/network"/>
+              <SidebarItem label="Industry Network Graph" to="" />
+              <SidebarItem label="Brand & Creator Centrality" to="" />
+              <SidebarItem label="Campaign Forecasting" to="" />
             </nav>
 
             <div className="px-4 py-3 bg-slate-950/40 border-t border-slate-800 text-xs text-slate-400">
               <p className="font-medium text-slate-200">Tip</p>
               <p className="mt-1">
-                MY Use filters on each card to focus on a specific niche or region.
+                Use filters on each card to focus on a specific niche or region.
               </p>
             </div>
           </aside>
 
           <main className="flex-1 space-y-6">
             <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
-              <StatCard
-                label="Total subscribers"
-                value="128,930"
-                change="+4.2%"
-                changeLabel="last 30 days"
-              />
-              <StatCard
-                label="View count"
-                value="Top 3%"
-                change="↑"
-                changeLabel="within selected niche"
-              />
-              <StatCard
-                label="Total likes"
-                value="18"
-                change="+6"
-                changeLabel="vs previous month"
-              />
-              <StatCard
-                label="Total comments"
-                value="2.3M h"
-                change="+12.4%"
-                changeLabel="organic traffic"
-              />
+            <StatCard
+              label="Industry Audience Size"
+              value="12.4M"
+              change="+3.1%"
+              changeLabel="last 30 days"
+            />
+
+            <StatCard
+              label="Avg Creator Engagement Rate"
+              value="7.8%"
+              change="+0.6%"
+              changeLabel="vs industry benchmark"
+            />
+
+            <StatCard
+              label="Top Performing Creators"
+              value="Top 1%"
+              change="↑"
+              changeLabel="in selected niche"
+            />
+
+            <StatCard
+              label="Campaign Reach Forecast"
+              value="2.3M"
+              change="+12.4%"
+              changeLabel="projected"
+            />
             </section>
 
       
             <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
               <div className="lg:col-span-2 space-y-4">
-                <Panel title="Latest Video">
+                <Panel title="Industry Highlights">
                 </Panel>
-                <Panel title="Predictive View Count">
+                <Panel title="Campaign Reach Forecast">
                   <ChartPlaceholder variant="line" />
                 </Panel>
               </div>
 
 
               <div className="space-y-4">
-                <Panel title="Latest Video">
+                  <Panel title="Top Creators in Your Industry">
                   <ul className="divide-y divide-slate-100 text-sm">
                     <CreatorRow
                       name="Sony Music"
@@ -102,7 +104,7 @@ export default function BusinessDashboard() {
                   </ul>
                 </Panel>
 
-                <Panel title="latest Comments">
+                <Panel title="Campaign & Outreach Updates">
                   <ul className="space-y-2 text-xs">
                     <DealRow
                       brand="Acme Headphones"

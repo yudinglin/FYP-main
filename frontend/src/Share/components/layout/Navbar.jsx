@@ -90,7 +90,7 @@ export default function Navbar() {
                 {avatar}
               </button>
 
-              {/* avatar meanu */}
+              {/* avatar menu */}
               {open && (
                 <div className="
                   absolute right-0 mt-2 w-40
