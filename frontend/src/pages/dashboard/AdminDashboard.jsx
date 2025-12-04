@@ -1,43 +1,43 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
 export default function AdminDashboard() {
-  // Mock users (replace with API fetch)
-  const [users, setUsers] = useState([
-    { email: "creator1@example.com", role: "CREATOR", status: "Active" },
-    { email: "creator2@example.com", role: "CREATOR", status: "Suspended" },
-    { email: "business1@example.com", role: "BUSINESS", status: "Active" },
-    { email: "business2@example.com", role: "BUSINESS", status: "Suspended" },
-  ]);
-
+  const [users, setUsers] = useState([]);
   const [roleFilter, setRoleFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
 
+  // Fetch users from backend
+  useEffect(() => {
+    fetch("http://localhost:5000/users")
+      .then((res) => res.json())
+      .then((data) => setUsers(data))
+      .catch((err) => console.error("Error fetching users:", err));
+  }, []);
+
+  // Filter users based on selected role & status
   const filteredUsers = users.filter((user) => {
-    const roleMatch = roleFilter === "All" || user.role === roleFilter;
-    const statusMatch = statusFilter === "All" || user.status === statusFilter;
+    const roleMatch =
+      roleFilter === "All" || user.role.toUpperCase() === roleFilter.toUpperCase();
+    const statusMatch =
+      statusFilter === "All" || user.status.toUpperCase() === statusFilter.toUpperCase();
     return roleMatch && statusMatch;
   });
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-slate-50">
+      {/* Header */}
       <div className="max-w-7xl mx-auto px-6 py-6">
         <h1 className="text-2xl font-semibold text-slate-900">
-          Admin control panel
+          Admin Control Panel
         </h1>
         <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-          Manage user accounts and roles.
+          View and manage user accounts.
         </p>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 pb-10 space-y-6">
         <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-slate-900">
-              User management
-            </h2>
-            <button className="text-xs text-slate-400 hover:text-slate-600">
-              View all
-            </button>
+            <h2 className="text-sm font-semibold text-slate-900">User Management</h2>
           </div>
 
           {/* Filters */}
@@ -52,9 +52,7 @@ export default function AdminDashboard() {
                     : "bg-slate-200 hover:bg-slate-300"
                 }`}
               >
-                {role === "All"
-                  ? "All Roles"
-                  : role.charAt(0) + role.slice(1).toLowerCase()}
+                {role === "All" ? "All Roles" : role}
               </button>
             ))}
 
@@ -91,13 +89,13 @@ export default function AdminDashboard() {
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((user, index) => (
-                  <tr key={index}>
+                filteredUsers.map((user) => (
+                  <tr key={user.user_id}>
                     <td className="py-2 pr-4">{user.email}</td>
                     <td className="py-2 pr-4">{user.role}</td>
                     <td className="py-2 pr-4">{user.status}</td>
                     <td className="py-2 pr-4 text-right">
-                      {user.status === "Active" ? (
+                      {user.status.toLowerCase() === "active" ? (
                         <button className="px-4 py-1 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition w-24">
                           Suspend
                         </button>

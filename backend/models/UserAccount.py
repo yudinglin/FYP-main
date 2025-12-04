@@ -170,3 +170,20 @@ class UserAccount:
 
     def check_password(self, plain_password):
         return check_password_hash(self.password_hash, plain_password)
+    
+    @classmethod
+    def get_all(cls):
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute(
+            """
+            SELECT user_id, email, password_hash, first_name, last_name, role, status
+            FROM User
+            """
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return [cls.from_row(row) for row in rows]
