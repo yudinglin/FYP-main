@@ -25,6 +25,7 @@ import CentralityMetrics from "../../pages/Creator/CentralityMetrics.jsx";
 import PredictiveAnalysis from "../../pages/Creator/PredictiveAnalysis.jsx";
 
 import EditPricing from "../../pages/Admin/EditPricing.jsx";
+import AdminSupport from "../../pages/Admin/AdminSupport.jsx";
 
 export default function AppRouter() {
   return (
@@ -139,7 +140,7 @@ export default function AppRouter() {
           </MainLayout>
         }
       />
-
+      <Route path="/admin/enquiries" element={<MainLayout><AdminSupport /></MainLayout>} />
       <Route
         path="/analytics"
         element={
