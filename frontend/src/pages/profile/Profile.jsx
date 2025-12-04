@@ -254,9 +254,9 @@ function LinkChannelSection({
 
       <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-6 space-y-4">
         <p className="text-sm text-slate-600">
-          Paste your YouTube channel link. Example:{" "}
+          Paste your YouTube channel ID. Example:{" "}
           <span className="text-sky-600">
-            https://www.youtube.com/@yourchannel
+            UCxYpJqNzKfLmWvB8T9zRwS2g
           </span>
         </p>
 
