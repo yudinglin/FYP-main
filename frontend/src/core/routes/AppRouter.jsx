@@ -24,6 +24,8 @@ import NetworkGraph from "../../pages/Creator/NetworkGraph.jsx";
 import CentralityMetrics from "../../pages/Creator/CentralityMetrics.jsx";
 import PredictiveAnalysis from "../../pages/Creator/PredictiveAnalysis.jsx";
 
+import EditPricing from "../../pages/Admin/EditPricing.jsx";
+
 export default function AppRouter() {
   return (
     <Routes>
@@ -126,6 +128,14 @@ export default function AppRouter() {
         element={
           <MainLayout>
             <AdminDashboard />
+          </MainLayout>
+        }
+      />
+      <Route
+        path="/admin/edit-pricing"
+        element={
+          <MainLayout>
+            <EditPricing />
           </MainLayout>
         }
       />

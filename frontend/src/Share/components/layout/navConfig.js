@@ -17,8 +17,10 @@ export const NAV_ITEMS = {
   ],
 
   admin: [
-    { label: "Pricing", path: "/admin/pricing" },
-    { label: "View Profile", path: "/admin/profiles" },
+    { label: "Dashboard", path: "/dashboard/admin" },
+    { label: "Edit Pricing", path: "/admin/edit-pricing" },
+    // { label: "View Profile", path: "/admin/profiles" },
     { label: "View Enquiries", path: "/admin/enquiries" },
+    // { label: "Update Profile", path: "/admin/update-profile" },
   ],
 };

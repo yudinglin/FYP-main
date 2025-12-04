@@ -1,4 +1,23 @@
+import React, { useState } from "react";
+
 export default function AdminDashboard() {
+  // Mock users (replace with API fetch)
+  const [users, setUsers] = useState([
+    { email: "creator1@example.com", role: "CREATOR", status: "Active" },
+    { email: "creator2@example.com", role: "CREATOR", status: "Suspended" },
+    { email: "business1@example.com", role: "BUSINESS", status: "Active" },
+    { email: "business2@example.com", role: "BUSINESS", status: "Suspended" },
+  ]);
+
+  const [roleFilter, setRoleFilter] = useState("All");
+  const [statusFilter, setStatusFilter] = useState("All");
+
+  const filteredUsers = users.filter((user) => {
+    const roleMatch = roleFilter === "All" || user.role === roleFilter;
+    const statusMatch = statusFilter === "All" || user.status === statusFilter;
+    return roleMatch && statusMatch;
+  });
+
   return (
     <div className="min-h-[calc(100vh-72px)] bg-slate-50">
       <div className="max-w-7xl mx-auto px-6 py-6">
@@ -6,7 +25,7 @@ export default function AdminDashboard() {
           Admin control panel
         </h1>
         <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-          Manage user accounts, roles and respond to support tickets.
+          Manage user accounts and roles.
         </p>
       </div>
 
@@ -21,6 +40,40 @@ export default function AdminDashboard() {
             </button>
           </div>
 
+          {/* Filters */}
+          <div className="flex gap-2 mb-4 flex-wrap">
+            {["All", "CREATOR", "BUSINESS"].map((role) => (
+              <button
+                key={role}
+                onClick={() => setRoleFilter(role)}
+                className={`px-3 py-1 text-xs rounded-full transition ${
+                  roleFilter === role
+                    ? "bg-red-600 text-white"
+                    : "bg-slate-200 hover:bg-slate-300"
+                }`}
+              >
+                {role === "All"
+                  ? "All Roles"
+                  : role.charAt(0) + role.slice(1).toLowerCase()}
+              </button>
+            ))}
+
+            {["All", "Active", "Suspended"].map((status) => (
+              <button
+                key={status}
+                onClick={() => setStatusFilter(status)}
+                className={`px-3 py-1 text-xs rounded-full transition ${
+                  statusFilter === status
+                    ? "bg-red-600 text-white"
+                    : "bg-slate-200 hover:bg-slate-300"
+                }`}
+              >
+                {status}
+              </button>
+            ))}
+          </div>
+
+          {/* Users Table */}
           <table className="w-full text-xs text-left">
             <thead className="text-slate-400 border-b border-slate-100">
               <tr>
@@ -31,48 +84,34 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody className="text-slate-700">
-              <tr>
-                <td className="py-2 pr-4">creator@example.com</td>
-                <td className="py-2 pr-4">CREATOR</td>
-                <td className="py-2 pr-4">Active</td>
-                <td className="py-2 pr-4 text-right">
-                  <button className="text-xs text-indigo-600 hover:underline mr-2">
-                    Make BUSINESS
-                  </button>
-                  <button className="text-xs text-rose-600 hover:underline">
-                    Suspend
-                  </button>
-                </td>
-              </tr>
+              {filteredUsers.length === 0 ? (
+                <tr>
+                  <td colSpan="4" className="py-4 text-center text-slate-400">
+                    No users found.
+                  </td>
+                </tr>
+              ) : (
+                filteredUsers.map((user, index) => (
+                  <tr key={index}>
+                    <td className="py-2 pr-4">{user.email}</td>
+                    <td className="py-2 pr-4">{user.role}</td>
+                    <td className="py-2 pr-4">{user.status}</td>
+                    <td className="py-2 pr-4 text-right">
+                      {user.status === "Active" ? (
+                        <button className="px-4 py-1 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition w-24">
+                          Suspend
+                        </button>
+                      ) : (
+                        <button className="px-4 py-1 text-sm font-medium text-white bg-teal-500 rounded-lg hover:bg-teal-600 transition w-24">
+                          Reactivate
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
-        </div>
-
-        <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-slate-900">
-              Support tickets
-            </h2>
-            <button className="text-xs text-slate-400 hover:text-slate-600">
-              View inbox
-            </button>
-          </div>
-
-          <ul className="space-y-2 text-xs text-slate-700">
-            <li className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-              <div>
-                <p className="font-medium text-slate-900">
-                  Campaign tracking issue
-                </p>
-                <p className="text-[11px] text-slate-400">
-                  From: brand@demo.com · Open 2h ago
-                </p>
-              </div>
-              <button className="text-xs text-indigo-600 hover:underline">
-                Reply
-              </button>
-            </li>
-          </ul>
         </div>
       </div>
     </div>
