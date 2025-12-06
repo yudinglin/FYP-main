@@ -1,15 +1,12 @@
-# likes / comments
+# backend/Controller/YouTube/videos_list.py
 
 from flask import Blueprint, request, jsonify
 from .youtube_utils import (
     extract_channel_id,
     fetch_basic_channel_stats,
     fetch_video_ids,
+    fetch_video_stats,
 )
-import requests
-import os
-
-API_KEY = os.getenv("YOUTUBE_API_KEY")
 
 videos_bp = Blueprint("videos_list", __name__, url_prefix="/api/youtube")
 
@@ -23,7 +20,12 @@ def videos_list():
         return jsonify({"error": "Missing url"}), 400
 
     channel_id = extract_channel_id(url_or_id)
+    if not channel_id:
+        return jsonify({"error": "Invalid channel URL"}), 400
+
     basic = fetch_basic_channel_stats(channel_id)
+    if not basic:
+        return jsonify({"error": "Channel not found"}), 404
 
     playlist_id = basic["uploadsPlaylistId"]
 
@@ -31,27 +33,14 @@ def videos_list():
     if not video_ids:
         return jsonify({"totalLikes": 0, "totalComments": 0}), 200
 
-    yt_url = "https://www.googleapis.com/youtube/v3/videos"
-    params = {
-        "part": "statistics",
-        "id": ",".join(video_ids),
-        "key": API_KEY,
-    }
+    # // main change use utils all the fuction that get data from api put in the youtube_utils.py
+    videos = fetch_video_stats(video_ids, with_snippet=False)
 
-    resp = requests.get(yt_url, params=params, timeout=10)
-    resp.raise_for_status()
-
-    data = resp.json()
-
-    total_likes = 0
-    total_comments = 0
-
-    for item in data.get("items", []):
-        st = item.get("statistics", {})
-        total_likes += int(st.get("likeCount", 0))
-        total_comments += int(st.get("commentCount", 0))
+    total_likes = sum(v["likes"] for v in videos)
+    total_comments = sum(v["comments"] for v in videos)
 
     return jsonify({
         "totalLikes": total_likes,
         "totalComments": total_comments,
     }), 200
+
