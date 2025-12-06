@@ -11,6 +11,7 @@ from routes.Shared.login import login_bp
 from routes.Shared.profile import profile_bp 
 from controllers.YouTube.channels_list import channels_bp
 from controllers.YouTube.videos_list import videos_bp
+from controllers.YouTube.video_correlation import video_corr_bp
 from routes.Shared.reviews import review_bp
 from routes.Admin.get_users import user_bp
 
@@ -33,6 +34,7 @@ app.register_blueprint(channels_bp)
 app.register_blueprint(videos_bp)
 app.register_blueprint(review_bp)
 app.register_blueprint(user_bp)
+app.register_blueprint(video_corr_bp)
 
 
 @app.route('/api/ping')
