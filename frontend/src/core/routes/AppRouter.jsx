@@ -19,6 +19,7 @@ import AdminDashboard from "../../pages/dashboard/AdminDashboard.jsx";
 import AnalyticsOverview from "../../pages/analytics/AnalyticsOverview.jsx";
 import BusinessAnalyticsOverview from "../../pages/analytics/BusinessAnalyticsOverview.jsx";
 import Profile from "../../pages/profile/Profile.jsx";
+import BusinessProfile from "../../pages/profile/BusinessProfile.jsx";
 
 import NetworkGraph from "../../pages/Creator/NetworkGraph.jsx";
 import CentralityMetrics from "../../pages/Creator/CentralityMetrics.jsx";
@@ -164,6 +165,15 @@ export default function AppRouter() {
         element={
           <MainLayout>
             <Profile />
+          </MainLayout>
+        }
+      />
+
+      <Route
+        path="/businessprofile"
+        element={
+          <MainLayout>
+            <BusinessProfile />
           </MainLayout>
         }
       />

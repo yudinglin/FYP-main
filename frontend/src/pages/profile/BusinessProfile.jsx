@@ -2,24 +2,50 @@
 import { useState, useEffect } from "react";
 import { useAuth } from "../../core/context/AuthContext";
 
-export default function Profile() {
+export default function BusinessProfile() {
   const { user, token, setUser } = useAuth();
 
   const [activeSection, setActiveSection] = useState("profile");
 
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
-  const [youtubeUrl, setYoutubeUrl] = useState("");
+  const [industry, setIndustry] = useState("");
+  const [youtubeChannels, setYoutubeChannels] = useState([""]); // Changed to array for multiple channels
+  const [channelNames, setChannelNames] = useState([""]); // For channel names/titles
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
 
+  const industryOptions = [
+    "Select your industry",
+    "Education",
+    "Gaming",
+    "Technology",
+    "Entertainment",
+    "Health & Fitness",
+    "Business",
+    "Music",
+    "Travel",
+    "Food & Cooking",
+    "Other"
+  ];
+
   useEffect(() => {
     if (user) {
       setFirstName(user.first_name || "");
       setLastName(user.last_name || "");
-      setYoutubeUrl(user.youtube_channel || "");
+      setIndustry(user.industry || "");
+      
+      // Initialize channels from user data
+      if (user.youtube_channels && user.youtube_channels.length > 0) {
+        setYoutubeChannels(user.youtube_channels.map(ch => ch.url || ""));
+        setChannelNames(user.youtube_channels.map(ch => ch.name || ""));
+      } else {
+        // If no channels in user data, initialize with empty array
+        setYoutubeChannels([""]);
+        setChannelNames([""]);
+      }
     }
   }, [user]);
 
@@ -40,6 +66,7 @@ export default function Profile() {
         body: JSON.stringify({
           first_name: firstName,
           last_name: lastName,
+          industry: industry,
         }),
       });
 
@@ -55,7 +82,7 @@ export default function Profile() {
     }
   }
 
-  async function handleSaveChannel() {
+  async function handleSaveChannels() {
     if (!token) return setError("You are not logged in.");
 
     setSaving(true);
@@ -63,26 +90,72 @@ export default function Profile() {
     setSuccess("");
 
     try {
-      const resp = await fetch("http://localhost:5000/api/profile/youtube", {
+      // Filter out empty channels
+      const validChannels = youtubeChannels
+        .map((url, index) => ({
+          url: url.trim(),
+          name: channelNames[index]?.trim() || `Channel ${index + 1}`
+        }))
+        .filter(channel => channel.url !== "");
+
+      const resp = await fetch("http://localhost:5000/api/profile/youtube-channels", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ youtube_channel: youtubeUrl }),
+        body: JSON.stringify({ channels: validChannels }),
       });
 
       const data = await resp.json();
-      if (!resp.ok) throw new Error(data.message || "Failed to update");
+      if (!resp.ok) throw new Error(data.message || "Failed to update channels");
 
       setUser(data.user);
-      setSuccess("YouTube channel linked successfully!");
+      setSuccess(`${validChannels.length} YouTube channel(s) saved successfully!`);
     } catch (err) {
       setError(err.message);
     } finally {
       setSaving(false);
     }
   }
+
+  // Function to add a new channel input
+  const addChannel = () => {
+    setYoutubeChannels([...youtubeChannels, ""]);
+    setChannelNames([...channelNames, ""]);
+  };
+
+  // Function to remove a channel input
+  const removeChannel = (index) => {
+    if (youtubeChannels.length <= 1) {
+      // Don't remove the last one, just clear it
+      const newChannels = [...youtubeChannels];
+      const newNames = [...channelNames];
+      newChannels[index] = "";
+      newNames[index] = "";
+      setYoutubeChannels(newChannels);
+      setChannelNames(newNames);
+    } else {
+      const newChannels = youtubeChannels.filter((_, i) => i !== index);
+      const newNames = channelNames.filter((_, i) => i !== index);
+      setYoutubeChannels(newChannels);
+      setChannelNames(newNames);
+    }
+  };
+
+  // Function to update a specific channel URL
+  const updateChannelUrl = (index, value) => {
+    const newChannels = [...youtubeChannels];
+    newChannels[index] = value;
+    setYoutubeChannels(newChannels);
+  };
+
+  // Function to update a specific channel name
+  const updateChannelName = (index, value) => {
+    const newNames = [...channelNames];
+    newNames[index] = value;
+    setChannelNames(newNames);
+  };
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-slate-50">
@@ -98,8 +171,11 @@ export default function Profile() {
               user={user}
               firstName={firstName}
               lastName={lastName}
+              industry={industry}
               setFirstName={setFirstName}
               setLastName={setLastName}
+              setIndustry={setIndustry}
+              industryOptions={industryOptions}
               error={error}
               success={success}
               saving={saving}
@@ -109,12 +185,16 @@ export default function Profile() {
 
           {activeSection === "linkChannel" && (
             <LinkChannelSection
-              youtubeUrl={youtubeUrl}
-              setYoutubeUrl={setYoutubeUrl}
+              youtubeChannels={youtubeChannels}
+              channelNames={channelNames}
+              updateChannelUrl={updateChannelUrl}
+              updateChannelName={updateChannelName}
+              addChannel={addChannel}
+              removeChannel={removeChannel}
               error={error}
               success={success}
               saving={saving}
-              onSave={handleSaveChannel}
+              onSave={handleSaveChannels}
             />
           )}
         </main>
@@ -176,8 +256,11 @@ function ProfileSection({
   user,
   firstName,
   lastName,
+  industry,
   setFirstName,
   setLastName,
+  setIndustry,
+  industryOptions,
   error,
   success,
   saving,
@@ -219,6 +302,27 @@ function ProfileSection({
           />
         </div>
 
+        {/* Industry Dropdown Section - Added below first name */}
+        <div className="text-sm">
+          <label className="block text-xs mb-1">
+            <span className="text-slate-500">Specify your industry</span>
+            <select
+              className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+              value={industry}
+              onChange={(e) => setIndustry(e.target.value)}
+            >
+              {industryOptions.map((option, index) => (
+                <option key={index} value={index === 0 ? "" : option}>
+                  {option}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-400">
+              This helps us customize your experience
+            </p>
+          </label>
+        </div>
+
         {error && <Message type="error" text={error} />}
         {success && <Message type="success" text={success} />}
 
@@ -239,8 +343,12 @@ function ProfileSection({
 /* ================= Link Channel Section ================= */
 
 function LinkChannelSection({
-  youtubeUrl,
-  setYoutubeUrl,
+  youtubeChannels,
+  channelNames,
+  updateChannelUrl,
+  updateChannelName,
+  addChannel,
+  removeChannel,
   error,
   success,
   saving,
@@ -249,38 +357,93 @@ function LinkChannelSection({
   return (
     <>
       <h1 className="text-xl font-semibold text-slate-900 mb-4">
-        Link your YouTube channel
+        Link your YouTube channels
       </h1>
 
-      <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-6 space-y-4">
+      <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-6 space-y-6">
         <p className="text-sm text-slate-600">
-          Paste your YouTube channel ID. Example:{" "}
-          <span className="text-sky-600">
-            UCxYpJqNzKfLmWvB8T9zRwS2g
-          </span>
+          Add multiple YouTube channels by clicking the + button. Enter channel IDs and optional names.
         </p>
 
-        <input
-          type="text"
-          className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm bg-slate-50"
-          value={youtubeUrl}
-          onChange={(e) => {
-          const v = e.target.value;
-          setYoutubeUrl(v);
-          localStorage.setItem("channelUrl", v);   
-              }}
-        />
+        {youtubeChannels.map((url, index) => (
+          <div key={index} className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+            <div className="flex justify-between items-center">
+              <h3 className="text-sm font-medium text-slate-700">
+                Channel {index + 1}
+              </h3>
+              {youtubeChannels.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() => removeChannel(index)}
+                  className="text-xs text-red-500 hover:text-red-700"
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">
+                  Channel Name (Optional)
+                </label>
+                <input
+                  type="text"
+                  className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white"
+                  placeholder="e.g., My Gaming Channel"
+                  value={channelNames[index] || ""}
+                  onChange={(e) => updateChannelName(index, e.target.value)}
+                />
+              </div>
+              
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">
+                  YouTube ID
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    className="flex-1 rounded-lg border border-slate-200 px-3 py-2 text-sm bg-white"
+                    value={url}
+                    onChange={(e) => updateChannelUrl(index, e.target.value)}
+                  />
+                </div>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-400">
+              Example ID format:{" "}
+              <span className="text-sky-600">
+                UCxYpJqNzKfLmWvB8T9zRwS2g
+              </span>
+            </p>
+          </div>
+        ))}
+
+        {/* Add Channel Button */}
+        <button
+          type="button"
+          onClick={addChannel}
+          className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border-2 border-dashed border-slate-300 hover:border-sky-400 hover:bg-sky-50 text-slate-500 hover:text-sky-600 transition-colors"
+        >
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          <span className="text-sm font-medium">Add Another Channel</span>
+        </button>
 
         {error && <Message type="error" text={error} />}
         {success && <Message type="success" text={success} />}
 
-        <button
-          onClick={onSave}
-          disabled={saving}
-          className="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700"
-        >
-          {saving ? "Saving..." : "Save Channel"}
-        </button>
+        <div className="flex justify-end pt-4">
+          <button
+            onClick={onSave}
+            disabled={saving}
+            className="px-4 py-2 rounded-lg bg-sky-600 text-white text-sm hover:bg-sky-700"
+          >
+            {saving ? "Saving..." : "Save All Channels"}
+          </button>
+        </div>
       </section>
     </>
   );

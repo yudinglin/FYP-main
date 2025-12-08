@@ -2,6 +2,9 @@
 import React, { useState } from "react";
 import ForceGraph2D from "react-force-graph-2d";
 
+
+
+
 // Backend API base address (if you have changed the port, change it here as well)）
 const API_BASE = "http://127.0.0.1:5000";
 
