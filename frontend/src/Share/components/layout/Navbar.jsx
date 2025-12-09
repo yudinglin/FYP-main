@@ -1,6 +1,5 @@
 import React, { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Link, NavLink } from "react-router-dom";
+import { useNavigate, Link, NavLink } from "react-router-dom";
 import { useAuth } from "../../../core/context/AuthContext";
 import { NAV_ITEMS } from "./navConfig";
 
@@ -17,8 +16,6 @@ export default function Navbar() {
     admin: "/dashboard/admin",
   }[role] || "/";
 
-
-  // Select the current character from the menu; if not found, go back.
   const rawMenu =
     (NAV_ITEMS && NAV_ITEMS[role]) ||
     (NAV_ITEMS && NAV_ITEMS["unregistered"]) ||
@@ -26,10 +23,7 @@ export default function Navbar() {
 
   const menu = Array.isArray(rawMenu) ? rawMenu : [];
 
-  const avatar = user?.name
-    ? user.name.charAt(0).toUpperCase()
-    : "U";
-
+  const avatar = user?.name ? user.name.charAt(0).toUpperCase() : "U";
   const [open, setOpen] = useState(false);
 
   return (
@@ -49,7 +43,7 @@ export default function Navbar() {
         {/* Right side: Menu + Avatar */}
         <div className="flex items-center gap-8">
 
-          {/* Menu(key and label in the navConfig) */}
+          {/* Menu */}
           <nav className="hidden md:flex items-center gap-8 text-[15px] font-medium text-gray-600">
             {menu.map((item) =>
               item.highlight ? (
@@ -62,12 +56,12 @@ export default function Navbar() {
                 </Link>
               ) : (
                 <NavLink
-                key={item.label}
-                to={item.label === "Dashboard" ? dashboardPath : item.path}
-                className="hover:text-gray-900"
-              >
-                {item.label}
-              </NavLink>
+                  key={item.label}
+                  to={item.label === "Dashboard" ? dashboardPath : item.path}
+                  className="hover:text-gray-900"
+                >
+                  {item.label}
+                </NavLink>
               )
             )}
             {role !== "admin" && (
@@ -80,7 +74,7 @@ export default function Navbar() {
             )}
           </nav>
 
-          {/* avatar */}
+          {/* Avatar */}
           {user && (
             <div className="relative">
               <button
@@ -90,31 +84,39 @@ export default function Navbar() {
                 {avatar}
               </button>
 
-              {/* avatar menu */}
+              {/* Avatar menu */}
               {open && (
-                <div className="
-                  absolute right-0 mt-2 w-40
-                  bg-white shadow-lg rounded-lg border border-gray-200
-                  py-2 text-gray-700
-                ">
-                  <Link
-                    to="/profile"
-                    className="block px-4 py-2 hover:bg-gray-100"
-                    onClick={() => setOpen(false)}
-                  >
-                    Profile
-                  </Link>
+                <div className="absolute right-0 mt-2 w-40 bg-white shadow-lg rounded-lg border border-gray-200 py-2 text-gray-700">
+                  
+                  {/* Conditional Profile Link */}
+                  {role === "business" ? (
+                    <Link
+                      to="/businessprofile"
+                      className="block px-4 py-2 hover:bg-gray-100"
+                      onClick={() => setOpen(false)}
+                    >
+                      Profile
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/profile"
+                      className="block px-4 py-2 hover:bg-gray-100"
+                      onClick={() => setOpen(false)}
+                    >
+                      Profile
+                    </Link>
+                  )}
 
-                 <button
-                  onClick={() => {
-                    logout();
-                    setOpen(false);
-                    navigate("/"); // redirect to Landing page
-                  }}
-                  className="w-full text-left block px-4 py-2 hover:bg-gray-100"
-                >
-                  Logout
-                </button>
+                  <button
+                    onClick={() => {
+                      logout();
+                      setOpen(false);
+                      navigate("/"); // redirect to Landing page
+                    }}
+                    className="w-full text-left block px-4 py-2 hover:bg-gray-100"
+                  >
+                    Logout
+                  </button>
                 </div>
               )}
             </div>
