@@ -18,6 +18,7 @@ export default function CreatorDashboard() {
   const [totalComments, setTotalComments] = useState(null);
 
   const [topVideos, setTopVideos] = useState([]);
+  const [latestComments, setLatestComments] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -48,12 +49,10 @@ export default function CreatorDashboard() {
         setTotalComments(d2.totalComments ?? 0);
 
         // 3) videos.correlationNetwork -> contains rawMetrics
-        //    (you already have this route in backend/video_correlation.py)
         const r3 = await fetch(
           `http://localhost:5000/api/youtube/videos.correlationNetwork?url=${q}&maxVideos=50`
         );
         if (!r3.ok) {
-          // if backend returns 200 with empty data, still parse
           const txt = await r3.text();
           throw new Error(`videos.correlationNetwork failed: ${r3.status} ${txt}`);
         }
@@ -80,13 +79,27 @@ export default function CreatorDashboard() {
 
         const sorted = withEngagement
           .sort((a, b) => b.engagementScore - a.engagementScore)
-          .slice(0, 4); // show top 4
+          .slice(0, 4);
 
         setTopVideos(sorted);
+
+        // 4) Fetch latest comments
+        const r4 = await fetch(
+          `http://localhost:5000/api/youtube/videos.latestComments?url=${q}&maxResults=5`
+        );
+        if (!r4.ok) {
+          console.warn("Failed to fetch comments");
+          setLatestComments([]);
+        } else {
+          const d4 = await r4.json();
+          setLatestComments(d4.comments || []);
+        }
+
       } catch (err) {
         console.error("Error loading dashboard:", err);
         setError(err.message || "Failed to load dashboard data");
         setTopVideos([]);
+        setLatestComments([]);
       } finally {
         setLoading(false);
       }
@@ -164,11 +177,25 @@ export default function CreatorDashboard() {
               </Panel>
 
               <Panel title="Latest Comments">
-                <ul className="space-y-2 text-xs">
-                  <DealRow brand="Acme Headphones" budget="$12,000" status="In negotiation" />
-                  <DealRow brand="Nova Energy Drink" budget="$7,500" status="Waiting creator reply" />
-                  <DealRow brand="Orbit VPN" budget="$18,300" status="Proposal sent" />
-                </ul>
+                {loading && <p className="text-xs text-slate-400 py-3">Loading comments...</p>}
+                
+                {!loading && latestComments.length === 0 && (
+                  <p className="text-xs text-slate-400 py-3">No recent comments</p>
+                )}
+
+                {!loading && latestComments.length > 0 && (
+                  <ul className="space-y-3 text-xs">
+                    {latestComments.map((comment, idx) => (
+                      <CommentRow
+                        key={`${comment.videoId}-${idx}`}
+                        author={comment.author}
+                        text={comment.text}
+                        publishedAt={comment.publishedAt}
+                        likeCount={comment.likeCount}
+                      />
+                    ))}
+                  </ul>
+                )}
               </Panel>
             </div>
           </section>
@@ -194,6 +221,40 @@ function VideoRow({ title, metric, badge }) {
         <p className="text-xs text-slate-400">{badge}</p>
       </div>
       <p className="text-xs font-semibold text-emerald-600">{metric}</p>
+    </li>
+  );
+}
+
+function CommentRow({ author, text, publishedAt, likeCount }) {
+  // Format date to relative time
+  const formatDate = (dateStr) => {
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 60) return `${diffMins}m ago`;
+    if (diffHours < 24) return `${diffHours}h ago`;
+    if (diffDays < 7) return `${diffDays}d ago`;
+    return date.toLocaleDateString();
+  };
+
+  // Truncate text to ~100 characters
+  const truncatedText = text.length > 100 ? text.substring(0, 100) + "..." : text;
+
+  return (
+    <li className="rounded-lg bg-slate-50 px-3 py-2.5">
+      <div className="flex items-start justify-between mb-1">
+        <p className="font-medium text-slate-800 text-xs">{author}</p>
+        <span className="text-[10px] text-slate-400">{formatDate(publishedAt)}</span>
+      </div>
+      <p className="text-[11px] text-slate-600 leading-relaxed mb-1.5">{truncatedText}</p>
+      <div className="flex items-center gap-1 text-[10px] text-slate-400">
+        <span>👍</span>
+        <span>{likeCount}</span>
+      </div>
     </li>
   );
 }
@@ -241,17 +302,5 @@ function ChartPlaceholder({ variant = "area" }) {
       <div className={`w-full h-4/5 ${gradient}`} />
       <p className="absolute bottom-2 right-3 text-[10px] uppercase tracking-wide text-slate-400">Chart placeholder · hook to real data later</p>
     </div>
-  );
-}
-
-function DealRow({ brand, budget, status }) {
-  return (
-    <li className="flex items-center justify-between rounded-lg bg-slate-50 px-3 py-2">
-      <div>
-        <p className="font-medium text-slate-800 text-xs">{brand}</p>
-        <p className="text-[11px] text-slate-400">{status}</p>
-      </div>
-      <p className="text-xs font-semibold text-slate-900">{budget}</p>
-    </li>
   );
 }
