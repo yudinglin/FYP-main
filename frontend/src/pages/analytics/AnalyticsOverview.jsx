@@ -21,13 +21,15 @@ export default function AnalyticsOverview() {
           badge="Channel-level view"
           description={
             <>
-              See how your channel interacts with others through comments, collaborations, and mentions. Identify <span className="font-semibold">top influencer connections</span> and potential collaboration opportunities.
+              Explore which videos behave similarly based on views, likes, and comments. Identify clusters of videos with similar performance patterns and discover which content types your audience responds to the most.
             </>
           }
           highlights={[
-            "Nodes = your channel and connected creators",
-            "Edges = comments, mentions, collab videos, shared audiences",
-            "Colour by niche/language, size by centrality score",
+            "Nodes = individual videos",
+            "Edges = similarity based on engagement correlations",
+            "Node size = number of views",
+            "Node colour = engagement rate",
+            "Click a node to open the video on YouTube",
           ]}
           link="/dashboard/network"
         />
