@@ -12,7 +12,6 @@ import {
   ComposedChart, Rectangle
 } from "recharts";
 
-import Heatmap from "../Creator/heatmap";
 
 
 
