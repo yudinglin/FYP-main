@@ -7,8 +7,15 @@ import {
   CartesianGrid,
   XAxis,
   YAxis,
-  Tooltip
+  Tooltip,Cell,
+  LineChart, Line,Legend, ResponsiveContainer, BarChart, Bar,  LabelList,
+  ComposedChart, Rectangle
 } from "recharts";
+
+import Heatmap from "../Creator/heatmap";
+
+
+
 
 const API_BASE = "http://127.0.0.1:5000";
 
@@ -21,6 +28,7 @@ export default function NetworkGraph() {
   const [error, setError] = useState("");
   const fgRef = useRef();
   const containerRef = useRef();
+  const [barMetric, setBarMetric] = useState("views"); // views / likes / comments
 
   const handleFetchGraph = async () => {
     setLoading(true);
@@ -291,6 +299,156 @@ export default function NetworkGraph() {
           </div>
         </div>
       )}
+
+      {/* Top Videos Bar Chart - Fully Polished Version */}
+      {graphData.rawMetrics.length > 0 && (
+        <div className="rounded-xl bg-white p-6 shadow-md border border-slate-200 mt-8">
+          <div className="flex justify-between items-center mb-2">
+            <h2 className="text-xl font-semibold text-slate-900">
+              Top 10 Videos by {barMetric.charAt(0).toUpperCase() + barMetric.slice(1)}
+            </h2>
+            <div className="flex gap-2">
+              {["views", "likes", "comments"].map((metric) => (
+                <button
+                  key={metric}
+                  onClick={() => setBarMetric(metric)}
+                  className={`px-3 py-1 rounded text-sm font-medium border transition-colors duration-200 ${
+                    barMetric === metric
+                      ? "bg-indigo-600 text-white border-indigo-600"
+                      : "bg-white text-slate-700 border-slate-300 hover:bg-slate-100"
+                  }`}
+                >
+                  {metric.charAt(0).toUpperCase() + metric.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <p className="text-sm text-slate-500 mb-4">
+            Shows which videos are performing the best in terms of {barMetric}.
+          </p>
+
+          <div className="w-full overflow-x-auto">
+            <div className="min-w-[700px] h-[420px]">
+              <ResponsiveContainer width="100%" height={420}>
+                <BarChart
+                  layout="vertical"
+                  data={graphData.rawMetrics
+                    .slice()
+                    .sort((a, b) => (b[barMetric] || 0) - (a[barMetric] || 0))
+                    .slice(0, 10)  // <-- THIS line limits to top 10
+                  }
+                  margin={{ top: 20, right: 30, bottom: 20, left: 150 }}
+                  barCategoryGap={20}
+                >
+                  <CartesianGrid strokeDasharray="4 4" stroke="#e5e7eb" />
+                  <XAxis
+                    type="number"
+                    tick={{ fontSize: 12 }}
+                    tickLine={false}
+                    axisLine={{ stroke: "#cbd5e1" }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="title"
+                    tick={{ fontSize: 12 }}
+                    width={150}
+                    tickFormatter={(val) => (val.length > 30 ? val.slice(0, 27) + "..." : val)}
+                  />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (active && payload && payload.length) {
+                        const vid = payload[0].payload;
+                        return (
+                          <div className="bg-white p-2 border rounded shadow text-sm flex gap-2 items-center">
+                            {vid.thumbnail && (
+                              <img
+                                src={vid.thumbnail}
+                                alt={vid.title}
+                                className="w-16 h-16 object-cover rounded"
+                              />
+                            )}
+                            <div className="flex flex-col">
+                              <div className="font-semibold">{vid.title}</div>
+                              <div>Views: {vid.views?.toLocaleString()}</div>
+                              <div>Likes: {vid.likes?.toLocaleString()}</div>
+                              <div>Comments: {vid.comments?.toLocaleString()}</div>
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    }}
+                  />
+                  <Bar
+                    dataKey={barMetric}
+                    radius={[6, 6, 6, 6]}
+                    barSize={20}
+                    isAnimationActive={true}
+                    animationDuration={1000}
+                    animationEasing="ease-out"
+                  >
+                    {graphData.rawMetrics
+                      .slice()
+                      .sort((a, b) => (b[barMetric] || 0) - (a[barMetric] || 0))
+                      .slice(0, 10)
+                      .map((entry, index) => {
+                        const gradientId = `grad-${barMetric}-${index}`;
+                        return (
+                          <React.Fragment key={index}>
+                            <defs>
+                              <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
+                                <stop
+                                  offset="0%"
+                                  stopColor={
+                                    barMetric === "views"
+                                      ? "#6C5DD3"
+                                      : barMetric === "likes"
+                                      ? "#00C49F"
+                                      : "#FF8042"
+                                  }
+                                  stopOpacity={0.8}
+                                />
+                                <stop
+                                  offset="100%"
+                                  stopColor={
+                                    barMetric === "views"
+                                      ? "#4f46e5"
+                                      : barMetric === "likes"
+                                      ? "#10b981"
+                                      : "#f97316"
+                                  }
+                                  stopOpacity={1}
+                                />
+                              </linearGradient>
+                            </defs>
+                            <Cell
+                              key={`cell-${index}`}
+                              fill={`url(#${gradientId})`}
+                              style={{ cursor: "pointer", transition: "transform 0.2s" }}
+                              onMouseEnter={(e) => (e.target.style.transform = "scaleX(1.05)")}
+                              onMouseLeave={(e) => (e.target.style.transform = "scaleX(1)")}
+                              onClick={() =>
+                                entry.id &&
+                                window.open(`https://www.youtube.com/watch?v=${entry.id}`, "_blank")
+                              }
+                            />
+                          </React.Fragment>
+                        );
+                      })}
+                    <LabelList
+                      dataKey={barMetric}
+                      position="right"
+                      formatter={(value) => value.toLocaleString()}
+                    />
+                  </Bar>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
