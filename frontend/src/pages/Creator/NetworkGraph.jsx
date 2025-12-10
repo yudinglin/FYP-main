@@ -102,7 +102,6 @@ export default function NetworkGraph() {
   const nodeTooltip = (node) => {
     return `
       Title: ${node.title || "Untitled Video"}
-      Published: ${node.publishedAt ?? "N/A"}
       Views: ${node.views?.toLocaleString() ?? 0}
       Likes: ${node.likes?.toLocaleString() ?? 0}
       Comments: ${node.comments?.toLocaleString() ?? 0}
@@ -262,56 +261,31 @@ export default function NetworkGraph() {
           <div className="w-full overflow-x-auto">
             <div className="min-w-[700px] h-[420px]">
               <ScatterChart
-                width={700}
+                width={containerSize.width - 50}
                 height={400}
                 margin={{ top: 20, right: 30, bottom: 40, left: 40 }}
               >
                 <CartesianGrid />
-                <XAxis
-                  type="number"
-                  dataKey="views"
-                  name="Views"
-                  label={{ value: "Views", position: "bottom", offset: 0 }}
-                />
-                <YAxis
-                  type="number"
-                  dataKey="likes"
-                  name="Likes"
-                  label={{ value: "Likes", angle: -90, position: "insideLeft" }}
-                />
-
-                <Tooltip
-                  cursor={{ strokeDasharray: "3 3" }}
-                  content={({ active, payload }) => {
-                    if (active && payload && payload.length) {
-                      const vid = payload[0].payload;
-                      return (
-                        <div className="bg-white p-2 border rounded shadow text-sm flex gap-2 items-center">
-                          {vid.thumbnail && (
-                            <img
-                              src={vid.thumbnail}
-                              alt={vid.title}
-                              className="w-16 h-16 object-cover rounded"
-                            />
-                          )}
-                          <div className="flex flex-col">
-                            <div className="font-semibold">{vid.title}</div>
-                            <div>Views: {vid.views?.toLocaleString() ?? 0}</div>
-                            <div>Likes: {vid.likes?.toLocaleString() ?? 0}</div>
-                            <div>Comments: {vid.comments?.toLocaleString() ?? 0}</div>
-                          </div>
+                <XAxis type="number" dataKey="views" name="Views" label={{ value: "Views", position: "bottom", offset: 0 }} />
+                <YAxis type="number" dataKey="likes" name="Likes" label={{ value: "Likes", angle: -90, position: "insideLeft" }} />
+                <Tooltip cursor={{ strokeDasharray: "3 3" }} content={({ active, payload }) => {
+                  if (active && payload && payload.length) {
+                    const vid = payload[0].payload;
+                    return (
+                      <div className="bg-white p-2 border rounded shadow text-sm flex gap-2 items-center">
+                        {vid.thumbnail && <img src={vid.thumbnail} alt={vid.title} className="w-16 h-16 object-cover rounded" />}
+                        <div className="flex flex-col">
+                          <div className="font-semibold">{vid.title}</div>
+                          <div>Views: {vid.views?.toLocaleString() ?? 0}</div>
+                          <div>Likes: {vid.likes?.toLocaleString() ?? 0}</div>
+                          <div>Comments: {vid.comments?.toLocaleString() ?? 0}</div>
                         </div>
-                      );
-                    }
-                    return null;
-                  }}
-                />
-
-                <Scatter
-                  name="Videos"
-                  data={graphData.rawMetrics}
-                  fill="rgba(79,70,229,0.7)"
-                />
+                      </div>
+                    );
+                  }
+                  return null;
+                }} />
+                <Scatter name="Videos" data={graphData.rawMetrics} fill="rgba(79,70,229,0.7)" />
               </ScatterChart>
             </div>
           </div>

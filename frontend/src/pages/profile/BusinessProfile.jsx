@@ -357,7 +357,7 @@ function LinkChannelSection({
   return (
     <>
       <h1 className="text-xl font-semibold text-slate-900 mb-4">
-        Link your YouTube channels
+        Link YouTube channels 
       </h1>
 
       <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-6 space-y-6">
