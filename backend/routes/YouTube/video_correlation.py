@@ -1,4 +1,4 @@
-# backend/Controller/YouTube/video_correlation.py
+# backend/routes/YouTube/video_correlation.py
 
 from flask import Blueprint, request, jsonify
 from .youtube_utils import (

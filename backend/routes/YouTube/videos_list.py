@@ -1,4 +1,4 @@
-# backend/Controller/YouTube/videos_list.py
+# backend/routes/YouTube/videos_list.py
 
 from flask import Blueprint, request, jsonify
 from .youtube_utils import (
