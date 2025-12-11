@@ -124,14 +124,39 @@ class UserAccount:
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
+        # 1. Update User table
         cursor.execute("""
-            UPDATE User SET first_name = %s, last_name = %s WHERE email = %s
+            UPDATE User
+            SET first_name = %s, last_name = %s
+            WHERE email = %s
         """, (first_name, last_name, email))
+
+        # 2. Fetch user_id and role
+        cursor.execute("""
+            SELECT user_id, role FROM User WHERE email = %s
+        """, (email,))
+        row = cursor.fetchone()
+        user_id = row['user_id']
+        role = row['role']
+
+        # 3. Update role-specific profile
+        if role == "creator":
+            display_name = f"{first_name} {last_name}"
+            cursor.execute("""
+                UPDATE CreatorProfile
+                SET display_name = %s
+                WHERE user_id = %s
+            """, (display_name, user_id))
+        elif role == "business":
+            # Optionally update company_name if you want to reflect first/last name
+            pass  # or implement your logic if needed
 
         conn.commit()
         cursor.close()
         conn.close()
+
         return cls.find_by_email(email)
+
 
     @classmethod
     def update_password(cls, email, new_password):
