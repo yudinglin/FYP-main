@@ -70,9 +70,12 @@ export default function NetworkGraph() {
           likes: n.likes || 0,
           comments: n.comments || 0,
           thumbnail: n.thumbnail,
-          title: n.title || n.id
+          title: n.title || n.id,
+          id: n.id,
         }))
       });
+      
+      localStorage.setItem("graphData", JSON.stringify({ nodes, links }));
     } catch (err) {
       console.error(err);
       setError(err.message);
@@ -187,7 +190,7 @@ export default function NetworkGraph() {
           />
         </div>
 
-        <div className="flex justify-end">
+        <div className="flex justify-end gap-3">
           <button
             onClick={handleFetchGraph}
             disabled={loading}
@@ -195,6 +198,52 @@ export default function NetworkGraph() {
           >
             {loading ? "Generating..." : "Generate Network"}
           </button>
+
+          {/* SAVE GRAPH */}
+          <button
+            onClick={() => {
+              const graphCopy = {
+                ...graphData,
+                nodes: graphData.nodes.map(n => ({
+                  ...n,
+                  x: n.x,
+                  y: n.y,
+                  vx: n.vx,
+                  vy: n.vy
+                }))
+              };
+
+              localStorage.setItem("savedGraph", JSON.stringify(graphCopy));
+              alert("Graph saved successfully!");
+            }}
+            disabled={graphData.nodes.length === 0}
+            className="inline-flex items-center rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-60"
+          >
+            Save Graph
+          </button>
+
+          {/* LOAD GRAPH */}
+          <button
+            onClick={() => {
+              const saved = localStorage.getItem("savedGraph");
+              if (!saved) return alert("No saved graph found.");
+
+              const parsed = JSON.parse(saved);
+
+              // Freeze positions so physics does not change layout
+              parsed.nodes.forEach(n => {
+                n.fx = n.x;
+                n.fy = n.y;
+              });
+
+              setGraphData(parsed);
+              alert("Graph loaded successfully!");
+            }}
+            className="inline-flex items-center rounded-md bg-slate-600 px-4 py-2 text-sm font-medium text-white hover:bg-slate-700"
+          >
+            Load Saved Graph
+          </button>
+
         </div>
 
         {error && <p className="text-sm text-red-600 mt-1 whitespace-pre-line">{error}</p>}
@@ -450,4 +499,5 @@ export default function NetworkGraph() {
 
     </div>
   );
+  
 }
