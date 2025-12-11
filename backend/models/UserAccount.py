@@ -1,4 +1,3 @@
-# backend/Entity/UserAccount.py
 from db import get_connection
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -13,20 +12,18 @@ class UserAccount:
         self.role = role
         self.status = status
 
-
     @classmethod
     def from_row(cls, row):
-        if row is None:
+        if not row:
             return None
-
         return cls(
-            user_id=row.get("user_id"),
-            email=row.get("email"),
-            password_hash=row.get("password_hash"),
-            first_name=row.get("first_name"),
-            last_name=row.get("last_name"),
-            role=row.get("role"),
-            status=row.get("status"),
+            user_id=row["user_id"],
+            email=row["email"],
+            password_hash=row["password_hash"],
+            first_name=row["first_name"],
+            last_name=row["last_name"],
+            role=row["role"],
+            status=row["status"]
         )
 
     def to_dict(self):
@@ -39,26 +36,22 @@ class UserAccount:
             "status": self.status,
         }
 
-
+    # -------------------------------------------------------------------------
+    # FINDERS
+    # -------------------------------------------------------------------------
     @classmethod
     def find_by_email(cls, email):
-    
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT user_id, email, password_hash, first_name, last_name, role, status
-            FROM User
-            WHERE email = %s
-            """,
-            (email,),
-        )
+            FROM User WHERE email = %s
+        """, (email,))
         row = cursor.fetchone()
 
         cursor.close()
         conn.close()
-
         return cls.from_row(row)
 
     @classmethod
@@ -66,29 +59,27 @@ class UserAccount:
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT user_id, email, password_hash, first_name, last_name, role, status
-            FROM User
-            WHERE user_id = %s
-            """,
-            (user_id,),
-        )
+            FROM User WHERE user_id = %s
+        """, (user_id,))
         row = cursor.fetchone()
 
         cursor.close()
         conn.close()
-
         return cls.from_row(row)
 
-
+    # -------------------------------------------------------------------------
+    # USER + PROFILE CREATION (ALL DB WORK DONE HERE)
+    # -------------------------------------------------------------------------
     @classmethod
-    def create_user(cls, email, password, first_name, last_name, role):
+    def register_user(cls, email, password, first_name, last_name, role, company_name=None, industry_id=None):
         hashed_pw = generate_password_hash(password)
 
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
+        # 1. Create User
         cursor.execute(
             """
             INSERT INTO User (email, password_hash, first_name, last_name, role)
@@ -96,6 +87,28 @@ class UserAccount:
             """,
             (email, hashed_pw, first_name, last_name, role),
         )
+        conn.commit()
+
+        # Get the newly created user_id
+        user_id = cursor.lastrowid
+
+        # 2. Create role-specific profile
+        if role == "creator":
+            cursor.execute(
+                """
+                INSERT INTO CreatorProfile (user_id, display_name)
+                VALUES (%s, %s)
+                """,
+                (user_id, f"{first_name} {last_name}")
+            )
+        elif role == "business":
+            cursor.execute(
+                """
+                INSERT INTO BusinessProfile (user_id, company_name, industry_id)
+                VALUES (%s, %s, %s)
+                """,
+                (user_id, company_name or f"{first_name} {last_name}", industry_id)
+            )
 
         conn.commit()
         cursor.close()
@@ -103,26 +116,21 @@ class UserAccount:
 
         return cls.find_by_email(email)
 
-
+    # -------------------------------------------------------------------------
+    # UPDATES
+    # -------------------------------------------------------------------------
     @classmethod
     def update_name(cls, email, first_name, last_name):
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
-        cursor.execute(
-            """
-            UPDATE User
-            SET first_name = %s,
-                last_name = %s
-            WHERE email = %s
-            """,
-            (first_name, last_name, email),
-        )
+        cursor.execute("""
+            UPDATE User SET first_name = %s, last_name = %s WHERE email = %s
+        """, (first_name, last_name, email))
 
         conn.commit()
         cursor.close()
         conn.close()
-
         return cls.find_by_email(email)
 
     @classmethod
@@ -132,19 +140,13 @@ class UserAccount:
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
-        cursor.execute(
-            """
-            UPDATE User
-            SET password_hash = %s
-            WHERE email = %s
-            """,
-            (hashed_pw, email),
-        )
+        cursor.execute("""
+            UPDATE User SET password_hash = %s WHERE email = %s
+        """, (hashed_pw, email))
 
         conn.commit()
         cursor.close()
         conn.close()
-
         return cls.find_by_email(email)
 
     @classmethod
@@ -152,38 +154,32 @@ class UserAccount:
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
-        cursor.execute(
-            """
-            UPDATE User
-            SET status = %s
-            WHERE email = %s
-            """,
-            (status, email),
-        )
+        cursor.execute("""
+            UPDATE User SET status = %s WHERE email = %s
+        """, (status, email))
 
         conn.commit()
         cursor.close()
         conn.close()
-
         return cls.find_by_email(email)
 
-
+    # -------------------------------------------------------------------------
+    # MISC
+    # -------------------------------------------------------------------------
     def check_password(self, plain_password):
         return check_password_hash(self.password_hash, plain_password)
-    
+
     @classmethod
     def get_all(cls):
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
-        cursor.execute(
-            """
+        cursor.execute("""
             SELECT user_id, email, password_hash, first_name, last_name, role, status
             FROM User
-            """
-        )
+        """)
         rows = cursor.fetchall()
+
         cursor.close()
         conn.close()
-
         return [cls.from_row(row) for row in rows]

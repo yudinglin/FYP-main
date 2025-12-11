@@ -96,7 +96,7 @@ CREATE TABLE CreatorProfile (
 CREATE TABLE BusinessProfile (
   user_id        INT NOT NULL,
   company_name   VARCHAR(160) NOT NULL,
-  industry_id    INT NOT NULL,
+  industry_id    INT NULL,
   website_url    VARCHAR(255),
   contact_person VARCHAR(120),
   PRIMARY KEY (user_id),
