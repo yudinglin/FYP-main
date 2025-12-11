@@ -15,6 +15,7 @@ from routes.YouTube.video_correlation import video_corr_bp
 from routes.YouTube.video_comments import comments_bp
 from routes.Shared.reviews import review_bp
 from routes.Admin.get_users import user_bp
+from routes.YouTube.centrality_metrics import centrality_bp
 
 
 load_dotenv()
@@ -37,6 +38,7 @@ app.register_blueprint(review_bp)
 app.register_blueprint(user_bp)
 app.register_blueprint(video_corr_bp)
 app.register_blueprint(comments_bp)
+app.register_blueprint(centrality_bp)
 
 
 @app.route('/api/ping')
