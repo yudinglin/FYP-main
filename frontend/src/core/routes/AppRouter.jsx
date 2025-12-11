@@ -27,6 +27,7 @@ import PredictiveAnalysis from "../../pages/Creator/PredictiveAnalysis.jsx";
 
 import EditPricing from "../../pages/Admin/EditPricing.jsx";
 import AdminSupport from "../../pages/Admin/AdminSupport.jsx";
+import AdminProfile from "../../pages/profile/AdminProfile.jsx";
 
 export default function AppRouter() {
   return (
@@ -174,6 +175,14 @@ export default function AppRouter() {
         element={
           <MainLayout>
             <BusinessProfile />
+          </MainLayout>
+        }
+      />
+      <Route
+        path="/admin/profile"
+        element={
+          <MainLayout>
+            <AdminProfile />
           </MainLayout>
         }
       />
