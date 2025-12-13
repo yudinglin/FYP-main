@@ -1,7 +1,9 @@
 # routes/profile_routes.py
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required
-from controllers.Shared.profile_controller import get_profile, update_profile
+from controllers.Shared.profile_controller import (
+    get_profile, update_profile, update_creator_youtube_channel
+)
 
 profile_bp = Blueprint("profile", __name__, url_prefix="/api")
 
@@ -26,5 +28,19 @@ def update_profile_route():
     updated_user = update_profile(first_name, last_name)
     if not updated_user:
         return jsonify({"message": "Update failed"}), 400
+
+    return jsonify({"user": updated_user.to_dict()}), 200
+
+@profile_bp.put("/profile/youtube")
+@jwt_required()
+def update_profile_youtube_route():
+    data = request.get_json() or {}
+    youtube_channel = (data.get("youtube_channel") or "").strip()
+    if not youtube_channel:
+        return jsonify({"message": "youtube_channel is required"}), 400
+
+    updated_user, err = update_creator_youtube_channel(youtube_channel)
+    if err:
+        return jsonify({"message": err}), 400
 
     return jsonify({"user": updated_user.to_dict()}), 200

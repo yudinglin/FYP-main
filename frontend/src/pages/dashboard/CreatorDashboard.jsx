@@ -1,6 +1,7 @@
 // frontend/src/pages/dashboard/CreatorDashboard.jsx
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { useAuth } from "../../core/context/AuthContext";
 
 /**
  * CreatorDashboard — uses the existing backend route
@@ -16,6 +17,7 @@ export default function CreatorDashboard() {
   const [viewCount, setViewCount] = useState(null);
   const [totalLikes, setTotalLikes] = useState(null);
   const [totalComments, setTotalComments] = useState(null);
+  const { user } = useAuth();
 
   const [topVideos, setTopVideos] = useState([]);
   const [latestComments, setLatestComments] = useState([]);
@@ -23,90 +25,75 @@ export default function CreatorDashboard() {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    async function fetchStatsAndVideos() {
-      setLoading(true);
-      setError(null);
+  if (!user?.youtube_channel) return;
 
-      try {
-        const channelUrl = localStorage.getItem("channelUrl");
-        if (!channelUrl) {
-          throw new Error("No channelUrl found in localStorage");
-        }
-        const q = encodeURIComponent(channelUrl);
+  async function fetchStatsAndVideos() {
+    setLoading(true);
+    setError(null);
 
-        // 1) channels.list
-        const r1 = await fetch(`http://localhost:5000/api/youtube/channels.list?url=${q}`);
-        if (!r1.ok) throw new Error("channels.list request failed");
-        const d1 = await r1.json();
-        setSubscribers(d1.subscriberCount ?? 0);
-        setViewCount(d1.viewCount ?? 0);
+    try {
+      const channelUrl = user.youtube_channel;
+      const q = encodeURIComponent(channelUrl);
 
-        // 2) videos.list (totals)
-        const r2 = await fetch(`http://localhost:5000/api/youtube/videos.list?url=${q}`);
-        if (!r2.ok) throw new Error("videos.list request failed");
-        const d2 = await r2.json();
-        setTotalLikes(d2.totalLikes ?? 0);
-        setTotalComments(d2.totalComments ?? 0);
+      const r1 = await fetch(`http://localhost:5000/api/youtube/channels.list?url=${q}`);
+      if (!r1.ok) throw new Error("channels.list request failed");
+      const d1 = await r1.json();
+      setSubscribers(d1.subscriberCount ?? 0);
+      setViewCount(d1.viewCount ?? 0);
 
-        // 3) videos.correlationNetwork -> contains rawMetrics
-        const r3 = await fetch(
-          `http://localhost:5000/api/youtube/videos.correlationNetwork?url=${q}&maxVideos=50`
-        );
-        if (!r3.ok) {
-          const txt = await r3.text();
-          throw new Error(`videos.correlationNetwork failed: ${r3.status} ${txt}`);
-        }
-        const d3 = await r3.json();
+      const r2 = await fetch(`http://localhost:5000/api/youtube/videos.list?url=${q}`);
+      if (!r2.ok) throw new Error("videos.list request failed");
+      const d2 = await r2.json();
+      setTotalLikes(d2.totalLikes ?? 0);
+      setTotalComments(d2.totalComments ?? 0);
 
-        const raw = d3.rawMetrics ?? d3.nodes ?? [];
-
-        // Compute engagement and sort descending
-        const withEngagement = raw.map((v) => {
-          const views = Number(v.views) || 0;
-          const likes = Number(v.likes) || 0;
-          const comments = Number(v.comments) || 0;
-          const engagement = views > 0 ? (likes + comments) / views : 0;
-          return {
-            videoId: v.id || v.videoId || v.videoID || "",
-            title: v.title || "Untitled",
-            views,
-            likeCount: likes,
-            commentCount: comments,
-            publishedAt: v.publishedAt || "",
-            engagementScore: engagement,
-          };
-        });
-
-        const sorted = withEngagement
-          .sort((a, b) => b.engagementScore - a.engagementScore)
-          .slice(0, 4);
-
-        setTopVideos(sorted);
-
-        // 4) Fetch latest comments
-        const r4 = await fetch(
-          `http://localhost:5000/api/youtube/videos.latestComments?url=${q}&maxResults=5`
-        );
-        if (!r4.ok) {
-          console.warn("Failed to fetch comments");
-          setLatestComments([]);
-        } else {
-          const d4 = await r4.json();
-          setLatestComments(d4.comments || []);
-        }
-
-      } catch (err) {
-        console.error("Error loading dashboard:", err);
-        setError(err.message || "Failed to load dashboard data");
-        setTopVideos([]);
-        setLatestComments([]);
-      } finally {
-        setLoading(false);
+      const r3 = await fetch(
+        `http://localhost:5000/api/youtube/videos.correlationNetwork?url=${q}&maxVideos=50`
+      );
+      if (!r3.ok) {
+        const txt = await r3.text();
+        throw new Error(`videos.correlationNetwork failed: ${r3.status} ${txt}`);
       }
-    }
+      const d3 = await r3.json();
 
-    fetchStatsAndVideos();
-  }, []);
+      const raw = d3.rawMetrics ?? d3.nodes ?? [];
+      const withEngagement = raw.map((v) => {
+        const views = Number(v.views) || 0;
+        const likes = Number(v.likes) || 0;
+        const comments = Number(v.comments) || 0;
+        const engagement = views > 0 ? (likes + comments) / views : 0;
+        return {
+          videoId: v.id || v.videoId || v.videoID || "",
+          title: v.title || "Untitled",
+          views,
+          likeCount: likes,
+          commentCount: comments,
+          publishedAt: v.publishedAt || "",
+          engagementScore: engagement,
+        };
+      });
+
+      setTopVideos(withEngagement.sort((a, b) => b.engagementScore - a.engagementScore).slice(0, 4));
+
+      const r4 = await fetch(
+        `http://localhost:5000/api/youtube/videos.latestComments?url=${q}&maxResults=5`
+      );
+      if (!r4.ok) setLatestComments([]);
+      else {
+        const d4 = await r4.json();
+        setLatestComments(d4.comments || []);
+      }
+    } catch (err) {
+      setError(err.message || "Failed to load dashboard data");
+      setTopVideos([]);
+      setLatestComments([]);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  fetchStatsAndVideos();
+}, [user?.youtube_channel]);
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-slate-50">

@@ -11,3 +11,7 @@ def update_profile(first_name: str, last_name: str):
     """Update the logged-in user's profile."""
     email = get_jwt_identity()
     return UserAccount.update_name(email, first_name, last_name)
+
+def update_creator_youtube_channel(youtube_channel: str):
+    email = get_jwt_identity()
+    return UserAccount.set_creator_primary_channel(email, youtube_channel)

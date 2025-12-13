@@ -264,11 +264,7 @@ function LinkChannelSection({
           type="text"
           className="block w-full rounded-lg border border-slate-200 px-3 py-2 text-sm bg-slate-50"
           value={youtubeUrl}
-          onChange={(e) => {
-          const v = e.target.value;
-          setYoutubeUrl(v);
-          localStorage.setItem("channelUrl", v);   
-              }}
+          onChange={(e) => setYoutubeUrl(e.target.value)}
         />
 
         {error && <Message type="error" text={error} />}

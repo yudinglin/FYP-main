@@ -12,6 +12,7 @@ import {
   LineChart, Line,Legend, ResponsiveContainer, BarChart, Bar,  LabelList,
   ComposedChart, Rectangle
 } from "recharts";
+import { useAuth } from "../../core/context/AuthContext";
 
 
 
@@ -27,6 +28,7 @@ export default function NetworkGraph() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const fgRef = useRef();
+  const { user } = useAuth();
   const containerRef = useRef();
   const [barMetric, setBarMetric] = useState("views"); // views / likes / comments
 
@@ -35,7 +37,7 @@ export default function NetworkGraph() {
     setError("");
 
     try {
-      const channelUrl = localStorage.getItem("channelUrl");
+      const channelUrl = user.youtube_channel;
       if (!channelUrl) {
         setError("No channel URL found in localStorage.");
         setLoading(false);
