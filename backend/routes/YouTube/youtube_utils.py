@@ -129,3 +129,53 @@ def fetch_video_stats(video_ids, with_snippet: bool = False):
 
     return all_videos
 
+# Retrieve top-level comments for a given video
+def fetch_video_comments(video_id: str, max_comments: int = 50):
+    """
+    Fetch top-level comments from a video.
+    Returns a list of comment strings (plain text).
+    """
+    comments = []
+    try:
+        params = {
+            "part": "snippet",
+            "videoId": video_id,
+            "maxResults": min(max_comments, 100),
+            "textFormat": "plainText",
+        }
+
+        data = youtube_get("commentThreads", params)
+
+        for item in data.get("items", []):
+            comment_snippet = item.get("snippet", {}).get("topLevelComment", {}).get("snippet", {})
+            text = comment_snippet.get("textDisplay")
+            if text:
+                comments.append(text)
+
+    except Exception as e:
+        print(f"Error fetching comments for video {video_id}: {e}")
+
+    return comments
+
+def fetch_video_title(video_id: str):
+    """
+    Fetch the title of a single video by ID.
+    """
+    try:
+        params = {
+            "part": "snippet",
+            "id": video_id,
+            "maxResults": 1
+        }
+        data = youtube_get("videos", params)
+        items = data.get("items", [])
+        if not items:
+            return None
+        snippet = items[0].get("snippet", {})
+        return snippet.get("title", None)
+    except Exception as e:
+        print(f"Error fetching title for video {video_id}: {e}")
+        return None
+
+
+
