@@ -1,7 +1,18 @@
 // frontend/src/pages/dashboard/CreatorDashboard.jsx
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../core/context/AuthContext";
+import {
+  LineChart,
+  Line,
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from "recharts";
 
 /**
  * CreatorDashboard — uses the existing backend route
@@ -21,6 +32,8 @@ export default function CreatorDashboard() {
 
   const [topVideos, setTopVideos] = useState([]);
   const [latestComments, setLatestComments] = useState([]);
+  const [allVideos, setAllVideos] = useState([]);
+  const [latestVideo, setLatestVideo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
 
@@ -73,7 +86,14 @@ export default function CreatorDashboard() {
         };
       });
 
+      setAllVideos(withEngagement);
       setTopVideos(withEngagement.sort((a, b) => b.engagementScore - a.engagementScore).slice(0, 4));
+      
+      // Find latest video by publishedAt
+      const sortedByDate = [...withEngagement]
+        .filter(v => v.publishedAt)
+        .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
+      setLatestVideo(sortedByDate.length > 0 ? sortedByDate[0] : null);
 
       const r4 = await fetch(
         `http://localhost:5000/api/youtube/videos.latestComments?url=${q}&maxResults=5`
@@ -94,6 +114,91 @@ export default function CreatorDashboard() {
 
   fetchStatsAndVideos();
 }, [user?.youtube_channel]);
+
+  // Calculate additional metrics
+  const additionalMetrics = useMemo(() => {
+    if (allVideos.length === 0) {
+      return {
+        avgEngagementRate: 0,
+        avgViewsPerVideo: 0,
+        subscriberGrowthRate: 0,
+        
+      };
+    }
+
+    // Average engagement rate
+    const totalEngagement = allVideos.reduce((sum, v) => sum + v.engagementScore, 0);
+    const avgEngagementRate = (totalEngagement / allVideos.length) * 100;
+
+    // Average views per video
+    const totalViews = allVideos.reduce((sum, v) => sum + v.views, 0);
+    const avgViewsPerVideo = totalViews / allVideos.length;
+
+    // Subscriber growth rate (estimate based on video performance)
+    // This is a simplified calculation - in reality you'd need historical subscriber data
+    const recentVideos = allVideos
+      .filter(v => v.publishedAt)
+      .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
+      .slice(0, 10);
+    
+    const recentAvgViews = recentVideos.length > 0
+      ? recentVideos.reduce((sum, v) => sum + v.views, 0) / recentVideos.length
+      : 0;
+    
+    const olderVideos = allVideos
+      .filter(v => v.publishedAt)
+      .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt))
+      .slice(10, 20);
+    
+    const olderAvgViews = olderVideos.length > 0
+      ? olderVideos.reduce((sum, v) => sum + v.views, 0) / olderVideos.length
+      : recentAvgViews;
+    
+    const subscriberGrowthRate = olderAvgViews > 0
+      ? ((recentAvgViews - olderAvgViews) / olderAvgViews) * 100
+      : 0;
+
+    return {
+      avgEngagementRate: parseFloat(avgEngagementRate.toFixed(2)),
+      avgViewsPerVideo: Math.round(avgViewsPerVideo),
+      subscriberGrowthRate: parseFloat(subscriberGrowthRate.toFixed(1)),
+    };
+  }, [allVideos]);
+
+  // Prepare time-series data for chart
+  const chartData = useMemo(() => {
+    if (allVideos.length === 0) return [];
+
+    const videosWithDates = allVideos
+      .filter(v => v.publishedAt)
+      .map(v => ({
+        ...v,
+        date: new Date(v.publishedAt),
+      }))
+      .sort((a, b) => a.date - b.date);
+
+    // Group by month and sum views
+    const monthlyData = {};
+    videosWithDates.forEach(video => {
+      const monthKey = `${video.date.getFullYear()}-${String(video.date.getMonth() + 1).padStart(2, '0')}`;
+      if (!monthlyData[monthKey]) {
+        monthlyData[monthKey] = {
+          month: monthKey,
+          views: 0,
+          videos: 0,
+        };
+      }
+      monthlyData[monthKey].views += video.views;
+      monthlyData[monthKey].videos += 1;
+    });
+
+    return Object.values(monthlyData)
+      .map(item => ({
+        ...item,
+        monthLabel: new Date(item.month + '-01').toLocaleDateString('en-US', { month: 'short', year: 'numeric' }),
+      }))
+      .sort((a, b) => a.month.localeCompare(b.month));
+  }, [allVideos]);
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-slate-50">
@@ -135,11 +240,90 @@ export default function CreatorDashboard() {
             <StatCard label="Total comments" value={formatValue(totalComments, loading, error)} />
           </section>
 
+          <section className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+            <StatCard
+              label="Avg Engagement Rate"
+              value={loading ? "Loading..." : error ? "--" : `${additionalMetrics.avgEngagementRate}%`}
+            />
+            <StatCard
+              label="Avg Views per Video"
+              value={loading ? "Loading..." : error ? "--" : formatValue(additionalMetrics.avgViewsPerVideo, false, false)}
+            />
+            <StatCard
+              label="Growth Rate (Est.)"
+              value={loading ? "Loading..." : error ? "--" : `${additionalMetrics.subscriberGrowthRate >= 0 ? '+' : ''}${additionalMetrics.subscriberGrowthRate}%`}
+            />
+          </section>
+
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 space-y-4">
-              <Panel title="Latest Video" />
-              <Panel title="Predictive View Count">
-                <ChartPlaceholder variant="line" />
+              <Panel title="Latest Video">
+                {loading && <p className="text-xs text-slate-400 py-3">Loading latest video...</p>}
+                {!loading && !latestVideo && (
+                  <p className="text-xs text-slate-400 py-3">No video data available</p>
+                )}
+                {!loading && latestVideo && <LatestVideoCard video={latestVideo} />}
+              </Panel>
+              <Panel title="Views Over Time">
+                {loading && (
+                  <div className="h-48 flex items-center justify-center">
+                    <p className="text-xs text-slate-400">Loading chart data...</p>
+                  </div>
+                )}
+                {!loading && chartData.length === 0 && (
+                  <div className="h-48 flex items-center justify-center">
+                    <p className="text-xs text-slate-400">No chart data available</p>
+                  </div>
+                )}
+                {!loading && chartData.length > 0 && (
+                  <div className="h-48">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={chartData} margin={{ top: 5, right: 10, left: 0, bottom: 0 }}>
+                        <defs>
+                          <linearGradient id="colorViews" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.8}/>
+                            <stop offset="95%" stopColor="#8b5cf6" stopOpacity={0.1}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" opacity={0.3} />
+                        <XAxis
+                          dataKey="monthLabel"
+                          stroke="#64748b"
+                          style={{ fontSize: "10px" }}
+                          angle={-45}
+                          textAnchor="end"
+                          height={60}
+                        />
+                        <YAxis
+                          stroke="#64748b"
+                          style={{ fontSize: "10px" }}
+                          tickFormatter={(value) => {
+                            if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                            if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+                            return value.toString();
+                          }}
+                        />
+                        <Tooltip
+                          contentStyle={{
+                            backgroundColor: 'white',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            fontSize: '12px',
+                          }}
+                          formatter={(value) => [value.toLocaleString(), 'Views']}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="views"
+                          stroke="#8b5cf6"
+                          fillOpacity={1}
+                          fill="url(#colorViews)"
+                          strokeWidth={2}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
               </Panel>
             </div>
 
@@ -282,12 +466,80 @@ function Panel({ title, children }) {
   );
 }
 
-function ChartPlaceholder({ variant = "area" }) {
-  const gradient = variant === "area" ? "bg-gradient-to-t from-sky-100 via-sky-50 to-transparent" : "bg-gradient-to-r from-violet-100 via-sky-50 to-emerald-100";
+function LatestVideoCard({ video }) {
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "Unknown date";
+    const date = new Date(dateStr);
+    const now = new Date();
+    const diffMs = now - date;
+    const diffDays = Math.floor(diffMs / 86400000);
+    const diffWeeks = Math.floor(diffDays / 7);
+    const diffMonths = Math.floor(diffDays / 30);
+
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    if (diffWeeks < 4) return `${diffWeeks} week${diffWeeks > 1 ? 's' : ''} ago`;
+    if (diffMonths < 12) return `${diffMonths} month${diffMonths > 1 ? 's' : ''} ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  };
+
+  const engagementRate = video.views > 0
+    ? ((video.likeCount + video.commentCount) / video.views * 100).toFixed(2)
+    : "0.00";
+
+  const videoUrl = video.videoId ? `https://www.youtube.com/watch?v=${video.videoId}` : "#";
+
   return (
-    <div className="h-48 rounded-xl bg-slate-50 border border-dashed border-slate-200 flex items-end overflow-hidden relative">
-      <div className={`w-full h-4/5 ${gradient}`} />
-      <p className="absolute bottom-2 right-3 text-[10px] uppercase tracking-wide text-slate-400">Chart placeholder · hook to real data later</p>
+    <div className="space-y-3">
+      <div className="flex gap-4">
+        {/* Thumbnail placeholder */}
+        <div className="w-32 h-20 rounded-lg bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center shrink-0">
+          <span className="text-2xl">🎬</span>
+        </div>
+        
+        <div className="flex-1 min-w-0">
+          <a
+            href={videoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block group"
+          >
+            <h3 className="text-sm font-semibold text-slate-900 group-hover:text-purple-600 transition-colors line-clamp-2 mb-1">
+              {video.title}
+            </h3>
+          </a>
+          <p className="text-xs text-slate-500 mb-2">{formatDate(video.publishedAt)}</p>
+          
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div>
+              <p className="text-slate-400">Views</p>
+              <p className="font-semibold text-slate-900">{video.views.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-slate-400">Likes</p>
+              <p className="font-semibold text-emerald-600">{video.likeCount.toLocaleString()}</p>
+            </div>
+            <div>
+              <p className="text-slate-400">Engagement</p>
+              <p className="font-semibold text-purple-600">{engagementRate}%</p>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-4 text-xs text-slate-500 pt-2 border-t border-slate-100">
+        <span>{video.commentCount.toLocaleString()} comments</span>
+        <span>•</span>
+        <a
+          href={videoUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-purple-600 hover:text-purple-700 font-medium"
+        >
+          Watch on YouTube →
+        </a>
+      </div>
     </div>
   );
 }

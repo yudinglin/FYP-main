@@ -1,16 +1,18 @@
 import React, { useEffect, useState } from "react";
 import { TrendingUp, Zap, Link2, Award } from "lucide-react";
+import { useAuth } from "../../core/context/AuthContext";
 
 export default function CentralityMetrics() {
   const [data, setData] = useState(null);
   const [videos, setVideos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const { user } = useAuth();
 
   useEffect(() => {
     async function fetchData() {
       try {
-        const channelUrl = localStorage.getItem("channelUrl");
+        const channelUrl = user.youtube_channel;
         if (!channelUrl) {
           throw new Error("No channelUrl found in localStorage");
         }
