@@ -27,15 +27,14 @@ export default function PredictiveAnalysis() {
   const [subscriberHistory, setSubscriberHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-    const { user } = useAuth();
+  const { user } = useAuth();
 
   useEffect(() => {
     async function fetchSubscriberData() {
       setLoading(true);
       setError(null);
-
       try {
-      const channelUrl = user.youtube_channel;
+        const channelUrl = user.youtube_channel;
         if (!channelUrl) {
           setError("No channel URL found in localStorage.");
           setLoading(false);
@@ -43,7 +42,7 @@ export default function PredictiveAnalysis() {
         }
 
         const q = encodeURIComponent(channelUrl);
-
+        
         // 1) Get current subscriber count
         const r1 = await fetch(`${API_BASE}/api/youtube/channels.list?url=${q}`);
         if (!r1.ok) throw new Error("Failed to fetch channel data");
@@ -56,7 +55,6 @@ export default function PredictiveAnalysis() {
         );
         if (!r2.ok) throw new Error("Failed to fetch video data");
         const videoData = await r2.json();
-
         const rawMetrics = videoData.rawMetrics ?? videoData.nodes ?? [];
         
         if (rawMetrics.length === 0) {
@@ -149,7 +147,6 @@ export default function PredictiveAnalysis() {
         }
 
         setSubscriberHistory(history);
-
       } catch (err) {
         console.error("Error fetching subscriber data:", err);
         setError(err.message || "Failed to load subscriber data");
@@ -160,7 +157,7 @@ export default function PredictiveAnalysis() {
     }
 
     fetchSubscriberData();
-  }, []);
+  }, [user.youtube_channel]);
 
   // Format date for display
   const formatDate = useCallback((dateStr) => {
@@ -336,17 +333,17 @@ export default function PredictiveAnalysis() {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
       return (
-        <div className="bg-white p-3 border border-slate-200 rounded-lg shadow-lg">
-          <p className="text-xs font-medium text-slate-600 mb-1">
+        <div className="bg-white p-3 border-2 border-red-600 rounded-lg shadow-xl">
+          <p className="text-xs font-semibold text-gray-700 mb-1">
             {formatDate(data.date)}
           </p>
           {data.historical !== null && (
-            <p className="text-sm font-semibold text-slate-900">
+            <p className="text-sm font-bold text-gray-900">
               Historical: {data.historical.toLocaleString()}
             </p>
           )}
           {data.predicted !== null && (
-            <p className="text-sm font-semibold text-emerald-600">
+            <p className="text-sm font-bold text-red-600">
               Predicted: {data.predicted.toLocaleString()}
             </p>
           )}
@@ -357,37 +354,35 @@ export default function PredictiveAnalysis() {
   };
 
   return (
-    <div className="min-h-[calc(100vh-72px)] bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 p-6">
+    <div className="min-h-[calc(100vh-72px)] bg-white p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header with gradient */}
+        {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-500 to-pink-500 bg-clip-text text-transparent mb-2">
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">
             Subscriber Growth Prediction
           </h1>
-          <p className="text-slate-300 text-sm">
-            Advanced AI-powered analytics to predict future subscriber growth based on historical channel performance
-          </p>
+
         </div>
 
         {loading && (
-          <div className="rounded-2xl bg-slate-800/50 backdrop-blur-sm p-12 border border-slate-700/50 shadow-2xl">
+          <div className="rounded-xl bg-white p-12 border-2 border-gray-200 shadow-lg">
             <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
-              <p className="ml-4 text-slate-300">Loading subscriber data...</p>
+              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
+              <p className="ml-4 text-gray-700">Loading subscriber data...</p>
             </div>
           </div>
         )}
 
         {error && (
-          <div className="rounded-2xl bg-red-900/20 backdrop-blur-sm p-6 border border-red-700/50 shadow-2xl">
-            <p className="text-red-400">{error}</p>
+          <div className="rounded-xl bg-red-50 p-6 border-2 border-red-200 shadow-lg">
+            <p className="text-red-700 font-medium">{error}</p>
           </div>
         )}
 
         {!loading && !error && (!subscriberHistory || subscriberHistory.length < 2) && (
-          <div className="rounded-2xl bg-slate-800/50 backdrop-blur-sm p-12 border border-slate-700/50 shadow-2xl">
+          <div className="rounded-xl bg-white p-12 border-2 border-gray-200 shadow-lg">
             <div className="text-center">
-              <p className="text-slate-400">
+              <p className="text-gray-600">
                 {subscriberHistory?.length === 0 
                   ? "No subscriber history available. Please ensure your channel has videos with publish dates." 
                   : "At least 2 data points required for prediction"}
@@ -404,35 +399,32 @@ export default function PredictiveAnalysis() {
                 label="Current Subscribers"
                 value={growthAnalytics.stats.current.toLocaleString()}
                 icon="👥"
-                gradient="from-blue-500 to-cyan-500"
+                gradient="from-red-600 to-red-700"
               />
               <StatCard
                 label="6-Month Projection"
                 value={growthAnalytics.stats.projected6Months.toLocaleString()}
                 icon="📈"
-                gradient="from-purple-500 to-pink-500"
+                gradient="from-blue-900 to-blue-950"
               />
               <StatCard
                 label="Avg Growth Rate"
                 value={`${growthAnalytics.stats.avgGrowthRate}%`}
                 icon="⚡"
-                gradient="from-green-500 to-emerald-500"
+                gradient="from-red-700 to-red-800"
               />
               <StatCard
                 label="Avg Monthly Gain"
                 value={growthAnalytics.stats.avgVelocity.toLocaleString()}
                 icon="🚀"
-                gradient="from-orange-500 to-red-500"
+                gradient="from-blue-950 to-gray-900"
               />
             </div>
 
             {/* Main Growth Chart */}
-            <div className="rounded-2xl bg-slate-800/50 backdrop-blur-sm p-6 border border-slate-700/50 shadow-2xl mb-6">
+            <div className="rounded-xl bg-white p-6 border-2 border-gray-200 shadow-lg mb-6">
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-semibold text-white">Subscriber Growth Forecast</h2>
-                <span className="px-3 py-1 bg-purple-500/20 text-purple-300 rounded-full text-xs font-medium">
-                  AI Prediction
-                </span>
+                <h2 className="text-xl font-bold text-gray-900">Subscriber Growth Forecast</h2>
               </div>
               <div className="w-full" style={{ height: "450px" }}>
                 <ResponsiveContainer width="100%" height="100%">
@@ -442,62 +434,55 @@ export default function PredictiveAnalysis() {
                   >
                     <defs>
                       <linearGradient id="colorHistorical" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#3b82f6" stopOpacity={0.1}/>
+                        <stop offset="5%" stopColor="#1e3a8a" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#1e3a8a" stopOpacity={0.1}/>
                       </linearGradient>
                       <linearGradient id="colorPredicted" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#10b981" stopOpacity={0.1}/>
+                        <stop offset="5%" stopColor="#dc2626" stopOpacity={0.8}/>
+                        <stop offset="95%" stopColor="#dc2626" stopOpacity={0.1}/>
                       </linearGradient>
                     </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#475569" opacity={0.3} />
+                    <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" opacity={0.5} />
                     <XAxis
                       dataKey="date"
                       tickFormatter={formatDate}
-                      stroke="#94a3b8"
-                      style={{ fontSize: "11px" }}
+                      stroke="#4b5563"
+                      style={{ fontSize: "11px", fontWeight: "500" }}
                       angle={-45}
                       textAnchor="end"
                       height={60}
                     />
                     <YAxis
-                      stroke="#94a3b8"
-                      style={{ fontSize: "11px" }}
+                      stroke="#4b5563"
+                      style={{ fontSize: "11px", fontWeight: "500" }}
                       tickFormatter={(value) => {
                         if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
                         if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
                         return value.toString();
                       }}
                     />
-                    <Tooltip 
-                      content={<CustomTooltip />}
-                      contentStyle={{ 
-                        backgroundColor: 'rgba(15, 23, 42, 0.95)', 
-                        border: '1px solid rgba(148, 163, 184, 0.3)',
-                        borderRadius: '8px'
-                      }}
-                    />
+                    <Tooltip content={<CustomTooltip />} />
                     <Legend
-                      wrapperStyle={{ fontSize: "12px", paddingTop: "10px", color: '#cbd5e1' }}
+                      wrapperStyle={{ fontSize: "12px", paddingTop: "10px", fontWeight: "600" }}
                       iconType="line"
                     />
                     <Area
                       type="monotone"
                       dataKey="historical"
                       name="Historical"
-                      stroke="#3b82f6"
+                      stroke="#1e3a8a"
                       fillOpacity={1}
                       fill="url(#colorHistorical)"
-                      strokeWidth={2}
+                      strokeWidth={3}
                     />
                     <Area
                       type="monotone"
                       dataKey="predicted"
                       name="Predicted (6 months)"
-                      stroke="#10b981"
+                      stroke="#dc2626"
                       fillOpacity={1}
                       fill="url(#colorPredicted)"
-                      strokeWidth={2}
+                      strokeWidth={3}
                       strokeDasharray="5 5"
                     />
                   </AreaChart>
@@ -508,65 +493,65 @@ export default function PredictiveAnalysis() {
             {/* Growth Rate & Velocity Charts */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               {/* Growth Rate Chart */}
-              <div className="rounded-2xl bg-slate-800/50 backdrop-blur-sm p-6 border border-slate-700/50 shadow-2xl">
-                <h3 className="text-lg font-semibold text-white mb-4">Monthly Growth Rate (%)</h3>
+              <div className="rounded-xl bg-white p-6 border-2 border-gray-200 shadow-lg">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Monthly Growth Rate (%)</h3>
                 <div className="w-full" style={{ height: "300px" }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={growthAnalytics.growthRate}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#475569" opacity={0.3} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" opacity={0.5} />
                       <XAxis
                         dataKey="date"
                         tickFormatter={formatDate}
-                        stroke="#94a3b8"
-                        style={{ fontSize: "10px" }}
+                        stroke="#4b5563"
+                        style={{ fontSize: "10px", fontWeight: "500" }}
                         angle={-45}
                         textAnchor="end"
                         height={60}
                       />
-                      <YAxis stroke="#94a3b8" style={{ fontSize: "11px" }} />
+                      <YAxis stroke="#4b5563" style={{ fontSize: "11px", fontWeight: "500" }} />
                       <Tooltip
                         contentStyle={{ 
-                          backgroundColor: 'rgba(15, 23, 42, 0.95)', 
-                          border: '1px solid rgba(148, 163, 184, 0.3)',
+                          backgroundColor: 'white', 
+                          border: '2px solid #dc2626',
                           borderRadius: '8px',
-                          color: '#cbd5e1'
+                          fontWeight: '600'
                         }}
                         formatter={(value) => [`${value}%`, "Growth Rate"]}
                       />
-                      <Bar dataKey="growthRate" fill="#8b5cf6" radius={[8, 8, 0, 0]} />
+                      <Bar dataKey="growthRate" fill="#1e3a8a" radius={[8, 8, 0, 0]} />
                     </BarChart>
                   </ResponsiveContainer>
                 </div>
               </div>
 
               {/* Growth Velocity Chart */}
-              <div className="rounded-2xl bg-slate-800/50 backdrop-blur-sm p-6 border border-slate-700/50 shadow-2xl">
-                <h3 className="text-lg font-semibold text-white mb-4">Subscribers Gained per Month</h3>
+              <div className="rounded-xl bg-white p-6 border-2 border-gray-200 shadow-lg">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Subscribers Gained per Month</h3>
                 <div className="w-full" style={{ height: "300px" }}>
                   <ResponsiveContainer width="100%" height="100%">
                     <ComposedChart data={growthAnalytics.velocity}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#475569" opacity={0.3} />
+                      <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" opacity={0.5} />
                       <XAxis
                         dataKey="date"
                         tickFormatter={formatDate}
-                        stroke="#94a3b8"
-                        style={{ fontSize: "10px" }}
+                        stroke="#4b5563"
+                        style={{ fontSize: "10px", fontWeight: "500" }}
                         angle={-45}
                         textAnchor="end"
                         height={60}
                       />
-                      <YAxis stroke="#94a3b8" style={{ fontSize: "11px" }} />
+                      <YAxis stroke="#4b5563" style={{ fontSize: "11px", fontWeight: "500" }} />
                       <Tooltip
                         contentStyle={{ 
-                          backgroundColor: 'rgba(15, 23, 42, 0.95)', 
-                          border: '1px solid rgba(148, 163, 184, 0.3)',
+                          backgroundColor: 'white', 
+                          border: '2px solid #dc2626',
                           borderRadius: '8px',
-                          color: '#cbd5e1'
+                          fontWeight: '600'
                         }}
                         formatter={(value) => [value.toLocaleString(), "Subscribers Gained"]}
                       />
-                      <Bar dataKey="gained" fill="#10b981" radius={[8, 8, 0, 0]} />
-                      <Line type="monotone" dataKey="gained" stroke="#34d399" strokeWidth={2} />
+                      <Bar dataKey="gained" fill="#dc2626" radius={[8, 8, 0, 0]} />
+                      <Line type="monotone" dataKey="gained" stroke="#1e3a8a" strokeWidth={3} />
                     </ComposedChart>
                   </ResponsiveContainer>
                 </div>
@@ -576,41 +561,41 @@ export default function PredictiveAnalysis() {
             {/* Milestones & Monthly Breakdown */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
               {/* Projected Milestones */}
-              <div className="rounded-2xl bg-slate-800/50 backdrop-blur-sm p-6 border border-slate-700/50 shadow-2xl">
-                <h3 className="text-lg font-semibold text-white mb-4">🎯 Projected Milestones</h3>
+              <div className="rounded-xl bg-white p-6 border-2 border-gray-200 shadow-lg">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">🎯 Projected Milestones</h3>
                 {growthAnalytics.milestones.length > 0 ? (
                   <div className="space-y-3">
                     {growthAnalytics.milestones.slice(0, 5).map((milestone, idx) => (
                       <div
                         key={idx}
-                        className="flex items-center justify-between p-4 bg-gradient-to-r from-purple-500/10 to-pink-500/10 rounded-lg border border-purple-500/20"
+                        className="flex items-center justify-between p-4 bg-gradient-to-r from-red-50 to-blue-50 rounded-lg border-2 border-red-200"
                       >
                         <div>
-                          <p className="text-white font-semibold">{milestone.milestone} Subscribers</p>
-                          <p className="text-slate-400 text-sm">{milestone.projectedDate}</p>
+                          <p className="text-gray-900 font-bold">{milestone.milestone} Subscribers</p>
+                          <p className="text-gray-600 text-sm font-medium">{milestone.projectedDate}</p>
                         </div>
                         <div className="text-right">
-                          <p className="text-purple-400 font-bold">{milestone.monthsAway}</p>
-                          <p className="text-slate-400 text-xs">months away</p>
+                          <p className="text-red-600 font-bold text-xl">{milestone.monthsAway}</p>
+                          <p className="text-gray-600 text-xs font-medium">months away</p>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-slate-400 text-sm">All major milestones achieved! 🎉</p>
+                  <p className="text-gray-600 text-sm">All major milestones achieved! 🎉</p>
                 )}
               </div>
 
               {/* Monthly Breakdown Table */}
-              <div className="rounded-2xl bg-slate-800/50 backdrop-blur-sm p-6 border border-slate-700/50 shadow-2xl">
-                <h3 className="text-lg font-semibold text-white mb-4">📊 Monthly Breakdown</h3>
+              <div className="rounded-xl bg-white p-6 border-2 border-gray-200 shadow-lg">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">📊 Monthly Breakdown</h3>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
-                      <tr className="border-b border-slate-700">
-                        <th className="text-left py-2 text-slate-400">Month</th>
-                        <th className="text-right py-2 text-slate-400">Subscribers</th>
-                        <th className="text-right py-2 text-slate-400">Growth</th>
+                      <tr className="border-b-2 border-gray-300">
+                        <th className="text-left py-2 text-gray-700 font-bold">Month</th>
+                        <th className="text-right py-2 text-gray-700 font-bold">Subscribers</th>
+                        <th className="text-right py-2 text-gray-700 font-bold">Growth</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -622,15 +607,15 @@ export default function PredictiveAnalysis() {
                         const isPredicted = item.predicted !== null;
                         
                         return (
-                          <tr key={idx} className="border-b border-slate-700/50">
-                            <td className="py-2 text-slate-300">
+                          <tr key={idx} className="border-b border-gray-200">
+                            <td className="py-2 text-gray-700 font-medium">
                               {formatDate(item.date)}
-                              {isPredicted && <span className="ml-2 text-xs text-emerald-400">●</span>}
+                              {isPredicted && <span className="ml-2 text-xs text-red-600 font-bold">●</span>}
                             </td>
-                            <td className="text-right py-2 text-white font-medium">
+                            <td className="text-right py-2 text-gray-900 font-bold">
                               {value.toLocaleString()}
                             </td>
-                            <td className={`text-right py-2 ${growth >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            <td className={`text-right py-2 font-bold ${growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                               {growth >= 0 ? '+' : ''}{growth.toLocaleString()}
                             </td>
                           </tr>
@@ -648,18 +633,15 @@ export default function PredictiveAnalysis() {
   );
 }
 
-// Stat Card Component
-function StatCard({ label, value, icon, gradient }) {
+function StatCard({ label, value }) {
   return (
-    <div className={`rounded-2xl bg-gradient-to-br ${gradient} p-6 shadow-xl border border-white/10 backdrop-blur-sm`}>
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-2xl">{icon}</span>
-        <div className="w-12 h-12 rounded-full bg-white/10 backdrop-blur-sm flex items-center justify-center">
-          <div className="w-8 h-8 rounded-full bg-white/20"></div>
-        </div>
-      </div>
-      <p className="text-white/80 text-sm mb-1">{label}</p>
-      <p className="text-white text-2xl font-bold">{value}</p>
+    <div className="rounded-xl bg-white p-6 border-2 border-red-600 shadow-lg">
+      <p className="text-sm font-semibold text-gray-600 mb-1">
+        {label}
+      </p>
+      <p className="text-3xl font-bold text-gray-900">
+        {value}
+      </p>
     </div>
   );
 }
