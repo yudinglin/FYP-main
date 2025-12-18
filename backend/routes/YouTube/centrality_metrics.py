@@ -34,47 +34,71 @@ def normalize_scores(raw_scores):
     return {k: round(((v - min_v) / scale) * 100.0, 2) for k, v in raw_scores.items()}
 
 
-def classify_roles(nodes, normalized_degree, normalized_betweenness, normalized_closeness):
+def classify_roles(nodes, retention_strength, discoverability_score, entry_friendliness):
     """
-    Assign a primary content role to each video based on the strongest
-    normalized centrality dimension.
+    Assign a primary content role to each video based on creator-friendly metrics.
+    Uses plain language that creators understand immediately.
     """
     role_map = {
-        "degree": "Pillar Content",        # highly connected to many videos
-        "betweenness": "Bridge Content",   # links otherwise separate groups
-        "closeness": "Core Content",       # quickly reaches the rest of the catalog
+        "retention": "Anchor Video",      # highly connected to similar content
+        "discoverability": "Explorer Video",  # helps viewers discover new topics
+        "entry": "Entry Video",           # best starting point for new viewers
     }
 
     roles = {}
     for node in nodes:
-        deg = normalized_degree.get(node, 0.0)
-        bet = normalized_betweenness.get(node, 0.0)
-        clo = normalized_closeness.get(node, 0.0)
+        retention = retention_strength.get(node, 0.0)
+        discoverability = discoverability_score.get(node, 0.0)
+        entry = entry_friendliness.get(node, 0.0)
 
-        scores = {"degree": deg, "betweenness": bet, "closeness": clo}
+        scores = {"retention": retention, "discoverability": discoverability, "entry": entry}
         primary_metric = max(scores, key=lambda k: scores[k])
         primary_role = role_map[primary_metric]
 
+        # Plain-English explanations for each role
+        role_explanations = {
+            "Anchor Video": {
+                "description": "This video represents what your channel is all about. It's highly connected to similar content and helps build viewer loyalty.",
+                "action": "Use this as your channel's signature style. Create more videos like this to strengthen your brand identity.",
+                "why_matters": "Viewers who love this video will likely enjoy your other content too. It's your retention builder."
+            },
+            "Explorer Video": {
+                "description": "This video helps viewers discover new topics on your channel. It bridges different themes and keeps people exploring.",
+                "action": "Feature this in playlists and end screens. It's perfect for moving viewers from one interest to another.",
+                "why_matters": "It expands your audience by connecting different viewer interests. Great for growth and discovery."
+            },
+            "Entry Video": {
+                "description": "This is the perfect starting point for new viewers. It's easy to find and leads naturally to your other content.",
+                "action": "Use this as your channel trailer, pin it, or make it the first video in your main playlist.",
+                "why_matters": "First impressions matter. This video helps new viewers understand your channel and want to watch more."
+            }
+        }
+
         roles[node] = {
             "primary_role": primary_role,
-            "scores": scores,
-            "description": {
-                "Pillar Content": "Highly connected videos that anchor your channel identity.",
-                "Bridge Content": "Discovery-friendly videos that help viewers jump between topics.",
-                "Core Content": "Videos close to everything else — great entry points for new viewers.",
-            }[primary_role],
+            "scores": {
+                "retention_strength": retention,
+                "discoverability_score": discoverability,
+                "entry_friendliness": entry
+            },
+            **role_explanations[primary_role]
         }
 
     return roles
 
 
 def build_network_summary(node_count, edge_count):
+    """
+    Build a creator-friendly summary of the content network.
+    Uses plain language instead of technical terms.
+    """
     if node_count < 2:
         return {
             "total_videos": node_count,
             "total_connections": edge_count,
-            "density_score": 0.0,
-            "consistency_label": "Weak",
+            "content_cohesion": 0.0,
+            "cohesion_label": "Building",
+            "cohesion_explanation": "You're just getting started! Keep creating content to see how your videos connect."
         }
 
     possible_edges = node_count * (node_count - 1) / 2
@@ -82,35 +106,32 @@ def build_network_summary(node_count, edge_count):
 
     if density >= 60:
         label = "Strong"
+        explanation = "Your content feels cohesive and connected. Viewers can easily find related videos they'll enjoy."
     elif density >= 30:
         label = "Moderate"
+        explanation = "You balance variety with consistency. Your best videos help guide viewers to discover more."
     else:
-        label = "Weak"
+        label = "Building"
+        explanation = "Your topics are diverse. Consider creating playlists or series to help viewers navigate your content."
 
     return {
         "total_videos": node_count,
         "total_connections": edge_count,
-        "density_score": round(density, 2),
-        "consistency_label": label,
+        "content_cohesion": round(density, 2),
+        "cohesion_label": label,
+        "cohesion_explanation": explanation
     }
 
 
-def generate_plain_insights(nodes, normalized_degree, normalized_betweenness, normalized_closeness, summary):
-    """Return plain-English insights without exposing math terms."""
+def generate_plain_insights(nodes, retention_strength, discoverability_score, entry_friendliness, summary, videos_map):
+    """
+    Generate actionable, creator-friendly insights.
+    Sounds like a YouTube growth coach, not a data scientist.
+    """
     insights = []
 
-    if summary["consistency_label"] == "Strong":
-        insights.append(
-            "Your catalog feels cohesive. New viewers will quickly find similar videos they enjoy."
-        )
-    elif summary["consistency_label"] == "Moderate":
-        insights.append(
-            "You balance variety with familiarity. Highlight the most connected videos to guide new viewers."
-        )
-    else:
-        insights.append(
-            "Your topics are spread out. Create mini-series or playlists to help viewers navigate."
-        )
+    # Add summary insight
+    insights.append(summary.get("cohesion_explanation", "Your content is growing!"))
 
     def top_item(score_map):
         if not score_map:
@@ -118,26 +139,43 @@ def generate_plain_insights(nodes, normalized_degree, normalized_betweenness, no
         top_node = max(score_map, key=score_map.get)
         return top_node, score_map.get(top_node, 0.0)
 
-    top_deg, deg_score = top_item(normalized_degree)
-    top_bet, bet_score = top_item(normalized_betweenness)
-    top_clo, clo_score = top_item(normalized_closeness)
+    top_retention, retention_val = top_item(retention_strength)
+    top_discover, discover_val = top_item(discoverability_score)
+    top_entry, entry_val = top_item(entry_friendliness)
 
-    if top_deg:
+    # Get video titles for better context
+    def get_video_title(video_id):
+        video = videos_map.get(video_id, {})
+        # Try to get title from various possible fields
+        title = video.get("title") or video.get("snippet", {}).get("title") or f"your video"
+        return title
+
+    if top_retention and retention_val > 50:
+        title = get_video_title(top_retention)
         insights.append(
-            f"Video {top_deg} is highly connected to others—use it to introduce new viewers to your channel style."
+            f"🎯 Your best retention builder: '{title}'. This video keeps viewers watching more of your content. Create similar videos to build a loyal audience."
         )
-    if top_bet:
+    
+    if top_discover and discover_val > 50:
+        title = get_video_title(top_discover)
         insights.append(
-            f"Video {top_bet} bridges different topics—feature it in playlists to move viewers across themes."
+            f"🔍 Your best discovery video: '{title}'. This helps viewers explore different topics on your channel. Add it to playlists and end screens to grow your reach."
         )
-    if top_clo:
+    
+    if top_entry and entry_val > 50:
+        title = get_video_title(top_entry)
         insights.append(
-            f"Video {top_clo} sits close to everything else—pin it or add it to end screens as a go-to starting point."
+            f"Your best entry point: '{title}'. Perfect for new viewers! Consider making this your channel trailer or pinning it to help first-time visitors understand your channel."
         )
 
-    if deg_score < 30 and bet_score < 30 and clo_score < 30:
+    # Overall growth advice
+    if retention_val < 30 and discover_val < 30 and entry_val < 30:
         insights.append(
-            "No single standout video yet. Keep publishing and interlinking to reveal your anchors and bridges."
+            "Keep creating! As you publish more videos and build connections between them, you'll discover which content works best for retention, discovery, and attracting new viewers."
+        )
+    elif summary.get("cohesion_label") == "Strong":
+        insights.append(
+            "Your content strategy is working! Your videos connect well, which means viewers can easily find more content they'll love. Keep this momentum going."
         )
 
     return insights
@@ -170,20 +208,22 @@ def centrality_metrics():
                     "betweenness": {},
                     "closeness": {}
                 },
-                "normalized_scores": {
-                    "degree": {},
-                    "betweenness": {},
-                    "closeness": {},
+                "scores": {
+                    "retention_strength": {},
+                    "discoverability_score": {},
+                    "entry_friendliness": {},
+                    "content_influence": {},
                 },
                 "roles": {},
-                "network_summary": {
+                "summary": {
                     "total_videos": len(videos),
                     "total_connections": 0,
-                    "density_score": 0.0,
-                    "consistency_label": "Weak",
+                    "content_cohesion": 0.0,
+                    "cohesion_label": "Building",
+                    "cohesion_explanation": "You're just getting started! Keep creating content to see how your videos connect."
                 },
                 "insights": [
-                    "We need at least two videos with comparable performance to map how your content connects."
+                    "📹 Keep creating! We need at least two videos to analyze how your content connects and identify your best-performing videos."
                 ],
                 "metadata": {
                     "threshold": None,
@@ -272,25 +312,43 @@ def centrality_metrics():
                 max_clo = max(closeness.values()) or 1
                 closeness = {k: v/max_clo for k, v in closeness.items()}
 
-        normalized_degree = normalize_scores(degree)
-        normalized_betweenness = normalize_scores(betweenness)
-        normalized_closeness = normalize_scores(closeness)
+        # Convert to creator-friendly metric names
+        # Retention Strength = how well this video connects to similar content (degree)
+        # Discoverability Score = how well this video bridges different topics (betweenness)
+        # Entry Friendliness = how easy it is to reach from anywhere (closeness)
+        retention_strength = normalize_scores(degree)
+        discoverability_score = normalize_scores(betweenness)
+        entry_friendliness = normalize_scores(closeness)
+
+        # Build videos map for insights
+        videos_map = {v["id"]: v for v in videos}
 
         roles = classify_roles(
             list(G.nodes()),
-            normalized_degree,
-            normalized_betweenness,
-            normalized_closeness,
+            retention_strength,
+            discoverability_score,
+            entry_friendliness,
         )
 
         summary = build_network_summary(len(G.nodes()), edge_count)
         insights = generate_plain_insights(
             list(G.nodes()),
-            normalized_degree,
-            normalized_betweenness,
-            normalized_closeness,
+            retention_strength,
+            discoverability_score,
+            entry_friendliness,
             summary,
+            videos_map,
         )
+
+        # Calculate Content Influence (combination metric for overall importance)
+        content_influence = {}
+        for node in G.nodes():
+            influence = (
+                retention_strength.get(node, 0) * 0.4 +
+                discoverability_score.get(node, 0) * 0.3 +
+                entry_friendliness.get(node, 0) * 0.3
+            )
+            content_influence[node] = round(influence, 2)
 
         return jsonify({
             "nodes": list(G.nodes()),
@@ -298,18 +356,21 @@ def centrality_metrics():
                 {"source": u, "target": v, "weight": d["weight"]} 
                 for u, v, d in G.edges(data=True)
             ],
+            # Keep raw centrality for technical/advanced view if needed
             "centrality": {
                 "degree": degree,
                 "betweenness": betweenness,
                 "closeness": closeness,
             },
-            "normalized_scores": {
-                "degree": normalized_degree,
-                "betweenness": normalized_betweenness,
-                "closeness": normalized_closeness,
+            # Creator-friendly scores (0-100)
+            "scores": {
+                "retention_strength": retention_strength,
+                "discoverability_score": discoverability_score,
+                "entry_friendliness": entry_friendliness,
+                "content_influence": content_influence,
             },
             "roles": roles,
-            "network_summary": summary,
+            "summary": summary,
             "insights": insights,
             "metadata": {
                 "threshold": threshold,

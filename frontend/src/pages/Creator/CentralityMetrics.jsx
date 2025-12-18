@@ -8,6 +8,11 @@ import {
   Info,
   Gauge,
   Shield,
+  Target,
+  ArrowRight,
+  PlayCircle,
+  Users,
+  BarChart3,
 } from "lucide-react";
 import { useAuth } from "../../core/context/AuthContext";
 
@@ -17,7 +22,6 @@ export default function CentralityMetrics() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showTechnical, setShowTechnical] = useState(false);
-  const [showInsights, setShowInsights] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -39,7 +43,7 @@ export default function CentralityMetrics() {
           ),
         ]);
 
-        if (!centralityRes.ok) throw new Error("Failed to fetch centrality data");
+        if (!centralityRes.ok) throw new Error("Failed to fetch content insights");
         if (!networkRes.ok) throw new Error("Failed to fetch video details");
 
         const centralityData = await centralityRes.json();
@@ -68,40 +72,40 @@ export default function CentralityMetrics() {
   }, [user]);
 
   const nodes = data?.nodes || [];
-  const edges = data?.edges || [];
-  const centrality = data?.centrality || {};
-  const normalized = data?.normalized_scores || {};
+  const scores = data?.scores || {};
   const roles = data?.roles || {};
-  const summary = data?.network_summary || {
+  const summary = data?.summary || {
     total_videos: nodes.length,
-    total_connections: edges.length,
-    density_score: 0,
-    consistency_label: "Weak",
+    total_connections: 0,
+    content_cohesion: 0,
+    cohesion_label: "Building",
+    cohesion_explanation: "Your content is growing!",
   };
   const insights = data?.insights || [];
 
+  // Transform data to use creator-friendly metrics
   const videoInsights = useMemo(() => {
     return nodes.map((id) => ({
       id,
       title: videos[id]?.title || id,
       views: videos[id]?.views || 0,
-      degree: normalized.degree?.[id] ?? (centrality.degree?.[id] || 0) * 100,
-      betweenness: normalized.betweenness?.[id] ?? (centrality.betweenness?.[id] || 0) * 100,
-      closeness: normalized.closeness?.[id] ?? (centrality.closeness?.[id] || 0) * 100,
-      role: roles[id]?.primary_role,
-      raw: {
-        degree: centrality.degree?.[id] ?? 0,
-        betweenness: centrality.betweenness?.[id] ?? 0,
-        closeness: centrality.closeness?.[id] ?? 0,
-      },
+      retention_strength: scores.retention_strength?.[id] || 0,
+      discoverability_score: scores.discoverability_score?.[id] || 0,
+      entry_friendliness: scores.entry_friendliness?.[id] || 0,
+      content_influence: scores.content_influence?.[id] || 0,
+      role: roles[id]?.primary_role || "Unknown",
+      roleData: roles[id] || {},
+      // Keep raw centrality for technical view
+      raw: data?.centrality || {},
     }));
-  }, [nodes, videos, normalized, centrality, roles]);
+  }, [nodes, videos, scores, roles, data]);
 
+  // Group videos by role
   const roleBuckets = useMemo(() => {
     const bucket = {
-      "Pillar Content": [],
-      "Bridge Content": [],
-      "Core Content": [],
+      "Anchor Video": [],
+      "Explorer Video": [],
+      "Entry Video": [],
     };
 
     videoInsights.forEach((v) => {
@@ -110,23 +114,32 @@ export default function CentralityMetrics() {
       }
     });
 
+    // Sort by content influence (overall importance)
     Object.keys(bucket).forEach((key) => {
-      bucket[key].sort((a, b) => b.degree - a.degree);
+      bucket[key].sort((a, b) => b.content_influence - a.content_influence);
     });
 
     return bucket;
   }, [videoInsights]);
 
-  const topPillar = roleBuckets["Pillar Content"]?.[0];
-  const topBridge = roleBuckets["Bridge Content"]?.[0];
-  const topCore = roleBuckets["Core Content"]?.[0];
+  // Get top videos for each category
+  const topAnchor = roleBuckets["Anchor Video"]?.[0];
+  const topExplorer = roleBuckets["Explorer Video"]?.[0];
+  const topEntry = roleBuckets["Entry Video"]?.[0];
+
+  // Get top videos by overall influence
+  const topVideos = useMemo(() => {
+    return [...videoInsights]
+      .sort((a, b) => b.content_influence - a.content_influence)
+      .slice(0, 5);
+  }, [videoInsights]);
 
   if (loading) {
     return (
       <Shell title="Content Strategy Insights">
         <div className="bg-white rounded-xl shadow-sm p-8 text-center">
           <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-slate-900 border-r-transparent"></div>
-          <p className="mt-4 text-slate-600">Analyzing your content patterns...</p>
+          <p className="mt-4 text-slate-600">Analyzing your content strategy...</p>
         </div>
       </Shell>
     );
@@ -149,161 +162,206 @@ export default function CentralityMetrics() {
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-6">
           <p className="text-yellow-800 font-medium mb-2">Not enough data to analyze</p>
           <p className="text-yellow-700 text-sm">
-            We need at least two videos with comparable performance to map how your content connects.
+            {summary.cohesion_explanation || "Keep creating content to see insights!"}
           </p>
         </div>
       </Shell>
     );
   }
 
-  const consistencyCopy = {
-    Strong: "Your catalog feels cohesive. Lean on your signature formats to nurture loyal viewers.",
-    Moderate: "You balance variety with familiarity. Promote the most connected videos to guide new viewers.",
-    Weak: "Your topics are spread out. Use playlists or series to connect related themes.",
-  };
-
   return (
     <Shell title="Content Strategy Insights">
       <div className="flex items-center justify-between mb-6">
         <p className="text-sm text-slate-600 max-w-2xl">
-          Spot your anchor videos, bridges, and best entry points—without needing to know any math.
+          Discover which videos to promote, link internally, and use to attract new viewers—all in plain language.
         </p>
-        <label className="flex items-center gap-2 text-sm text-slate-600">
+        <label className="flex items-center gap-2 text-sm text-slate-600 cursor-pointer">
           <input
             type="checkbox"
             checked={showTechnical}
             onChange={() => setShowTechnical((v) => !v)}
             className="h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
           />
-          Advanced / Technical view
+          <span>Show technical details</span>
         </label>
       </div>
 
-      {/* Decision-first actions */}
-      <SectionCard title="What you should do next" icon={<Sparkles className="w-5 h-5 text-amber-500" />}>
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
+      {/* Hero Section: What should I do? */}
+      <div className="bg-gradient-to-br from-indigo-50 to-purple-50 rounded-xl border border-indigo-100 p-6 mb-6">
+        <div className="flex items-start gap-3 mb-4">
+          <Target className="w-6 h-6 text-indigo-600" />
+          <div>
+            <h2 className="text-lg font-semibold text-slate-900 mb-1">What videos should I focus on?</h2>
+            <p className="text-sm text-slate-600">
+              Based on how your videos connect, here are your top opportunities:
+            </p>
+          </div>
+        </div>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           <ActionCard
-            label="Most important"
-            title={topPillar?.title || "Your most connected video"}
-            description="Make 2–3 follow-ups in this style to keep your audience on familiar ground."
-            badge="Pillar"
+            priority="high"
+            icon={<Award className="w-5 h-5" />}
+            title={topAnchor?.title || "Your anchor video"}
+            description={topAnchor?.roleData?.action || "Create more videos in this style to build viewer loyalty."}
+            badge="Anchor Video"
+            color="purple"
+            score={topAnchor?.retention_strength}
+            scoreLabel="Retention"
           />
           <ActionCard
-            label="Recommended"
-            title={topBridge?.title || "Your best discovery video"}
-            description="Feature this in playlists and end screens to move viewers across topics."
-            badge="Discovery"
+            priority="medium"
+            icon={<Link2 className="w-5 h-5" />}
+            title={topExplorer?.title || "Your explorer video"}
+            description={topExplorer?.roleData?.action || "Feature this in playlists to help viewers discover new topics."}
+            badge="Explorer Video"
+            color="sky"
+            score={topExplorer?.discoverability_score}
+            scoreLabel="Discovery"
           />
           <ActionCard
-            label="Recommended"
-            title={topCore?.title || "Your best entry video"}
-            description="Use this as a channel trailer or first playlist item for new viewers."
-            badge="Core"
+            priority="medium"
+            icon={<PlayCircle className="w-5 h-5" />}
+            title={topEntry?.title || "Your entry video"}
+            description={topEntry?.roleData?.action || "Use this as your channel trailer or pin it for new viewers."}
+            badge="Entry Video"
+            color="emerald"
+            score={topEntry?.entry_friendliness}
+            scoreLabel="Entry"
           />
+        </div>
+      </div>
+
+      {/* Channel Health Summary */}
+      <SectionCard 
+        title="Your channel health" 
+        icon={<BarChart3 className="w-5 h-5 text-indigo-600" />}
+      >
+        <div className="flex items-start gap-4">
+          <div className="flex-1">
+            <p className="text-sm text-slate-700 mb-3">{summary.cohesion_explanation}</p>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <StatBadge label="Videos analyzed" value={summary.total_videos} icon={<PlayCircle className="w-4 h-4" />} />
+              <StatBadge label="Content connections" value={summary.total_connections} icon={<Link2 className="w-4 h-4" />} />
+              <StatBadge 
+                label="Content cohesion" 
+                value={`${Math.round(summary.content_cohesion || 0)}%`} 
+                icon={<Gauge className="w-4 h-4" />} 
+              />
+              <StatBadge 
+                label="Status" 
+                value={summary.cohesion_label} 
+                icon={<Shield className="w-4 h-4" />} 
+              />
+            </div>
+          </div>
         </div>
       </SectionCard>
 
-      {/* Plain-language summary */}
-      <SectionCard title="What this means for your channel" icon={<TrendingUp className="w-5 h-5 text-indigo-600" />}>
-        <p className="text-sm text-slate-700">{consistencyCopy[summary.consistency_label]}</p>
-        <p className="text-xs text-slate-500 mt-2">
-          These picks are based on how your videos relate to each other—not on views alone.
-        </p>
-      </SectionCard>
-
-      {/* Role highlights */}
+      {/* Video Roles Explained */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
-        <RolePanel
-          title="Highly connected videos"
-          subtitle="These represent what your channel is about."
-          helper="Good for reinforcing your core theme."
+        <RoleCard
+          title="Anchor Videos"
+          subtitle="Build viewer loyalty"
+          description="These videos represent your channel's core identity. They're highly connected to similar content and help build a loyal audience."
           icon={<Award className="w-5 h-5" />}
-          color="from-purple-500/20 to-purple-500/5"
-          accent="text-purple-600"
-          videos={roleBuckets["Pillar Content"]}
+          color="purple"
+          videos={roleBuckets["Anchor Video"]}
           showTechnical={showTechnical}
-          technicalLabels={{ key: "Degree", friendly: "Highly connected" }}
         />
-        <RolePanel
-          title="Discovery videos"
-          subtitle="These help viewers jump between topics."
-          helper="Great for playlists and end screens."
+        <RoleCard
+          title="Explorer Videos"
+          subtitle="Grow your reach"
+          description="These videos help viewers discover new topics. Perfect for playlists and end screens to expand your audience."
           icon={<Link2 className="w-5 h-5" />}
-          color="from-sky-500/20 to-sky-500/5"
-          accent="text-sky-600"
-          videos={roleBuckets["Bridge Content"]}
+          color="sky"
+          videos={roleBuckets["Explorer Video"]}
           showTechnical={showTechnical}
-          technicalLabels={{ key: "Betweenness", friendly: "Discovery" }}
         />
-        <RolePanel
-          title="Best entry videos"
-          subtitle="Easy starting points for new viewers."
-          helper="Use as channel trailer or pinned content."
+        <RoleCard
+          title="Entry Videos"
+          subtitle="Attract new viewers"
+          description="These are the best starting points for new viewers. Use them as channel trailers or pin them to make great first impressions."
           icon={<TrendingUp className="w-5 h-5" />}
-          color="from-emerald-500/20 to-emerald-500/5"
-          accent="text-emerald-600"
-          videos={roleBuckets["Core Content"]}
+          color="emerald"
+          videos={roleBuckets["Entry Video"]}
           showTechnical={showTechnical}
-          technicalLabels={{ key: "Closeness", friendly: "Core reach" }}
         />
       </div>
 
-      {/* Optional creator-friendly tips */}
+      {/* Actionable Insights
       <SectionCard
-        title="Quick tips for creators"
-        icon={<Zap className="w-5 h-5 text-amber-500" />}
-        actionLabel={showInsights ? "Hide" : "Show more"}
-        onAction={() => setShowInsights((v) => !v)}
+        title="Actionable insights"
+        icon={<Sparkles className="w-5 h-5 text-amber-500" />}
       >
-        {!showInsights && (
-          <p className="text-sm text-slate-600">Tap “Show more” for plain-language takeaways.</p>
-        )}
-        {showInsights && (
-          <div className="space-y-3">
-            {insights.length === 0 && (
-              <p className="text-sm text-slate-500">Insights will appear once we have enough data.</p>
-            )}
-            {insights.map((tip, idx) => (
-              <InsightItem key={idx} text={tip} />
+        <div className="space-y-3">
+          {insights.length === 0 ? (
+            <p className="text-sm text-slate-500">Keep creating content to see personalized insights!</p>
+          ) : (
+            insights.map((insight, idx) => (
+              <InsightCard key={idx} text={insight} />
+            ))
+          )}
+        </div>
+      </SectionCard> */}
+
+      {/* Top Performing Videos */}
+      {topVideos.length > 0 && (
+        <SectionCard
+          title="Your most influential videos"
+          icon={<Target className="w-5 h-5 text-indigo-600" />}
+        >
+          <p className="text-sm text-slate-600 mb-4">
+            These videos have the strongest overall impact on your channel strategy.
+          </p>
+          <div className="space-y-2">
+            {topVideos.map((video, idx) => (
+              <VideoRankingCard
+                key={video.id}
+                rank={idx + 1}
+                video={video}
+                showTechnical={showTechnical}
+              />
             ))}
           </div>
-        )}
-      </SectionCard>
+        </SectionCard>
+      )}
 
-      {/* Advanced / technical view */}
+      {/* Technical View */}
       {showTechnical && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <SummaryStat
-              label="Videos analyzed"
-              value={summary.total_videos}
-              icon={<Sparkles className="w-4 h-4" />}
-            />
-            <SummaryStat
-              label="Content connections"
-              value={summary.total_connections}
-              icon={<Link2 className="w-4 h-4" />}
-            />
-            <SummaryStat
-              label="Consistency score"
-              value={`${Math.round(summary.density_score)} / 100`}
-              icon={<Gauge className="w-4 h-4" />}
-            />
-            <SummaryStat
-              label="Network health"
-              value={summary.consistency_label}
-              icon={<Shield className="w-4 h-4" />}
-            />
-          </div>
-
-          <div className="bg-white rounded-xl border border-slate-200 p-5">
-            <div className="flex items-center gap-2 mb-3">
-              <Info className="w-5 h-5 text-slate-500" />
-              <h3 className="font-semibold text-slate-900">Technical breakdown</h3>
+        <SectionCard
+          title="Technical details"
+          icon={<Info className="w-5 h-5 text-slate-500" />}
+        >
+          <div className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <SummaryStat
+                label="Videos analyzed"
+                value={summary.total_videos}
+                icon={<PlayCircle className="w-4 h-4" />}
+              />
+              <SummaryStat
+                label="Content connections"
+                value={summary.total_connections}
+                icon={<Link2 className="w-4 h-4" />}
+              />
+              <SummaryStat
+                label="Content cohesion"
+                value={`${Math.round(summary.content_cohesion || 0)}%`}
+                icon={<Gauge className="w-4 h-4" />}
+              />
+              <SummaryStat
+                label="Network status"
+                value={summary.cohesion_label}
+                icon={<Shield className="w-4 h-4" />}
+              />
             </div>
-            <CentralityTable videos={videoInsights} showTechnical={showTechnical} />
+
+            <div className="bg-slate-50 rounded-lg border border-slate-200 p-4">
+              <h4 className="text-sm font-semibold text-slate-900 mb-3">Score Breakdown</h4>
+              <TechnicalTable videos={videoInsights} />
+            </div>
           </div>
-        </div>
+        </SectionCard>
       )}
     </Shell>
   );
@@ -315,7 +373,7 @@ function Shell({ children, title }) {
       <div className="mb-6">
         <h1 className="text-2xl font-semibold text-slate-900 mb-1">{title}</h1>
         <p className="text-sm text-slate-600">
-          Channel-friendly guidance powered by your existing video network.
+          Plain-language insights to help you grow your channel—no math required.
         </p>
       </div>
       {children}
@@ -323,26 +381,179 @@ function Shell({ children, title }) {
   );
 }
 
-function SectionCard({ title, icon, children, actionLabel, onAction }) {
+function SectionCard({ title, icon, children }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-5 mb-6">
-      <div className="flex items-start justify-between gap-3 mb-3">
-        <div className="flex items-start gap-3">
-          <div className="bg-slate-900 text-white p-2 rounded-lg">{icon}</div>
-          <div>
-            <h3 className="font-semibold text-slate-900">{title}</h3>
-          </div>
-        </div>
-        {actionLabel && (
-          <button
-            onClick={onAction}
-            className="text-sm text-indigo-600 hover:text-indigo-700 font-semibold"
-          >
-            {actionLabel}
-          </button>
-        )}
+      <div className="flex items-start gap-3 mb-4">
+        <div className="bg-slate-900 text-white p-2 rounded-lg">{icon}</div>
+        <h3 className="font-semibold text-slate-900 text-lg">{title}</h3>
       </div>
       {children}
+    </div>
+  );
+}
+
+function ActionCard({ priority, icon, title, description, badge, color, score, scoreLabel }) {
+  const colorClasses = {
+    purple: "from-purple-500/10 to-purple-500/5 border-purple-200",
+    sky: "from-sky-500/10 to-sky-500/5 border-sky-200",
+    emerald: "from-emerald-500/10 to-emerald-500/5 border-emerald-200",
+  };
+
+  const badgeColors = {
+    purple: "bg-purple-100 text-purple-700",
+    sky: "bg-sky-100 text-sky-700",
+    emerald: "bg-emerald-100 text-emerald-700",
+  };
+
+  return (
+    <div className={`bg-gradient-to-br ${colorClasses[color]} border rounded-xl p-4`}>
+      <div className="flex items-start justify-between mb-3">
+        <div className={`${badgeColors[color]} px-2 py-1 rounded-full text-xs font-semibold`}>
+          {badge}
+        </div>
+        {priority === "high" && (
+          <span className="text-xs font-semibold text-amber-700 bg-amber-50 px-2 py-1 rounded-full">
+            Priority
+          </span>
+        )}
+      </div>
+      <div className="flex items-start gap-3 mb-3">
+        <div className={`text-${color}-600`}>{icon}</div>
+        <div className="flex-1">
+          <h4 className="font-semibold text-slate-900 line-clamp-2 mb-1">{title}</h4>
+          <p className="text-sm text-slate-600">{description}</p>
+        </div>
+      </div>
+      {score !== undefined && (
+        <div className="flex items-center gap-2 mt-3 pt-3 border-t border-slate-200">
+          <span className="text-xs text-slate-500">{scoreLabel} Score:</span>
+          <span className="text-sm font-semibold text-slate-900">{Math.round(score)}/100</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatBadge({ label, value, icon }) {
+  return (
+    <div className="flex items-center gap-2">
+      <div className="bg-slate-100 text-slate-600 p-1.5 rounded-lg">{icon}</div>
+      <div>
+        <p className="text-xs text-slate-500">{label}</p>
+        <p className="text-sm font-semibold text-slate-900">{value}</p>
+      </div>
+    </div>
+  );
+}
+
+function RoleCard({ title, subtitle, description, icon, color, videos, showTechnical }) {
+  const colorClasses = {
+    purple: "from-purple-500/20 to-purple-500/5 border-purple-200",
+    sky: "from-sky-500/20 to-sky-500/5 border-sky-200",
+    emerald: "from-emerald-500/20 to-emerald-500/5 border-emerald-200",
+  };
+
+  const accentColors = {
+    purple: "text-purple-600 bg-purple-100",
+    sky: "text-sky-600 bg-sky-100",
+    emerald: "text-emerald-600 bg-emerald-100",
+  };
+
+  return (
+    <div className={`bg-gradient-to-br ${colorClasses[color]} border rounded-xl p-5`}>
+      <div className="flex items-start gap-3 mb-4">
+        <div className={`${accentColors[color]} p-2 rounded-lg`}>{icon}</div>
+        <div>
+          <h3 className="font-semibold text-slate-900">{title}</h3>
+          <p className="text-xs text-slate-600">{subtitle}</p>
+        </div>
+      </div>
+      <p className="text-sm text-slate-700 mb-4">{description}</p>
+
+      {videos.length === 0 ? (
+        <p className="text-sm text-slate-500">No videos in this category yet.</p>
+      ) : (
+        <div className="space-y-2">
+          {videos.slice(0, 3).map((video, idx) => (
+            <div key={video.id} className="bg-white border border-slate-100 rounded-lg p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-slate-900 text-sm truncate" title={video.title}>
+                    {video.title}
+                  </p>
+                  <p className="text-xs text-slate-500 mt-1">
+                    {video.views.toLocaleString()} views
+                  </p>
+                </div>
+                {idx === 0 && (
+                  <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full shrink-0">
+                    Top
+                  </span>
+                )}
+              </div>
+              {showTechnical && (
+                <div className="mt-2 pt-2 border-t border-slate-100 grid grid-cols-3 gap-1 text-[10px] text-slate-500">
+                  <div>Retention: {Math.round(video.retention_strength)}</div>
+                  <div>Discovery: {Math.round(video.discoverability_score)}</div>
+                  <div>Entry: {Math.round(video.entry_friendliness)}</div>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function InsightCard({ text }) {
+  return (
+    <div className="flex items-start gap-3 p-3 rounded-lg bg-gradient-to-r from-indigo-50 to-purple-50 border border-indigo-100">
+      <div className="bg-indigo-600 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
+        <ArrowRight className="w-3 h-3" />
+      </div>
+      <p className="text-sm text-slate-700 flex-1">{text}</p>
+    </div>
+  );
+}
+
+function VideoRankingCard({ rank, video, showTechnical }) {
+  return (
+    <div className="bg-white border border-slate-200 rounded-lg p-4 hover:border-indigo-300 transition-colors">
+      <div className="flex items-start gap-4">
+        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-100 text-indigo-700 font-bold text-sm shrink-0">
+          {rank}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-slate-900 mb-1 truncate" title={video.title}>
+            {video.title}
+          </p>
+          <div className="flex items-center gap-4 text-xs text-slate-500 mb-2">
+            <span>{video.views.toLocaleString()} views</span>
+            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-700 rounded-full font-medium">
+              {video.role}
+            </span>
+          </div>
+          {showTechnical && (
+            <div className="flex items-center gap-3 mt-2 pt-2 border-t border-slate-100 text-xs">
+              <ScoreBadge label="Influence" value={Math.round(video.content_influence)} />
+              <ScoreBadge label="Retention" value={Math.round(video.retention_strength)} />
+              <ScoreBadge label="Discovery" value={Math.round(video.discoverability_score)} />
+              <ScoreBadge label="Entry" value={Math.round(video.entry_friendliness)} />
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ScoreBadge({ label, value }) {
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-slate-500">{label}:</span>
+      <span className="font-semibold text-slate-900">{value}</span>
     </div>
   );
 }
@@ -359,139 +570,49 @@ function SummaryStat({ label, value, icon }) {
   );
 }
 
-function RolePanel({ title, subtitle, helper, icon, color, accent, videos, showTechnical, technicalLabels }) {
+function TechnicalTable({ videos }) {
   return (
-    <div className={`rounded-xl border border-slate-200 bg-gradient-to-br ${color} p-5`}>
-      <div className="flex items-start gap-3 mb-2">
-        <div className={`${accent.replace("text-", "bg-")} text-white p-2 rounded-lg`}>{icon}</div>
-        <div>
-          <h3 className="font-semibold text-slate-900">{title}</h3>
-          <p className="text-xs text-slate-600">{subtitle}</p>
-          <p className="text-[11px] text-slate-500 mt-1">{helper}</p>
-        </div>
-      </div>
-
-      {videos.length === 0 ? (
-        <p className="text-sm text-slate-500">No videos in this role yet.</p>
-      ) : (
-        <div className="space-y-3">
-          {videos.slice(0, 3).map((video, idx) => (
-            <div key={video.id} className="bg-white border border-slate-100 rounded-lg p-3">
-              <div className="flex items-start gap-3">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-semibold text-slate-400 mt-0.5">#{idx + 1}</span>
-                  {idx === 0 && (
-                    <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-50 px-2 py-1 rounded-full">
-                      Most important
-                    </span>
-                  )}
-                  {idx > 0 && (
-                    <span className="text-[11px] text-slate-600 bg-slate-100 px-2 py-1 rounded-full">
-                      Supporting
-                    </span>
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-medium text-slate-900 truncate">{video.title}</p>
-                  <p className="text-xs text-slate-500">{video.views.toLocaleString()} views</p>
-                </div>
-              </div>
-              {showTechnical && (
-                <div className="mt-3 grid grid-cols-3 gap-2 text-[11px] text-slate-500">
-                  <TechPill label="Degree" value={video.raw.degree} />
-                  <TechPill label="Betweenness" value={video.raw.betweenness} />
-                  <TechPill label="Closeness" value={video.raw.closeness} />
-                </div>
-              )}
-            </div>
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-slate-200">
+            <th className="text-left py-2 px-3 text-xs font-semibold text-slate-600">Video</th>
+            <th className="text-center py-2 px-3 text-xs font-semibold text-slate-600">Retention</th>
+            <th className="text-center py-2 px-3 text-xs font-semibold text-slate-600">Discovery</th>
+            <th className="text-center py-2 px-3 text-xs font-semibold text-slate-600">Entry</th>
+            <th className="text-center py-2 px-3 text-xs font-semibold text-slate-600">Influence</th>
+            <th className="text-center py-2 px-3 text-xs font-semibold text-slate-600">Role</th>
+          </tr>
+        </thead>
+        <tbody>
+          {videos.slice(0, 10).map((video) => (
+            <tr key={video.id} className="border-b border-slate-100">
+              <td className="py-2 px-3">
+                <p className="font-medium text-slate-900 truncate max-w-xs" title={video.title}>
+                  {video.title}
+                </p>
+              </td>
+              <td className="text-center py-2 px-3">
+                <span className="text-xs font-medium">{Math.round(video.retention_strength)}</span>
+              </td>
+              <td className="text-center py-2 px-3">
+                <span className="text-xs font-medium">{Math.round(video.discoverability_score)}</span>
+              </td>
+              <td className="text-center py-2 px-3">
+                <span className="text-xs font-medium">{Math.round(video.entry_friendliness)}</span>
+              </td>
+              <td className="text-center py-2 px-3">
+                <span className="text-xs font-semibold text-indigo-600">{Math.round(video.content_influence)}</span>
+              </td>
+              <td className="text-center py-2 px-3">
+                <span className="text-xs px-2 py-1 bg-slate-100 text-slate-700 rounded-full">
+                  {video.role}
+                </span>
+              </td>
+            </tr>
           ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ActionCard({ label, title, description, badge }) {
-  return (
-    <div className="bg-white border border-slate-200 rounded-xl p-4 flex flex-col gap-2">
-      <div className="flex items-center justify-between">
-        <span className="text-[11px] font-semibold text-slate-600 bg-slate-100 px-2 py-1 rounded-full">
-          {label}
-        </span>
-        <span className="text-[11px] text-indigo-700 bg-indigo-50 px-2 py-1 rounded-full">
-          {badge}
-        </span>
-      </div>
-      <p className="font-semibold text-slate-900 line-clamp-2">{title}</p>
-      <p className="text-sm text-slate-600">{description}</p>
-    </div>
-  );
-}
-
-function InsightItem({ text }) {
-  return (
-    <div className="flex items-start gap-3 p-3 rounded-lg bg-slate-50 border border-slate-100">
-      <div className="bg-indigo-600 text-white rounded-full w-6 h-6 flex items-center justify-center text-xs font-bold shrink-0 mt-0.5">
-        ✓
-      </div>
-      <p className="text-sm text-slate-700">{text}</p>
-    </div>
-  );
-}
-
-function CentralityTable({ videos, showTechnical }) {
-  return (
-    <div className="overflow-hidden rounded-lg border border-slate-200">
-      <div className="grid grid-cols-12 bg-slate-50 text-xs font-semibold text-slate-600 px-4 py-2">
-        <div className="col-span-6">Video</div>
-        <div className="col-span-2 text-center">{showTechnical ? "Degree" : "Highly connected"}</div>
-        <div className="col-span-2 text-center">{showTechnical ? "Betweenness" : "Discovery"}</div>
-        <div className="col-span-2 text-center">{showTechnical ? "Closeness" : "Core reach"}</div>
-      </div>
-      <div className="divide-y divide-slate-100">
-        {videos.slice(0, 8).map((v) => (
-          <div key={v.id} className="grid grid-cols-12 px-4 py-3 text-sm items-center">
-            <div className="col-span-6">
-              <p className="font-medium text-slate-900 truncate">{v.title}</p>
-              {showTechnical && (
-                <p className="text-[11px] text-slate-500 truncate">ID: {v.id}</p>
-              )}
-            </div>
-            <div className="col-span-2 text-center">
-              <ScorePill value={Math.round(v.degree)} label={showTechnical ? "Degree" : "Connections"} />
-            </div>
-            <div className="col-span-2 text-center">
-              <ScorePill value={Math.round(v.betweenness)} label={showTechnical ? "Betweenness" : "Bridges"} />
-            </div>
-            <div className="col-span-2 text-center">
-              <ScorePill value={Math.round(v.closeness)} label={showTechnical ? "Closeness" : "Core reach"} />
-            </div>
-          </div>
-        ))}
-        {videos.length === 0 && (
-          <div className="px-4 py-3 text-sm text-slate-500">No videos available.</div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function ScorePill({ value, label }) {
-  return (
-    <div className="inline-flex flex-col items-center justify-center gap-1">
-      <span className="text-xs text-slate-500">{label}</span>
-      <span className="px-2 py-1 rounded-full bg-slate-100 text-slate-900 text-xs font-semibold">
-        {value}/100
-      </span>
-    </div>
-  );
-}
-
-function TechPill({ label, value }) {
-  return (
-    <div className="inline-flex items-center gap-1 px-2 py-1 bg-slate-100 text-slate-600 rounded-full">
-      <span>{label}</span>
-      <span className="font-semibold">{Number(value).toFixed(2)}</span>
+        </tbody>
+      </table>
     </div>
   );
 }
