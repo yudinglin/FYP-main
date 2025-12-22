@@ -7,6 +7,7 @@ import os
 
 # import blueprint
 from routes.Unregistered_User.register_user import register_bp
+from routes.Unregistered_User.payment import payment_bp
 from routes.Shared.login import login_bp
 from routes.Shared.profile import profile_bp 
 from routes.YouTube.channels_list import channels_bp
@@ -32,6 +33,7 @@ jwt = JWTManager(app)
 
 # build blueprint
 app.register_blueprint(register_bp)
+app.register_blueprint(payment_bp)
 app.register_blueprint(login_bp)
 app.register_blueprint(profile_bp)   
 app.register_blueprint(channels_bp)

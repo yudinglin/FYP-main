@@ -11,6 +11,7 @@ import ContactSupport from "../../pages/misc/ContactSupport";
 import Login from "../../pages/auth/Login.jsx";
 import Register from "../../pages/auth/Register.jsx";
 import PlansPage from "../../pages/UnregisteredUser/PlansPage.jsx";
+import PaymentPage from "../../pages/UnregisteredUser/PaymentPage.jsx";
 
 import CreatorDashboard from "../../pages/dashboard/CreatorDashboard.jsx";
 import BusinessDashboard from "../../pages/dashboard/BusinessDashboard.jsx";
@@ -48,6 +49,16 @@ export default function AppRouter() {
         element={
           <MainLayout>
             <PlansPage />
+          </MainLayout>
+        }
+      />
+
+    {/* Payment Page */}
+      <Route
+        path="/payment"
+        element={
+          <MainLayout>
+            <PaymentPage />
           </MainLayout>
         }
       />

@@ -26,7 +26,7 @@ export default function PlansPage() {
             </ul>
           </div>
           <Link
-            to="/register?role=creator"
+            to="/payment?plan=creator"
             className="block text-center bg-red-600 text-white py-3 rounded-full font-medium hover:bg-red-700 transition"
           >
             Get Started
@@ -49,7 +49,7 @@ export default function PlansPage() {
             </ul>
           </div>
           <Link
-            to="/register?role=business"
+            to="/payment?plan=business"
             className="block text-center bg-red-600 text-white py-3 rounded-full font-medium hover:bg-red-700 transition"
           >
             Get Started

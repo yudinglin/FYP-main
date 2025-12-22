@@ -248,3 +248,13 @@ CREATE TABLE Review (
 ) ENGINE=InnoDB;
 
 
+INSERT INTO SubscriptionPlan (name, description, target_role, price_monthly, max_channels, max_saved_graphs, is_active)
+VALUES 
+    ('Content Creator', 'Perfect for YouTubers who want analytics, predictions, and network graphs.', 'creator', 12.00, 1, 5, TRUE),
+    ('Business', 'For companies analyzing multiple channels & industry trends.', 'business', 30.00, 10, 50, TRUE)
+ON DUPLICATE KEY UPDATE 
+    description = VALUES(description),
+    price_monthly = VALUES(price_monthly),
+    max_channels = VALUES(max_channels),
+    max_saved_graphs = VALUES(max_saved_graphs),
+    is_active = VALUES(is_active);
