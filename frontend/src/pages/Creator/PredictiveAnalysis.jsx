@@ -28,6 +28,7 @@ export default function PredictiveAnalysis() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const { user } = useAuth();
+  const [activeView, setActiveView] = useState("charts"); // 'charts' or 'summary'
 
   useEffect(() => {
     async function fetchSubscriberData() {
@@ -353,280 +354,390 @@ export default function PredictiveAnalysis() {
     return null;
   };
 
-  return (
-    <div className="min-h-[calc(100vh-72px)] bg-white p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Subscriber Growth Prediction
-          </h1>
+  // Summary Panel Component
+  const SummaryPanel = ({ subscriberHistory, growthAnalytics, chartData }) => {
+    if (!subscriberHistory || subscriberHistory.length === 0 || !growthAnalytics.stats) {
+      return (
+        <div className="p-6 text-center text-slate-500">
+          No data available for summary.
+        </div>
+      );
+    }
 
+    const stats = growthAnalytics.stats;
+    const milestones = growthAnalytics.milestones;
+
+    return (
+      <div className="p-6 space-y-6">
+        {/* Overall Performance */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">Subscriber Growth Overview</h3>
+          <p className="text-slate-700">
+            Your channel currently has <span className="font-medium">{stats.current.toLocaleString()}</span> subscribers.
+            Based on historical data, you're projected to reach <span className="font-medium">{stats.projected6Months.toLocaleString()}</span> subscribers in 6 months,
+            with an average monthly growth rate of <span className="font-medium">{stats.avgGrowthRate}%</span> and gaining about <span className="font-medium">{stats.avgVelocity.toLocaleString()}</span> subscribers per month.
+          </p>
         </div>
 
-        {loading && (
-          <div className="rounded-xl bg-white p-12 border-2 border-gray-200 shadow-lg">
-            <div className="flex items-center justify-center">
-              <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
-              <p className="ml-4 text-gray-700">Loading subscriber data...</p>
-            </div>
-          </div>
-        )}
-
-        {error && (
-          <div className="rounded-xl bg-red-50 p-6 border-2 border-red-200 shadow-lg">
-            <p className="text-red-700 font-medium">{error}</p>
-          </div>
-        )}
-
-        {!loading && !error && (!subscriberHistory || subscriberHistory.length < 2) && (
-          <div className="rounded-xl bg-white p-12 border-2 border-gray-200 shadow-lg">
-            <div className="text-center">
-              <p className="text-gray-600">
-                {subscriberHistory?.length === 0 
-                  ? "No subscriber history available. Please ensure your channel has videos with publish dates." 
-                  : "At least 2 data points required for prediction"}
-              </p>
-            </div>
-          </div>
-        )}
-
-        {!loading && !error && subscriberHistory && subscriberHistory.length >= 2 && growthAnalytics.stats && (
-          <>
-            {/* Key Statistics Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-              <StatCard
-                label="Current Subscribers"
-                value={growthAnalytics.stats.current.toLocaleString()}
-                icon="👥"
-                gradient="from-red-600 to-red-700"
-              />
-              <StatCard
-                label="6-Month Projection"
-                value={growthAnalytics.stats.projected6Months.toLocaleString()}
-                icon="📈"
-                gradient="from-blue-900 to-blue-950"
-              />
-              <StatCard
-                label="Avg Growth Rate"
-                value={`${growthAnalytics.stats.avgGrowthRate}%`}
-                icon="⚡"
-                gradient="from-red-700 to-red-800"
-              />
-              <StatCard
-                label="Avg Monthly Gain"
-                value={growthAnalytics.stats.avgVelocity.toLocaleString()}
-                icon="🚀"
-                gradient="from-blue-950 to-gray-900"
-              />
-            </div>
-
-            {/* Main Growth Chart */}
-            <div className="rounded-xl bg-white p-6 border-2 border-gray-200 shadow-lg mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-xl font-bold text-gray-900">Subscriber Growth Forecast</h2>
-              </div>
-              <div className="w-full" style={{ height: "450px" }}>
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart
-                    data={chartData}
-                    margin={{ top: 10, right: 15, left: 5, bottom: 70 }}
-                  >
-                    <defs>
-                      <linearGradient id="colorHistorical" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#1e3a8a" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#1e3a8a" stopOpacity={0.1}/>
-                      </linearGradient>
-                      <linearGradient id="colorPredicted" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="#dc2626" stopOpacity={0.8}/>
-                        <stop offset="95%" stopColor="#dc2626" stopOpacity={0.1}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" opacity={0.5} />
-                    <XAxis
-                      dataKey="date"
-                      tickFormatter={formatDate}
-                      stroke="#4b5563"
-                      style={{ fontSize: "11px", fontWeight: "500" }}
-                      angle={-45}
-                      textAnchor="end"
-                      height={60}
-                    />
-                    <YAxis
-                      stroke="#4b5563"
-                      style={{ fontSize: "11px", fontWeight: "500" }}
-                      tickFormatter={(value) => {
-                        if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
-                        if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
-                        return value.toString();
-                      }}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <Legend
-                      wrapperStyle={{ fontSize: "12px", paddingTop: "10px", fontWeight: "600" }}
-                      iconType="line"
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="historical"
-                      name="Historical"
-                      stroke="#1e3a8a"
-                      fillOpacity={1}
-                      fill="url(#colorHistorical)"
-                      strokeWidth={3}
-                    />
-                    <Area
-                      type="monotone"
-                      dataKey="predicted"
-                      name="Predicted (6 months)"
-                      stroke="#dc2626"
-                      fillOpacity={1}
-                      fill="url(#colorPredicted)"
-                      strokeWidth={3}
-                      strokeDasharray="5 5"
-                    />
-                  </AreaChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-
-            {/* Growth Rate & Velocity Charts */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              {/* Growth Rate Chart */}
-              <div className="rounded-xl bg-white p-6 border-2 border-gray-200 shadow-lg">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Monthly Growth Rate (%)</h3>
-                <div className="w-full" style={{ height: "300px" }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={growthAnalytics.growthRate}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" opacity={0.5} />
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={formatDate}
-                        stroke="#4b5563"
-                        style={{ fontSize: "10px", fontWeight: "500" }}
-                        angle={-45}
-                        textAnchor="end"
-                        height={60}
-                      />
-                      <YAxis stroke="#4b5563" style={{ fontSize: "11px", fontWeight: "500" }} />
-                      <Tooltip
-                        contentStyle={{ 
-                          backgroundColor: 'white', 
-                          border: '2px solid #dc2626',
-                          borderRadius: '8px',
-                          fontWeight: '600'
-                        }}
-                        formatter={(value) => [`${value}%`, "Growth Rate"]}
-                      />
-                      <Bar dataKey="growthRate" fill="#1e3a8a" radius={[8, 8, 0, 0]} />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-
-              {/* Growth Velocity Chart */}
-              <div className="rounded-xl bg-white p-6 border-2 border-gray-200 shadow-lg">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">Subscribers Gained per Month</h3>
-                <div className="w-full" style={{ height: "300px" }}>
-                  <ResponsiveContainer width="100%" height="100%">
-                    <ComposedChart data={growthAnalytics.velocity}>
-                      <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" opacity={0.5} />
-                      <XAxis
-                        dataKey="date"
-                        tickFormatter={formatDate}
-                        stroke="#4b5563"
-                        style={{ fontSize: "10px", fontWeight: "500" }}
-                        angle={-45}
-                        textAnchor="end"
-                        height={60}
-                      />
-                      <YAxis stroke="#4b5563" style={{ fontSize: "11px", fontWeight: "500" }} />
-                      <Tooltip
-                        contentStyle={{ 
-                          backgroundColor: 'white', 
-                          border: '2px solid #dc2626',
-                          borderRadius: '8px',
-                          fontWeight: '600'
-                        }}
-                        formatter={(value) => [value.toLocaleString(), "Subscribers Gained"]}
-                      />
-                      <Bar dataKey="gained" fill="#dc2626" radius={[8, 8, 0, 0]} />
-                      <Line type="monotone" dataKey="gained" stroke="#1e3a8a" strokeWidth={3} />
-                    </ComposedChart>
-                  </ResponsiveContainer>
-                </div>
-              </div>
-            </div>
-
-            {/* Milestones & Monthly Breakdown */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-              {/* Projected Milestones */}
-              <div className="rounded-xl bg-white p-6 border-2 border-gray-200 shadow-lg">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">🎯 Projected Milestones</h3>
-                {growthAnalytics.milestones.length > 0 ? (
-                  <div className="space-y-3">
-                    {growthAnalytics.milestones.slice(0, 5).map((milestone, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center justify-between p-4 bg-gradient-to-r from-red-50 to-blue-50 rounded-lg border-2 border-red-200"
-                      >
-                        <div>
-                          <p className="text-gray-900 font-bold">{milestone.milestone} Subscribers</p>
-                          <p className="text-gray-600 text-sm font-medium">{milestone.projectedDate}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-red-600 font-bold text-xl">{milestone.monthsAway}</p>
-                          <p className="text-gray-600 text-xs font-medium">months away</p>
-                        </div>
-                      </div>
-                    ))}
+        {/* Key Milestones */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <h3 className="text-lg font-semibold text-slate-900 mb-3">Upcoming Milestones</h3>
+          <p className="text-slate-600 mb-4">Projected dates to reach major subscriber counts:</p>
+          {milestones.length > 0 ? (
+            <div className="space-y-3">
+              {milestones.slice(0, 5).map((milestone, idx) => (
+                <div
+                  key={idx}
+                  className="flex items-center justify-between p-4 bg-gradient-to-r from-red-50 to-blue-50 rounded-lg border-2 border-red-200"
+                >
+                  <div>
+                    <p className="text-gray-900 font-bold">{milestone.milestone} Subscribers</p>
+                    <p className="text-gray-600 text-sm font-medium">{milestone.projectedDate}</p>
                   </div>
-                ) : (
-                  <p className="text-gray-600 text-sm">All major milestones achieved! 🎉</p>
-                )}
+                  <div className="text-right">
+                    <p className="text-red-600 font-bold text-xl">{milestone.monthsAway}</p>
+                    <p className="text-gray-600 text-xs font-medium">months away</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-gray-600">All major milestones achieved! 🎉</p>
+          )}
+        </div>
+
+        {/* Growth Insights */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <h3 className="text-lg font-semibold text-slate-900 mb-3">Growth Insights</h3>
+          <ul className="space-y-2 text-slate-700">
+            <li>• Your subscriber growth shows {stats.avgGrowthRate > 2 ? "strong" : stats.avgGrowthRate > 1 ? "moderate" : "slow"} momentum with a {stats.avgGrowthRate}% monthly increase.</li>
+            <li>• On average, you're gaining {stats.avgVelocity.toLocaleString()} new subscribers each month.</li>
+            <li>• Total growth since the start of tracking: {stats.totalGrowth.toLocaleString()} subscribers.</li>
+            <li>• Keep up the consistent content creation to maintain this trajectory!</li>
+          </ul>
+        </div>
+
+        {/* Actionable Suggestions */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <h3 className="text-lg font-semibold text-slate-900 mb-3">Tips to Accelerate Growth</h3>
+          <ul className="space-y-2 text-slate-700">
+            <li>• Analyze your top-performing videos and create similar content.</li>
+            <li>• Engage with your audience through comments and community posts.</li>
+            <li>• Optimize video titles, thumbnails, and descriptions for better discoverability.</li>
+            <li>• Collaborate with other creators to tap into new audiences.</li>
+            <li>• Post consistently and promote your videos on social media.</li>
+          </ul>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-[calc(100vh-72px)] bg-slate-50 p-6 max-w-7xl mx-auto flex gap-6">
+      {/* Sidebar */}
+      <div className="w-60 bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">Analysis Views</h2>
+        <div className="space-y-2">
+          <button
+            onClick={() => setActiveView("charts")}
+            className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
+              activeView === "charts" ? "bg-indigo-100 text-indigo-700" : "text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+            Charts & Graphs
+          </button>
+          <button
+            onClick={() => setActiveView("summary")}
+            className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
+              activeView === "summary" ? "bg-indigo-100 text-indigo-700" : "text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+            Summary
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1">
+        {activeView === "charts" ? (
+          <>
+            <div className="max-w-7xl mx-auto">
+              {/* Header */}
+              <div className="mb-8">
+                <h1 className="text-4xl font-bold text-gray-900 mb-2">
+                  Subscriber Growth Prediction
+                </h1>
+
               </div>
 
-              {/* Monthly Breakdown Table */}
-              <div className="rounded-xl bg-white p-6 border-2 border-gray-200 shadow-lg">
-                <h3 className="text-lg font-bold text-gray-900 mb-4">📊 Monthly Breakdown</h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b-2 border-gray-300">
-                        <th className="text-left py-2 text-gray-700 font-bold">Month</th>
-                        <th className="text-right py-2 text-gray-700 font-bold">Subscribers</th>
-                        <th className="text-right py-2 text-gray-700 font-bold">Growth</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {chartData.slice(-8).map((item, idx) => {
-                        const prevItem = chartData[chartData.indexOf(item) - 1];
-                        const value = item.historical ?? item.predicted ?? 0;
-                        const prevValue = prevItem ? (prevItem.historical ?? prevItem.predicted ?? 0) : value;
-                        const growth = value - prevValue;
-                        const isPredicted = item.predicted !== null;
-                        
-                        return (
-                          <tr key={idx} className="border-b border-gray-200">
-                            <td className="py-2 text-gray-700 font-medium">
-                              {formatDate(item.date)}
-                              {isPredicted && <span className="ml-2 text-xs text-red-600 font-bold">●</span>}
-                            </td>
-                            <td className="text-right py-2 text-gray-900 font-bold">
-                              {value.toLocaleString()}
-                            </td>
-                            <td className={`text-right py-2 font-bold ${growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                              {growth >= 0 ? '+' : ''}{growth.toLocaleString()}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
+              {loading && (
+                <div className="rounded-xl bg-white p-12 border-2 border-gray-200 shadow-lg">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-red-600"></div>
+                    <p className="ml-4 text-gray-700">Loading subscriber data...</p>
+                  </div>
                 </div>
-              </div>
+              )}
+
+              {error && (
+                <div className="rounded-xl bg-red-50 p-6 border-2 border-red-200 shadow-lg">
+                  <p className="text-red-700 font-medium">{error}</p>
+                </div>
+              )}
+
+              {!loading && !error && (!subscriberHistory || subscriberHistory.length < 2) && (
+                <div className="rounded-xl bg-white p-12 border-2 border-gray-200 shadow-lg">
+                  <div className="text-center">
+                    <p className="text-gray-600">
+                      {subscriberHistory?.length === 0 
+                        ? "No subscriber history available. Please ensure your channel has videos with publish dates." 
+                        : "At least 2 data points required for prediction"}
+                    </p>
+                  </div>
+                </div>
+              )}
+
+              {!loading && !error && subscriberHistory && subscriberHistory.length >= 2 && growthAnalytics.stats && (
+                <>
+                  {/* Key Statistics Cards */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                    <StatCard
+                      label="Current Subscribers"
+                      value={growthAnalytics.stats.current.toLocaleString()}
+                      icon="👥"
+                      gradient="from-red-600 to-red-700"
+                    />
+                    <StatCard
+                      label="6-Month Projection"
+                      value={growthAnalytics.stats.projected6Months.toLocaleString()}
+                      icon="📈"
+                      gradient="from-blue-900 to-blue-950"
+                    />
+                    <StatCard
+                      label="Avg Growth Rate"
+                      value={`${growthAnalytics.stats.avgGrowthRate}%`}
+                      icon="⚡"
+                      gradient="from-red-700 to-red-800"
+                    />
+                    <StatCard
+                      label="Avg Monthly Gain"
+                      value={growthAnalytics.stats.avgVelocity.toLocaleString()}
+                      icon="🚀"
+                      gradient="from-blue-950 to-gray-900"
+                    />
+                  </div>
+
+                  {/* Main Growth Chart */}
+                  <div className="rounded-xl bg-white p-6 border-2 border-gray-200 shadow-lg mb-6">
+                    <div className="flex items-center justify-between mb-4">
+                      <h2 className="text-xl font-bold text-gray-900">Subscriber Growth Forecast</h2>
+                    </div>
+                    <div className="w-full" style={{ height: "450px" }}>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <AreaChart
+                          data={chartData}
+                          margin={{ top: 10, right: 15, left: 5, bottom: 70 }}
+                        >
+                          <defs>
+                            <linearGradient id="colorHistorical" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#1e3a8a" stopOpacity={0.8}/>
+                              <stop offset="95%" stopColor="#1e3a8a" stopOpacity={0.1}/>
+                            </linearGradient>
+                            <linearGradient id="colorPredicted" x1="0" y1="0" x2="0" y2="1">
+                              <stop offset="5%" stopColor="#dc2626" stopOpacity={0.8}/>
+                              <stop offset="95%" stopColor="#dc2626" stopOpacity={0.1}/>
+                            </linearGradient>
+                          </defs>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" opacity={0.5} />
+                          <XAxis
+                            dataKey="date"
+                            tickFormatter={formatDate}
+                            stroke="#4b5563"
+                            style={{ fontSize: "11px", fontWeight: "500" }}
+                            angle={-45}
+                            textAnchor="end"
+                            height={60}
+                          />
+                          <YAxis
+                            stroke="#4b5563"
+                            style={{ fontSize: "11px", fontWeight: "500" }}
+                            tickFormatter={(value) => {
+                              if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
+                              if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
+                              return value.toString();
+                            }}
+                          />
+                          <Tooltip content={<CustomTooltip />} />
+                          <Legend
+                            wrapperStyle={{ fontSize: "12px", paddingTop: "10px", fontWeight: "600" }}
+                            iconType="line"
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="historical"
+                            name="Historical"
+                            stroke="#1e3a8a"
+                            fillOpacity={1}
+                            fill="url(#colorHistorical)"
+                            strokeWidth={3}
+                          />
+                          <Area
+                            type="monotone"
+                            dataKey="predicted"
+                            name="Predicted (6 months)"
+                            stroke="#dc2626"
+                            fillOpacity={1}
+                            fill="url(#colorPredicted)"
+                            strokeWidth={3}
+                            strokeDasharray="5 5"
+                          />
+                        </AreaChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </div>
+
+                  {/* Growth Rate & Velocity Charts */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    {/* Growth Rate Chart */}
+                    <div className="rounded-xl bg-white p-6 border-2 border-gray-200 shadow-lg">
+                      <h3 className="text-lg font-bold text-gray-900 mb-4">Monthly Growth Rate (%)</h3>
+                      <div className="w-full" style={{ height: "300px" }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={growthAnalytics.growthRate}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" opacity={0.5} />
+                            <XAxis
+                              dataKey="date"
+                              tickFormatter={formatDate}
+                              stroke="#4b5563"
+                              style={{ fontSize: "10px", fontWeight: "500" }}
+                              angle={-45}
+                              textAnchor="end"
+                              height={60}
+                            />
+                            <YAxis stroke="#4b5563" style={{ fontSize: "11px", fontWeight: "500" }} />
+                            <Tooltip
+                              contentStyle={{ 
+                                backgroundColor: 'white', 
+                                border: '2px solid #dc2626',
+                                borderRadius: '8px',
+                                fontWeight: '600'
+                              }}
+                              formatter={(value) => [`${value}%`, "Growth Rate"]}
+                            />
+                            <Bar dataKey="growthRate" fill="#1e3a8a" radius={[8, 8, 0, 0]} />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+
+                    {/* Growth Velocity Chart */}
+                    <div className="rounded-xl bg-white p-6 border-2 border-gray-200 shadow-lg">
+                      <h3 className="text-lg font-bold text-gray-900 mb-4">Subscribers Gained per Month</h3>
+                      <div className="w-full" style={{ height: "300px" }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <ComposedChart data={growthAnalytics.velocity}>
+                            <CartesianGrid strokeDasharray="3 3" stroke="#d1d5db" opacity={0.5} />
+                            <XAxis
+                              dataKey="date"
+                              tickFormatter={formatDate}
+                              stroke="#4b5563"
+                              style={{ fontSize: "10px", fontWeight: "500" }}
+                              angle={-45}
+                              textAnchor="end"
+                              height={60}
+                            />
+                            <YAxis stroke="#4b5563" style={{ fontSize: "11px", fontWeight: "500" }} />
+                            <Tooltip
+                              contentStyle={{ 
+                                backgroundColor: 'white', 
+                                border: '2px solid #dc2626',
+                                borderRadius: '8px',
+                                fontWeight: '600'
+                              }}
+                              formatter={(value) => [value.toLocaleString(), "Subscribers Gained"]}
+                            />
+                            <Bar dataKey="gained" fill="#dc2626" radius={[8, 8, 0, 0]} />
+                            <Line type="monotone" dataKey="gained" stroke="#1e3a8a" strokeWidth={3} />
+                          </ComposedChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Milestones & Monthly Breakdown */}
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+                    {/* Projected Milestones */}
+                    <div className="rounded-xl bg-white p-6 border-2 border-gray-200 shadow-lg">
+                      <h3 className="text-lg font-bold text-gray-900 mb-4">🎯 Projected Milestones</h3>
+                      {growthAnalytics.milestones.length > 0 ? (
+                        <div className="space-y-3">
+                          {growthAnalytics.milestones.slice(0, 5).map((milestone, idx) => (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between p-4 bg-gradient-to-r from-red-50 to-blue-50 rounded-lg border-2 border-red-200"
+                            >
+                              <div>
+                                <p className="text-gray-900 font-bold">{milestone.milestone} Subscribers</p>
+                                <p className="text-gray-600 text-sm font-medium">{milestone.projectedDate}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-red-600 font-bold text-xl">{milestone.monthsAway}</p>
+                                <p className="text-gray-600 text-xs font-medium">months away</p>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <p className="text-gray-600 text-sm">All major milestones achieved! 🎉</p>
+                      )}
+                    </div>
+
+                    {/* Monthly Breakdown Table */}
+                    <div className="rounded-xl bg-white p-6 border-2 border-gray-200 shadow-lg">
+                      <h3 className="text-lg font-bold text-gray-900 mb-4">📊 Monthly Breakdown</h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b-2 border-gray-300">
+                              <th className="text-left py-2 text-gray-700 font-bold">Month</th>
+                              <th className="text-right py-2 text-gray-700 font-bold">Subscribers</th>
+                              <th className="text-right py-2 text-gray-700 font-bold">Growth</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {chartData.slice(-8).map((item, idx) => {
+                              const prevItem = chartData[chartData.indexOf(item) - 1];
+                              const value = item.historical ?? item.predicted ?? 0;
+                              const prevValue = prevItem ? (prevItem.historical ?? prevItem.predicted ?? 0) : value;
+                              const growth = value - prevValue;
+                              const isPredicted = item.predicted !== null;
+                              
+                              return (
+                                <tr key={idx} className="border-b border-gray-200">
+                                  <td className="py-2 text-gray-700 font-medium">
+                                    {formatDate(item.date)}
+                                    {isPredicted && <span className="ml-2 text-xs text-red-600 font-bold">●</span>}
+                                  </td>
+                                  <td className="text-right py-2 text-gray-900 font-bold">
+                                    {value.toLocaleString()}
+                                  </td>
+                                  <td className={`text-right py-2 font-bold ${growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                                    {growth >= 0 ? '+' : ''}{growth.toLocaleString()}
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </>
+        ) : (
+          <SummaryPanel subscriberHistory={subscriberHistory} growthAnalytics={growthAnalytics} chartData={chartData} />
         )}
       </div>
     </div>

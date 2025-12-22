@@ -1,9 +1,9 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../core/context/AuthContext";
 
 export default function ContactSupport() {
-  const { user } = useAuth();
+  const { user, token } = useAuth();
   const navigate = useNavigate();
 
   // Only allow non-admin users
@@ -13,11 +13,26 @@ export default function ContactSupport() {
   }
 
   const [form, setForm] = useState({
+    name: "",
+    email: "",
     category: "",
     subject: "",
     message: "",
-    attachment: null,
   });
+
+  useEffect(() => {
+    const defaultName = user
+      ? `${user.first_name || ""} ${user.last_name || ""}`.trim()
+      : "";
+    setForm((prev) => ({
+      ...prev,
+      name: prev.name || defaultName,
+      email: prev.email || user?.email || "",
+    }));
+  }, [user]);
+
+  const [status, setStatus] = useState({ type: null, message: "" });
+  const [submitting, setSubmitting] = useState(false);
 
   const [view, setView] = useState("new"); // "new" or "responses"
 
@@ -41,18 +56,54 @@ export default function ContactSupport() {
 
   const handleChange = (e) => {
     const { name, value, files } = e.target;
-    if (name === "attachment") {
-      setForm({ ...form, attachment: files[0] });
-    } else {
-      setForm({ ...form, [name]: value });
-    }
+    setForm({ ...form, [name]: value });
   };
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    console.log("Contact Support Form Submitted:", form);
-    alert("Your message has been submitted!");
-    setForm({ category: "", subject: "", message: "", attachment: null });
+    setStatus({ type: null, message: "" });
+    setSubmitting(true);
+
+    const payload = {
+      name: form.name?.trim(),
+      email: form.email?.trim(),
+      category: form.category,
+      subject: form.subject,
+      message: form.message,
+    };
+
+    try {
+      const resp = await fetch("http://localhost:5000/api/support", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) {
+        throw new Error(data.message || "Unable to submit support request");
+      }
+
+      setStatus({
+        type: "success",
+        message: data.message || "Your request has been submitted.",
+      });
+
+      setForm({
+        name: payload.name || form.name,
+        email: payload.email || form.email,
+        category: "",
+        subject: "",
+        message: "",
+      });
+    } catch (err) {
+      setStatus({ type: "error", message: err.message });
+    } finally {
+      setSubmitting(false);
+    }
   };
 
   return (
@@ -97,6 +148,36 @@ export default function ContactSupport() {
             </p>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex flex-col">
+                  <span className="text-gray-700 font-medium">Name</span>
+                  <input
+                    type="text"
+                    name="name"
+                    value={form.name}
+                    onChange={handleChange}
+                    className="mt-1 p-2 border border-gray-300 rounded-md"
+                    placeholder="Your name"
+                    required
+                    disabled={!!user}
+                  />
+                </label>
+
+                <label className="flex flex-col">
+                  <span className="text-gray-700 font-medium">Email</span>
+                  <input
+                    type="email"
+                    name="email"
+                    value={form.email}
+                    onChange={handleChange}
+                    className="mt-1 p-2 border border-gray-300 rounded-md"
+                    placeholder="you@example.com"
+                    required
+                    disabled={!!user}
+                  />
+                </label>
+              </div>
+
               <label className="flex flex-col">
                 <span className="text-gray-700 font-medium">Category</span>
                 <select
@@ -140,21 +221,24 @@ export default function ContactSupport() {
                 />
               </label>
 
-              <label className="flex flex-col">
-                <span className="text-gray-700 font-medium">Attachment (optional)</span>
-                <input
-                  type="file"
-                  name="attachment"
-                  onChange={handleChange}
-                  className="mt-1"
-                />
-              </label>
+              {status.message && (
+                <div
+                  className={`rounded-md p-3 text-sm ${
+                    status.type === "success"
+                      ? "bg-green-50 text-green-700 border border-green-200"
+                      : "bg-red-50 text-red-700 border border-red-200"
+                  }`}
+                >
+                  {status.message}
+                </div>
+              )}
 
               <button
                 type="submit"
-                className="mt-4 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition font-semibold"
+                disabled={submitting}
+                className="mt-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition font-semibold disabled:opacity-70"
               >
-                Submit
+                {submitting ? "Submitting..." : "Submit"}
               </button>
             </form>
           </div>
