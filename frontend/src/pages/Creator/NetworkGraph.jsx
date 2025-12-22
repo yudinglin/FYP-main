@@ -1,5 +1,3 @@
-// frontend/src/pages/Creator/NetworkGraph.jsx
-//18273102
 import React, { useState, useRef, useEffect } from "react";
 import ForceGraph2D from "react-force-graph-2d";
 import {
@@ -21,7 +19,6 @@ import { useAuth } from "../../core/context/AuthContext";
 const API_BASE = "http://127.0.0.1:5000";
 
 export default function NetworkGraph() {
-  const [channelInput, setChannelInput] = useState("");
   const [threshold, setThreshold] = useState(0.9);
   const [maxVideos, setMaxVideos] = useState(10); // <-- New state
   const [graphData, setGraphData] = useState({ nodes: [], links: [], rawMetrics: [] });
@@ -31,6 +28,7 @@ export default function NetworkGraph() {
   const { user } = useAuth();
   const containerRef = useRef();
   const [barMetric, setBarMetric] = useState("views"); // views / likes / comments
+  const [activeView, setActiveView] = useState("charts"); // 'charts' or 'summary'
 
   const handleFetchGraph = async () => {
     setLoading(true);
@@ -144,16 +142,154 @@ export default function NetworkGraph() {
 
   const truncate = (str, n = 30) => str?.length > n ? str.substr(0, n) + "..." : str;
 
-  return (
-    <div className="min-h-[calc(100vh-72px)] bg-slate-50 p-6 max-w-7xl mx-auto">
-      <h1 className="text-2xl font-semibold text-slate-900 mb-4">
-        Enhanced Video Correlation Network
-      </h1>
+  // Summary Panel Component
+  const SummaryPanel = ({ data }) => {
+    if (!data || data.length === 0) {
+      return (
+        <div className="p-6 text-center text-slate-500">
+          No data available for summary.
+        </div>
+      );
+    }
 
-      <p className="text-sm text-slate-500 mb-6">
-        Explore which videos behave similarly based on views, likes, and comments.
-        Node size = views, color = engagement rate. Click a node to open the video.
-      </p>
+    // Calculate metrics
+    const sortedByViews = [...data].sort((a, b) => (b.views || 0) - (a.views || 0));
+    const sortedByComments = [...data].sort((a, b) => (b.comments || 0) - (a.comments || 0));
+
+    const topVideos = sortedByViews.slice(0, 3);
+    const lowVideos = sortedByViews.slice(-3).reverse(); // bottom 3, but reverse for display
+
+    const avgViews = data.reduce((sum, v) => sum + (v.views || 0), 0) / data.length;
+    const avgLikes = data.reduce((sum, v) => sum + (v.likes || 0), 0) / data.length;
+    const avgComments = data.reduce((sum, v) => sum + (v.comments || 0), 0) / data.length;
+    const avgEngagement = data.reduce((sum, v) => {
+      const views = v.views || 0;
+      return sum + (views > 0 ? ((v.likes || 0) + (v.comments || 0)) / views : 0);
+    }, 0) / data.length;
+
+    const overallPerformance = avgEngagement > 0.05 ? "excellent" : avgEngagement > 0.02 ? "good" : "needs improvement";
+
+    const engagementDrivers = sortedByComments.slice(0, 3); // videos with most comments drive engagement
+
+    return (
+      <div className="p-6 space-y-6">
+        {/* Overall Performance */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">Channel Performance Overview</h3>
+          <p className="text-slate-700">
+            Your content is performing <span className="font-medium">{overallPerformance}</span>. 
+            On average, your videos get {Math.round(avgViews).toLocaleString()} views, 
+            {Math.round(avgLikes).toLocaleString()} likes, and {Math.round(avgComments).toLocaleString()} comments.
+          </p>
+        </div>
+
+        {/* Top Performing Videos */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <h3 className="text-lg font-semibold text-slate-900 mb-3">Your Best Performing Videos</h3>
+          <p className="text-slate-600 mb-4">These videos are getting the most attention from viewers:</p>
+          <div className="space-y-3">
+            {topVideos.map((video, idx) => (
+              <div key={video.id} className="flex items-center gap-3 p-3 bg-green-50 rounded-lg cursor-pointer hover:bg-green-100 transition-colors" onClick={() => window.open(`https://www.youtube.com/watch?v=${video.id}`, "_blank")}>
+                {video.thumbnail && <img src={video.thumbnail} alt={video.title} className="w-12 h-12 object-cover rounded" />}
+                <div className="flex-1">
+                  <div className="font-medium text-slate-900">{truncate(video.title, 50)}</div>
+                  <div className="text-sm text-slate-600">{(video.views || 0).toLocaleString()} views</div>
+                </div>
+                <div className="text-green-600 font-medium">#{idx + 1}</div>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-slate-500 mt-3">💡 Make more videos like these to keep your audience engaged.</p>
+        </div>
+
+        {/* Videos Needing Improvement */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <h3 className="text-lg font-semibold text-slate-900 mb-3">Videos That Could Use Some Work</h3>
+          <p className="text-slate-600 mb-4">These videos aren't getting as much attention:</p>
+          <div className="space-y-3">
+            {lowVideos.map((video) => (
+              <div key={video.id} className="flex items-center gap-3 p-3 bg-orange-50 rounded-lg cursor-pointer hover:bg-orange-100 transition-colors" onClick={() => window.open(`https://www.youtube.com/watch?v=${video.id}`, "_blank")}>
+                {video.thumbnail && <img src={video.thumbnail} alt={video.title} className="w-12 h-12 object-cover rounded" />}
+                <div className="flex-1">
+                  <div className="font-medium text-slate-900">{truncate(video.title, 50)}</div>
+                  <div className="text-sm text-slate-600">{(video.views || 0).toLocaleString()} views</div>
+                </div>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-slate-500 mt-3">💡 Try improving titles, thumbnails, or descriptions for these videos to attract more viewers.</p>
+        </div>
+
+        {/* Engagement Drivers */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <h3 className="text-lg font-semibold text-slate-900 mb-3">Videos Driving the Most Engagement</h3>
+          <p className="text-slate-600 mb-4">These videos are sparking the most conversations:</p>
+          <div className="space-y-3">
+            {engagementDrivers.map((video, idx) => (
+              <div key={video.id} className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg cursor-pointer hover:bg-blue-100 transition-colors" onClick={() => window.open(`https://www.youtube.com/watch?v=${video.id}`, "_blank")}>
+                {video.thumbnail && <img src={video.thumbnail} alt={video.title} className="w-12 h-12 object-cover rounded" />}
+                <div className="flex-1">
+                  <div className="font-medium text-slate-900">{truncate(video.title, 50)}</div>
+                  <div className="text-sm text-slate-600">{(video.comments || 0).toLocaleString()} comments</div>
+                </div>
+                <div className="text-blue-600 font-medium">#{idx + 1}</div>
+              </div>
+            ))}
+          </div>
+          <p className="text-sm text-slate-500 mt-3">💡 Encourage viewers to leave comments on your videos to build community.</p>
+        </div>
+
+        {/* Actionable Suggestions */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <h3 className="text-lg font-semibold text-slate-900 mb-3">Quick Tips to Grow Your Channel</h3>
+          <ul className="space-y-2 text-slate-700">
+            <li>• Focus on creating content similar to your top-performing videos.</li>
+            <li>• Engage with your audience by responding to comments regularly.</li>
+            <li>• Experiment with different thumbnails and titles to see what works best.</li>
+            <li>• Post consistently to keep your viewers coming back.</li>
+          </ul>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="min-h-[calc(100vh-72px)] bg-slate-50 p-6 max-w-7xl mx-auto flex gap-6">
+      {/* Sidebar */}
+      <div className="w-60 bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+        <h2 className="text-lg font-semibold text-slate-900 mb-4">Analysis Views</h2>
+        <div className="space-y-2">
+          <button
+            onClick={() => setActiveView("charts")}
+            className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
+              activeView === "charts" ? "bg-indigo-100 text-indigo-700" : "text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+            Charts & Graphs
+          </button>
+          <button
+            onClick={() => setActiveView("summary")}
+            className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
+              activeView === "summary" ? "bg-indigo-100 text-indigo-700" : "text-slate-700 hover:bg-slate-100"
+            }`}
+          >
+           Summary
+          </button>
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="flex-1">
+        {activeView === "charts" ? (
+          <>
+            <h1 className="text-2xl font-semibold text-slate-900 mb-4">
+              Enhanced Video Correlation Network
+            </h1>
+
+            <p className="text-sm text-slate-500 mb-6">
+              Explore which videos behave similarly based on views, likes, and comments.
+              Node size = views, color = engagement rate. Click a node to open the video.
+            </p>
 
       {/* Controls */}
       <div className="mb-6 space-y-4 rounded-xl bg-white p-4 shadow-sm border border-slate-200">
@@ -500,6 +636,11 @@ export default function NetworkGraph() {
         </div>
       )}
 
+          </>
+        ) : (
+          <SummaryPanel data={graphData.rawMetrics} />
+        )}
+      </div>
     </div>
   );
   
