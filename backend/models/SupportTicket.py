@@ -99,3 +99,39 @@ class SupportTicket:
         conn.close()
 
         return SupportTicket.get_by_id(new_id)
+
+    @staticmethod
+    def get_all():
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT ticket_id, user_id, name, email, subject, message, status, created_at
+            FROM SupportTicket
+            ORDER BY created_at DESC
+            """
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return [SupportTicket._from_row(row) for row in rows]
+
+    @staticmethod
+    def update_status(ticket_id: int, status: str):
+        if status not in ['OPEN', 'ANSWERED', 'CLOSED']:
+            raise ValueError("Invalid status")
+        
+        conn = get_connection()
+        cursor = conn.cursor()
+        cursor.execute(
+            """
+            UPDATE SupportTicket
+            SET status = %s
+            WHERE ticket_id = %s
+            """,
+            (status, ticket_id),
+        )
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True

@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../core/context/AuthContext";
+import { getSupportTickets, respondToSupportTicket } from "../../core/api/user.js";
 
 export default function AdminSupport() {
   const { user } = useAuth();
@@ -14,47 +15,59 @@ export default function AdminSupport() {
   }
 
   const [view, setView] = useState("pending"); // "pending" or "resolved"
-
-  const [requests, setRequests] = useState([
-    {
-      id: 1,
-      userEmail: "creator1@example.com",
-      category: "technical",
-      subject: "Issue with analytics",
-      message: "I can't see my latest video stats.",
-      reply: "",
-      status: "Pending",
-    },
-    {
-      id: 2,
-      userEmail: "creator2@example.com",
-      category: "billing",
-      subject: "Billing question",
-      message: "I was charged twice for my plan.",
-      reply: "Refunded already.",
-      status: "Resolved",
-    },
-  ]);
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const [replyText, setReplyText] = useState({});
+
+  useEffect(() => {
+    fetchTickets();
+  }, []);
+
+  const fetchTickets = async () => {
+    try {
+      setLoading(true);
+      const tickets = await getSupportTickets();
+      setRequests(tickets);
+      setError(null);
+    } catch (err) {
+      setError("Failed to load support tickets");
+      console.error(err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const handleReplyChange = (id, value) => {
     setReplyText({ ...replyText, [id]: value });
   };
 
-  const handleReplySubmit = (id) => {
-    setRequests(
-      requests.map((req) =>
-        req.id === id
-          ? { ...req, reply: replyText[id] || "", status: "Resolved" }
-          : req
-      )
-    );
-    setReplyText({ ...replyText, [id]: "" });
+  const handleReplySubmit = async (id) => {
+    const message = replyText[id]?.trim();
+    if (!message) return;
+
+    try {
+      const res = await respondToSupportTicket(id, message);
+      if (res.ok) {
+        // Refresh tickets to get updated data
+        await fetchTickets();
+        setReplyText({ ...replyText, [id]: "" });
+      } else {
+        alert("Failed to submit response: " + (res.error || "Unknown error"));
+      }
+    } catch (err) {
+      alert("Error submitting response");
+      console.error(err);
+    }
   };
 
   const filteredRequests = requests.filter(
-    (r) => (view === "pending" ? r.status === "Pending" : r.status === "Resolved")
+    (r) => {
+      if (view === "pending") return r.status === "OPEN";
+      if (view === "resolved") return r.status === "ANSWERED" || r.status === "CLOSED";
+      return true;
+    }
   );
 
   return (
@@ -94,51 +107,65 @@ export default function AdminSupport() {
           {view === "pending" ? "Pending Requests" : "Resolved Requests"}
         </h1>
 
-        {filteredRequests.length === 0 && (
+        {loading && <p className="text-gray-500">Loading tickets...</p>}
+        {error && <p className="text-red-500">{error}</p>}
+        {!loading && !error && filteredRequests.length === 0 && (
           <p className="text-gray-500">No {view} requests at the moment.</p>
         )}
 
-        {filteredRequests.map((req) => (
+        {!loading && !error && filteredRequests.map((req) => (
           <div
-            key={req.id}
+            key={req.ticket_id}
             className="bg-white shadow rounded-2xl p-6 flex flex-col gap-3"
           >
             <div className="flex justify-between items-center">
               <p className="font-semibold text-gray-700">{req.subject}</p>
               <span
                 className={`text-xs font-medium px-2 py-1 rounded ${
-                  req.status === "Pending"
+                  req.status === "OPEN"
                     ? "bg-yellow-100 text-yellow-800"
-                    : "bg-green-100 text-green-800"
+                    : req.status === "ANSWERED"
+                    ? "bg-green-100 text-green-800"
+                    : "bg-gray-100 text-gray-800"
                 }`}
               >
                 {req.status}
               </span>
             </div>
-            <p className="text-gray-500 text-sm">From: {req.userEmail}</p>
-            <p className="text-gray-500 text-sm">Category: {req.category}</p>
+            <p className="text-gray-500 text-sm">From: {req.email || req.name}</p>
             <p className="text-gray-600">{req.message}</p>
 
-            {req.status === "Pending" && (
+            {/* Display existing responses */}
+            {req.responses && req.responses.length > 0 && (
+              <div className="mt-4 space-y-2">
+                <p className="font-medium text-gray-700">Responses:</p>
+                {req.responses.map((response) => (
+                  <div key={response.response_id} className="bg-gray-50 p-3 rounded-md">
+                    <p className="text-sm text-gray-600">{response.message}</p>
+                    <p className="text-xs text-gray-400 mt-1">
+                      {new Date(response.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {req.status === "OPEN" && (
               <>
                 <textarea
                   rows={3}
                   placeholder="Write your reply..."
                   className="w-full p-2 border border-gray-300 rounded-md"
-                  value={replyText[req.id] || ""}
-                  onChange={(e) => handleReplyChange(req.id, e.target.value)}
+                  value={replyText[req.ticket_id] || ""}
+                  onChange={(e) => handleReplyChange(req.ticket_id, e.target.value)}
                 />
                 <button
-                  onClick={() => handleReplySubmit(req.id)}
+                  onClick={() => handleReplySubmit(req.ticket_id)}
                   className="bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition font-semibold"
                 >
                   Submit Reply
                 </button>
               </>
-            )}
-
-            {req.reply && (
-              <p className="mt-2 text-gray-800 font-medium">Reply: {req.reply}</p>
             )}
           </div>
         ))}
