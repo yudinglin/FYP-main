@@ -25,7 +25,7 @@ export async function apiRequest(path, options = {}) {
   }
 
   if (!res.ok) {
-    return { ok: false, status: res.status, error: data?.message || "" };
+    return { ok: false, status: res.status, error: data?.error || data?.message || "An error occurred" };
   }
 
   return { ok: true, status: res.status, data };

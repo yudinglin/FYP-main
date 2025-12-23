@@ -19,3 +19,11 @@ export async function respondToSupportTicket(ticketId, message) {
   });
   return res;
 }
+
+export async function submitReview(rating, comment) {
+  const res = await apiRequest("/api/reviews", {
+    method: "POST",
+    body: JSON.stringify({ rating, comment }),
+  });
+  return res;
+}

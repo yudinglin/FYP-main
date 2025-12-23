@@ -7,6 +7,7 @@ import Landing from "../../pages/misc/Landing.jsx";
 import NotFound from "../../pages/misc/NotFound.jsx";
 import AboutUs from "../../pages/misc/AboutUs.jsx";
 import ContactSupport from "../../pages/misc/ContactSupport";
+import ReviewBubble from "../../pages/misc/ReviewBubble.jsx";
 
 import Login from "../../pages/auth/Login.jsx";
 import Register from "../../pages/auth/Register.jsx";
@@ -69,6 +70,16 @@ export default function AppRouter() {
       element={
         <MainLayout>
           <AboutUs />
+        </MainLayout>
+      }
+    />
+
+    {/* Reviews */}
+      <Route
+      path="/reviews"
+      element={
+        <MainLayout>
+          <ReviewBubble />
         </MainLayout>
       }
     />

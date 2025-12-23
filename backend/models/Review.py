@@ -105,18 +105,30 @@ class Review:
     @staticmethod
     def create(user_id, rating, comment):
         """Insert a new review and return the created Review object."""
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
+        conn = None
+        cursor = None
+        try:
+            conn = get_connection()
+            cursor = conn.cursor(dictionary=True)
 
-        cursor.execute("""
-            INSERT INTO Review (user_id, rating, comment)
-            VALUES (%s, %s, %s)
-        """, (user_id, rating, comment))
+            cursor.execute("""
+                INSERT INTO Review (user_id, rating, comment)
+                VALUES (%s, %s, %s)
+            """, (user_id, rating, comment))
 
-        conn.commit()
-        new_id = cursor.lastrowid
+            conn.commit()
+            new_id = cursor.lastrowid
 
-        cursor.close()
-        conn.close()
+            if not new_id:
+                raise Exception("Failed to insert review - no ID returned")
 
-        return Review.get_by_id(new_id)
+            return Review.get_by_id(new_id)
+        except Exception as e:
+            if conn:
+                conn.rollback()
+            raise e
+        finally:
+            if cursor:
+                cursor.close()
+            if conn:
+                conn.close()

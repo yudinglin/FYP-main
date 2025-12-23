@@ -1,5 +1,6 @@
 import React from "react";
 import { Link } from "react-router-dom";
+import ReviewBubble from "../../pages/misc/ReviewBubble.jsx";
 
 export default function BusinessDashboard() {
   return (
@@ -129,6 +130,7 @@ export default function BusinessDashboard() {
             
           </main>
         </div>
+        <ReviewBubble />
       </div>
     );
   }
