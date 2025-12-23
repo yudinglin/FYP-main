@@ -35,8 +35,8 @@ class Review:
     # --------------------------------------------
 
     @staticmethod
-    def get_reviews():
-        """Return list of Review objects with user names."""
+    def get_reviews(min_rating=4):
+        """Return list of Review objects with user names (filtered by rating)."""
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
@@ -45,8 +45,10 @@ class Review:
             FROM Review r
             JOIN User u ON r.user_id = u.user_id
             WHERE r.status = 'VISIBLE'
+            AND r.rating >= %s
             ORDER BY r.created_at DESC
-        """)
+        """, (min_rating,))
+
         rows = cursor.fetchall()
 
         reviews = []
@@ -68,6 +70,7 @@ class Review:
         cursor.close()
         conn.close()
         return reviews
+
 
     @staticmethod
     def get_by_id(review_id):

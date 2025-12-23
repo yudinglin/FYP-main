@@ -4,15 +4,20 @@ from flask import request, jsonify
 from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
 
 def get_reviews():
-    reviews = Review.get_reviews()
+    reviews = Review.get_reviews(min_rating=4)
     return [
         {
             "review_id": r.review_id,
+            "rating": r.rating,
             "comment": r.comment,
-            "user_name": f"{r.user['first_name']} {r.user['last_name']}" if r.user else "Anonymous",
+            "user_name": (
+                f"{r.user['first_name']} {r.user['last_name']}"
+                if r.user else "Anonymous"
+            ),
         }
         for r in reviews
     ]
+
 
 def create_review():
     try:

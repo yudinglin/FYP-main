@@ -5,7 +5,7 @@ export default function Landing() {
   const [reviews, setReviews] = useState([]);
 
   useEffect(() => {
-    fetch("http://localhost:5000/reviews") // <-- remove /api
+    fetch("http://localhost:5000/api/reviews") // <-- remove /api
       .then((res) => res.json())
       .then((data) => setReviews(Array.isArray(data) ? data : data.reviews))
       .catch((err) => console.error("Review fetch error:", err));
@@ -84,30 +84,78 @@ export default function Landing() {
       </main>
 
       {/* -------------------------------- */}
-      {/* ⭐ REVIEWS SECTION — ADDED HERE ⭐ */}
+      {/* ⭐ REVIEWS SECTION */}
       {/* -------------------------------- */}
-      <section className="relative z-10 mt-32 px-6 mx-auto max-w-[1100px]">
-        <h2 className="text-xl font-bold text-gray-900 mb-6">What Users Say</h2>
+      <section className="relative z-10 mt-36 px-6 mx-auto max-w-[1100px]">
+        <div className="mb-10 text-center">
+          <h2 className="text-2xl font-bold text-gray-900">
+            Trusted by Users
+          </h2>
+          <p className="mt-2 text-sm text-gray-500">
+            Feedback from creators and analysts using YouAnalyze
+          </p>
+        </div>
 
         {reviews.length === 0 ? (
-          <p className="text-gray-500 text-sm">Loading reviews...</p>
+          <p className="text-center text-gray-400 text-sm">
+            Loading reviews...
+          </p>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
             {reviews.map((r) => (
               <div
                 key={r.review_id}
-                className="rounded-xl border border-gray-200 bg-white shadow-sm p-5 hover:shadow-md transition"
+                className="group relative rounded-2xl bg-white p-6
+                          border border-gray-100
+                          shadow-sm hover:shadow-lg
+                          transition-all duration-300"
               >
-                <p className="text-gray-700 text-sm leading-relaxed mb-3">
+                {/* Quote mark */}
+                <span className="absolute -top-3 -left-3 text-5xl text-red-100 select-none">
+                  “
+                </span>
+
+                {/* Rating */}
+                <div className="mb-3 flex items-center gap-1">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <span
+                      key={star}
+                      className={`text-sm ${
+                        r.rating >= star
+                          ? "text-yellow-400"
+                          : "text-gray-300"
+                      }`}
+                    >
+                      ★
+                    </span>
+                  ))}
+                </div>
+
+                {/* Comment */}
+                <p className="text-gray-700 text-sm leading-relaxed mb-5">
                   {r.comment}
                 </p>
 
-                <p className="text-xs text-gray-400">— {r.user_name}</p>
+                {/* User */}
+                <div className="flex items-center gap-3 pt-3 border-t border-gray-100">
+                  <div className="h-9 w-9 rounded-full bg-red-100 flex items-center justify-center text-xs font-semibold text-red-600">
+                    {r.user_name?.[0] || "U"}
+                  </div>
+                  <div className="text-xs">
+                    <p className="font-semibold text-gray-800">
+                      {r.user_name}
+                    </p>
+                    <p className="text-gray-400">
+                      Verified user
+                    </p>
+                  </div>
+                </div>
               </div>
             ))}
           </div>
         )}
       </section>
+
     </div>
   );
 }
