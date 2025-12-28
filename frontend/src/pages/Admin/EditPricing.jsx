@@ -1,45 +1,71 @@
 import React, { useState, useEffect } from "react";
+import { apiRequest } from "../../core/api/client.js";
 
 export default function EditPricing() {
-  const [plans, setPlans] = useState([
-    {
-      id: "creator",
-      name: "Content Creator",
-      price: 12,
-      description: "Perfect for YouTubers who want analytics, predictions, and network graphs.",
-      features: [
-        "YouTube analytics",
-        "Network graph visualization",
-        "Engagement metrics",
-        "Growth prediction"
-      ]
-    },
-    {
-      id: "business",
-      name: "Business",
-      price: 30,
-      description: "For companies analyzing multiple channels & industry trends.",
-      features: [
-        "Multi-channel support",
-        "Industry network graphs",
-        "Brand centrality analysis",
-        "Campaign reach prediction"
-      ]
-    }
-  ]);
+  const [plans, setPlans] = useState([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Helper function to parse description to extract description text and features
+  const parsePlanData = (plan) => {
+    let description = plan.description || "";
+    let features = [];
+
+    if (description) {
+      try {
+        const parsed = JSON.parse(description);
+        if (parsed.features && Array.isArray(parsed.features)) {
+          features = parsed.features;
+          description = parsed.description || "";
+        } else if (Array.isArray(parsed)) {
+          features = parsed;
+          description = "";
+        }
+      } catch (e) {
+        // Not JSON, use description as-is
+      }
+    }
+
+    return {
+      ...plan,
+      description: description,
+      features: features,
+      price: plan.price_monthly || plan.price || 0,
+    };
+  };
+
+  // Helper function to format plan data for saving (combine description and features as JSON)
+  const formatPlanForSave = (plan) => {
+    const descriptionJson = JSON.stringify({
+      description: plan.description || "",
+      features: plan.features || [],
+    });
+    return {
+      name: plan.name,
+      description: descriptionJson,
+      price_monthly: plan.price,
+      target_role: plan.target_role || "BOTH",
+      max_channels: plan.max_channels || 1,
+      max_saved_graphs: plan.max_saved_graphs || 5,
+      is_active: plan.is_active !== undefined ? plan.is_active : true,
+    };
+  };
 
   useEffect(() => {
     async function fetchPlans() {
       try {
-        const res = await fetch("http://localhost:5000/api/pricing");
-        const data = await res.json();
-        if (data.plans) {
-          setPlans(data.plans);
+        const response = await apiRequest("/api/admin/plans");
+        if (response.ok && response.data.plans) {
+          // Parse each plan to extract description and features
+          const parsedPlans = response.data.plans.map(parsePlanData);
+          setPlans(parsedPlans);
+        } else {
+          setError(response.error || "Failed to fetch plans");
         }
       } catch (err) {
         console.error("Failed to fetch plans:", err);
+        setError(err.message || "Failed to fetch plans");
       } finally {
         setLoading(false);
       }
@@ -81,16 +107,34 @@ export default function EditPricing() {
 
   const handleSave = async () => {
     setSaving(true);
+    setError(null);
     try {
-      await fetch("http://localhost:5000/api/pricing", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ plans }),
+      // Update each plan individually
+      const updatePromises = plans.map(async (plan) => {
+        const planData = formatPlanForSave(plan);
+        const response = await apiRequest(`/api/admin/plans/${plan.plan_id}`, {
+          method: "PUT",
+          body: JSON.stringify(planData),
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to update ${plan.name}: ${response.error}`);
+        }
+        return response.data;
       });
+
+      await Promise.all(updatePromises);
       alert("Pricing updated successfully!");
+      
+      // Refresh plans to get updated data
+      const response = await apiRequest("/api/admin/plans");
+      if (response.ok && response.data.plans) {
+        const parsedPlans = response.data.plans.map(parsePlanData);
+        setPlans(parsedPlans);
+      }
     } catch (err) {
       console.error("Failed to save:", err);
-      alert("Failed to update pricing");
+      setError(err.message || "Failed to update pricing");
+      alert(`Failed to update pricing: ${err.message}`);
     } finally {
       setSaving(false);
     }
@@ -119,12 +163,23 @@ export default function EditPricing() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-          {plans.map((plan, planIndex) => (
-            <div
-              key={plan.id}
-              className="bg-white rounded-2xl shadow-xl p-8 border-2 border-red-100 hover:border-red-300 transition-all hover:shadow-2xl"
-            >
+        {error && (
+          <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+            {error}
+          </div>
+        )}
+
+        {plans.length === 0 && !loading ? (
+          <div className="text-center py-12">
+            <p className="text-gray-600">No plans found. Please add plans to the database first.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
+            {plans.map((plan, planIndex) => (
+              <div
+                key={plan.plan_id}
+                className="bg-white rounded-2xl shadow-xl p-8 border-2 border-red-100 hover:border-red-300 transition-all hover:shadow-2xl"
+              >
               {/* Plan Name */}
               <div className="mb-6">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
@@ -175,7 +230,7 @@ export default function EditPricing() {
                   Features
                 </label>
                 <div className="space-y-3">
-                  {plan.features.map((feature, featureIndex) => (
+                  {(plan.features || []).map((feature, featureIndex) => (
                     <div key={featureIndex} className="flex gap-2">
                       <input
                         type="text"
@@ -218,7 +273,8 @@ export default function EditPricing() {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        )}
 
         {/* Save Button */}
         <div className="flex justify-center">

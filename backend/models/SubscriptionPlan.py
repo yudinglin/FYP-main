@@ -113,3 +113,81 @@ class SubscriptionPlan:
         cursor.close()
         conn.close()
         return [cls.from_row(row) for row in rows]
+
+    @classmethod
+    def get_all(cls):
+        """Get all plans (including inactive) - for admin use"""
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT plan_id, name, description, target_role, price_monthly, 
+                   max_channels, max_saved_graphs, is_active
+            FROM SubscriptionPlan
+            ORDER BY price_monthly ASC
+        """)
+        rows = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+        return [cls.from_row(row) for row in rows]
+
+    @classmethod
+    def update(cls, plan_id, name=None, description=None, target_role=None, 
+               price_monthly=None, max_channels=None, max_saved_graphs=None, is_active=None):
+        """Update a subscription plan"""
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        # Build dynamic update query
+        updates = []
+        params = []
+
+        if name is not None:
+            updates.append("name = %s")
+            params.append(name)
+        if description is not None:
+            updates.append("description = %s")
+            params.append(description)
+        if target_role is not None:
+            updates.append("target_role = %s")
+            params.append(target_role.upper())
+        if price_monthly is not None:
+            updates.append("price_monthly = %s")
+            params.append(price_monthly)
+        if max_channels is not None:
+            updates.append("max_channels = %s")
+            params.append(max_channels)
+        if max_saved_graphs is not None:
+            updates.append("max_saved_graphs = %s")
+            params.append(max_saved_graphs)
+        if is_active is not None:
+            updates.append("is_active = %s")
+            params.append(bool(is_active))
+
+        if not updates:
+            cursor.close()
+            conn.close()
+            return None
+
+        params.append(plan_id)
+        query = f"""
+            UPDATE SubscriptionPlan
+            SET {', '.join(updates)}
+            WHERE plan_id = %s
+        """
+        cursor.execute(query, params)
+        conn.commit()
+
+        # Fetch and return updated plan
+        cursor.execute("""
+            SELECT plan_id, name, description, target_role, price_monthly, 
+                   max_channels, max_saved_graphs, is_active
+            FROM SubscriptionPlan
+            WHERE plan_id = %s
+        """, (plan_id,))
+        row = cursor.fetchone()
+
+        cursor.close()
+        conn.close()
+        return cls.from_row(row)

@@ -17,6 +17,7 @@ from routes.YouTube.video_comments import comments_bp
 from routes.Shared.reviews import review_bp
 from routes.Shared.support import support_bp
 from routes.Admin.get_users import user_bp
+from routes.Admin.subscription_plans import subscription_plans_bp
 from routes.YouTube.centrality_metrics import centrality_bp
 from routes.YouTube.video_sentiment import sentiment_bp
 from routes.YouTube.subscriber_prediction import subscriber_predict_bp
@@ -42,6 +43,7 @@ app.register_blueprint(videos_bp)
 app.register_blueprint(review_bp)
 app.register_blueprint(support_bp)
 app.register_blueprint(user_bp)
+app.register_blueprint(subscription_plans_bp)
 app.register_blueprint(video_corr_bp)
 app.register_blueprint(comments_bp)
 app.register_blueprint(centrality_bp)
