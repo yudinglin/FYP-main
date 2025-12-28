@@ -7,30 +7,51 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Legend,
 } from "recharts";
+
 import { useAuth } from "../../core/context/AuthContext";
 
 const API_BASE = "http://localhost:5000";
 
 export default function SentimentAnalysis() {
+  const { user } = useAuth();
   const [data, setData] = useState(null);
   const [loadingVideos, setLoadingVideos] = useState(false);
   const [loadingSentiment, setLoadingSentiment] = useState(false);
   const [error, setError] = useState(null);
+  const [selectedMonth, setSelectedMonth] = useState("all");
   const [filter, setFilter] = useState("all");
   const [sortOrder, setSortOrder] = useState("desc");
   const [videoOptions, setVideoOptions] = useState([]);
   const [selectedVideos, setSelectedVideos] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
-  const { user } = useAuth();
+  const [activeView, setActiveView] = useState("charts"); // 'charts' or 'summary'
 
   const COLORS = { positive: "#22c55e", neutral: "#f59e0b", negative: "#ef4444" };
   const selectedSet = useMemo(() => new Set(selectedVideos), [selectedVideos]);
-  const filteredVideoOptions = useMemo(() => {
+  const sentimentTimeline = useMemo(() => {
+    if (!data?.sentimentByMonth?.length) return [];
+    return data.sentimentByMonth;
+  }, [data]);
+
+  const availableMonths = useMemo(() => {
+    if (!sentimentTimeline.length) return [];
+    return ["all", ...new Set(sentimentTimeline.map((d) => d.month))];
+  }, [sentimentTimeline]);
+
+  const filteredTimeline = useMemo(() => {
+  if (!sentimentTimeline.length) return [];
+  if (selectedMonth === "all") return sentimentTimeline;
+  return sentimentTimeline.filter((d) => d.month === selectedMonth);
+}, [sentimentTimeline, selectedMonth]);
+
+    const filteredVideoOptions = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
     if (!term) return videoOptions;
     return videoOptions.filter((v) => v.title.toLowerCase().includes(term));
@@ -153,12 +174,196 @@ export default function SentimentAnalysis() {
   const noSelection = !selectedVideos.length;
   const hasError = Boolean(error);
 
+  // Summary Panel Component
+  const SummaryPanel = ({ data, selectedVideos, videoOptions }) => {
+    if (!data || !data.summary) {
+      return (
+        <div className="p-6 text-center text-slate-500">
+          No data available for summary.
+        </div>
+      );
+    }
+
+    const summary = data.summary;
+    const totalComments = summary.totalComments || 0;
+    const positiveCount = summary.positive || 0;
+    const neutralCount = summary.neutral || 0;
+    const negativeCount = summary.negative || 0;
+
+    // Calculate percentages
+    const positivePercent = totalComments > 0 ? ((positiveCount / totalComments) * 100).toFixed(1) : 0;
+    const neutralPercent = totalComments > 0 ? ((neutralCount / totalComments) * 100).toFixed(1) : 0;
+    const negativePercent = totalComments > 0 ? ((negativeCount / totalComments) * 100).toFixed(1) : 0;
+
+    // Determine overall tone
+    let overallTone = "neutral";
+    let toneDescription = "balanced";
+    if (positiveCount > negativeCount && positiveCount > neutralCount) {
+      overallTone = "positive";
+      toneDescription = "mostly positive";
+    } else if (negativeCount > positiveCount && negativeCount > neutralCount) {
+      overallTone = "negative";
+      toneDescription = "mostly negative";
+    }
+
+    // Find most impactful video (most comments)
+    // ✅ Correct: derive from sentiment comments
+    const mostDiscussedVideo = useMemo(() => {
+      if (!data?.comments?.length) return null;
+
+      const counts = {};
+
+      data.comments.forEach((c) => {
+        const key = c.videoId;
+        if (!counts[key]) {
+          counts[key] = {
+            videoId: c.videoId,
+            title: c.videoTitle,
+            count: 0,
+            positive: 0,
+            neutral: 0,
+            negative: 0,
+          };
+        }
+        counts[key].count += 1;
+        counts[key][c.sentiment] += 1;
+      });
+
+      return Object.values(counts).sort((a, b) => b.count - a.count)[0];
+    }, [data]);
+
+    // Calculate sentiment for most discussed video
+    let videoSentiment = "neutral";
+    if (mostDiscussedVideo) {
+      const videoPositive = mostDiscussedVideo.positive || 0;
+      const videoNegative = mostDiscussedVideo.negative || 0;
+      if (videoPositive > videoNegative) videoSentiment = "positive";
+      else if (videoNegative > videoPositive) videoSentiment = "negative";
+    }
+
+    return (
+      <div className="p-6 space-y-6">
+        {/* 1. Overall Audience Tone */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">Overall Audience Tone</h3>
+          <p className="text-slate-700">
+            Audience sentiment is <span className="font-medium">{toneDescription}</span>, indicating {overallTone === "positive" ? "strong viewer satisfaction" : overallTone === "negative" ? "areas for improvement" : "balanced feedback"} with recent content.
+          </p>
+        </div>
+
+        {/* 2. Sentiment Distribution */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <h3 className="text-lg font-semibold text-slate-900 mb-3">Sentiment Distribution</h3>
+          <div className="grid grid-cols-3 gap-4">
+            <div className="text-center p-3 bg-green-50 rounded-lg">
+              <div className="text-2xl font-bold text-green-600">{positivePercent}%</div>
+              <div className="text-sm text-slate-600">Positive</div>
+            </div>
+            <div className="text-center p-3 bg-yellow-50 rounded-lg">
+              <div className="text-2xl font-bold text-yellow-600">{neutralPercent}%</div>
+              <div className="text-sm text-slate-600">Neutral</div>
+            </div>
+            <div className="text-center p-3 bg-red-50 rounded-lg">
+              <div className="text-2xl font-bold text-red-600">{negativePercent}%</div>
+              <div className="text-sm text-slate-600">Negative</div>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Most Discussed Video */}
+        {mostDiscussedVideo && (
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <h3 className="text-lg font-semibold text-slate-900 mb-3">
+            Most Discussed Video
+          </h3>
+
+          <p className="text-slate-600 mb-3">
+            This video received the highest number of comments during the analysis period.
+          </p>
+
+          <div
+            className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg cursor-pointer hover:bg-blue-100 transition"
+            onClick={() =>
+              window.open(`https://www.youtube.com/watch?v=${mostDiscussedVideo.videoId}`, "_blank")
+            }
+          >
+            <div className="flex-1">
+              <div className="font-medium text-slate-900">
+                {mostDiscussedVideo.title}
+              </div>
+              <div className="text-sm text-slate-600">
+                {mostDiscussedVideo.count} comments •
+                Positive: {mostDiscussedVideo.positive} •
+                Neutral: {mostDiscussedVideo.neutral} •
+                Negative: {mostDiscussedVideo.negative}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+        {/* 4. Key Interpretation */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <h3 className="text-lg font-semibold text-slate-900 mb-2">Key Interpretation</h3>
+          <p className="text-slate-700">
+            {overallTone === "positive" 
+              ? "Positive sentiment suggests current content strategy resonates well with viewers, creating strong audience engagement."
+              : overallTone === "negative"
+              ? "Negative sentiment clusters indicate specific content issues rather than overall dissatisfaction, suggesting targeted improvements."
+              : "Balanced sentiment distribution shows consistent but moderate audience reception, with room for strategic content optimization."
+            }
+          </p>
+        </div>
+
+        {/* 5. Actionable Recommendations */}
+        <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-4">
+          <h3 className="text-lg font-semibold text-slate-900 mb-3">Actionable Recommendations</h3>
+          <ul className="space-y-2 text-slate-700">
+            <li>• Respond to negative comments promptly to reduce dissatisfaction and show you care about viewer feedback.</li>
+            <li>• Create follow-up content based on positively received topics to capitalize on successful content themes.</li>
+            <li>• Address recurring complaints in future videos to prevent similar negative feedback patterns.</li>
+            <li>• Use comment sentiment analysis to refine content tone and style for better audience connection.</li>
+          </ul>
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="p-6 max-w-6xl mx-auto">
       <div className="p-6 max-w-6xl mx-auto">
         <h1 className="text-3xl font-bold mb-6 text-center text-gray-800">
           Sentiment Analysis
         </h1>
+
+        {/* View Toggle */}
+        <div className="flex justify-center mb-6">
+          <div className="bg-white rounded-lg shadow-sm border border-slate-200 p-1">
+            <button
+              onClick={() => setActiveView("charts")}
+              className={`px-6 py-2 rounded-md text-sm font-medium transition ${
+                activeView === "charts"
+                  ? "bg-indigo-100 text-indigo-700 shadow-sm"
+                  : "text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              Charts
+            </button>
+            <button
+              onClick={() => setActiveView("summary")}
+              className={`px-6 py-2 rounded-md text-sm font-medium transition ${
+                activeView === "summary"
+                  ? "bg-indigo-100 text-indigo-700 shadow-sm"
+                  : "text-slate-700 hover:bg-slate-100"
+              }`}
+            >
+              Summary
+            </button>
+          </div>
+        </div>
+
+        
 
         {/* Select Videos at the top */}
         <div className="mb-6">
@@ -245,7 +450,9 @@ export default function SentimentAnalysis() {
 
       {!showLoading && !hasError && data && (
         <>
-          {/* Summary Cards */}
+          {activeView === "charts" ? (
+            <>
+              {/* Summary Cards */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
             {sentimentSummary.map((item) => (
               <div key={item.name} className="p-4 rounded-lg shadow-md text-center bg-white border-l-8" style={{ borderColor: item.color }}>
@@ -289,6 +496,68 @@ export default function SentimentAnalysis() {
               </PieChart>
             </ResponsiveContainer>
           </div>
+
+          <div className="mb-4">
+          <label className="text-sm text-gray-600 mr-2">Filter by Month:</label>
+          <select
+            value={selectedMonth}
+            onChange={(e) => setSelectedMonth(e.target.value)}
+            className="p-2 border rounded"
+          >
+            {availableMonths.map((m) => (
+              <option key={m} value={m}>
+                {m === "all" ? "All months" : m}
+              </option>
+            ))}
+          </select>
+        </div>
+
+
+          {/* Sentiment Timeline */}
+          <div className="p-4 bg-white rounded-lg shadow-md mb-6">
+            <h2 className="text-xl font-semibold mb-2 text-gray-700">
+              Audience Sentiment Over Time
+            </h2>
+            <p className="text-sm text-gray-500 mb-4">
+              See how viewer sentiment has changed across different years.
+            </p>
+
+            <ResponsiveContainer width="100%" height={320}>
+              <AreaChart data={filteredTimeline}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+
+                <Area
+                  type="monotone"
+                  dataKey="positive"
+                  stackId="1"
+                  stroke={COLORS.positive}
+                  fill={COLORS.positive}
+                  name="Positive"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="neutral"
+                  stackId="1"
+                  stroke={COLORS.neutral}
+                  fill={COLORS.neutral}
+                  name="Neutral"
+                />
+                <Area
+                  type="monotone"
+                  dataKey="negative"
+                  stackId="1"
+                  stroke={COLORS.negative}
+                  fill={COLORS.negative}
+                  name="Negative"
+                />
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+
 
           {/* Sentiment Trend (Stacked Bar Chart) */}
           <div className="p-4 bg-white rounded-lg shadow-md mb-6">
@@ -357,6 +626,10 @@ export default function SentimentAnalysis() {
               )}
             </ul>
           </div>
+        </>
+          ) : (
+            <SummaryPanel data={data} selectedVideos={selectedVideos} videoOptions={videoOptions} />
+          )}
         </>
       )}
     </div>

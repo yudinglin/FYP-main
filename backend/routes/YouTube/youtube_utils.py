@@ -133,7 +133,7 @@ def fetch_video_stats(video_ids, with_snippet: bool = False):
 def fetch_video_comments(video_id: str, max_comments: int = 50):
     """
     Fetch top-level comments from a video.
-    Returns a list of comment strings (plain text).
+    Returns a list of dicts with text + publishedAt.
     """
     comments = []
     try:
@@ -147,15 +147,26 @@ def fetch_video_comments(video_id: str, max_comments: int = 50):
         data = youtube_get("commentThreads", params)
 
         for item in data.get("items", []):
-            comment_snippet = item.get("snippet", {}).get("topLevelComment", {}).get("snippet", {})
-            text = comment_snippet.get("textDisplay")
-            if text:
-                comments.append(text)
+            snippet = (
+                item.get("snippet", {})
+                    .get("topLevelComment", {})
+                    .get("snippet", {})
+            )
+
+            text = snippet.get("textDisplay")
+            published_at = snippet.get("publishedAt")
+
+            if text and published_at:
+                comments.append({
+                    "text": text,
+                    "publishedAt": published_at
+                })
 
     except Exception as e:
         print(f"Error fetching comments for video {video_id}: {e}")
 
     return comments
+
 
 def fetch_video_title(video_id: str):
     """
