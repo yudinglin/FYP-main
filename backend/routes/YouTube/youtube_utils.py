@@ -85,6 +85,7 @@ def fetch_video_ids(playlist_id: str, max_videos: int = 50):
 
 
 # Retrieve statistical information based on videoIds (shared with videos.list and similarity analysis)
+# UPDATED: Now includes thumbnail support
 
 def fetch_video_stats(video_ids, with_snippet: bool = False):
     if not video_ids:
@@ -124,6 +125,18 @@ def fetch_video_stats(video_ids, with_snippet: bool = False):
             if with_snippet:
                 video["title"] = sn.get("title", "")
                 video["publishedAt"] = sn.get("publishedAt", "")
+                
+                # Add thumbnail support
+                thumbnails = sn.get("thumbnails", {})
+                thumbnail_url = ""
+                if "medium" in thumbnails:
+                    thumbnail_url = thumbnails["medium"]["url"]
+                elif "default" in thumbnails:
+                    thumbnail_url = thumbnails["default"]["url"]
+                elif "high" in thumbnails:
+                    thumbnail_url = thumbnails["high"]["url"]
+                
+                video["thumbnail"] = thumbnail_url
 
             all_videos.append(video)
 
@@ -187,6 +200,3 @@ def fetch_video_title(video_id: str):
     except Exception as e:
         print(f"Error fetching title for video {video_id}: {e}")
         return None
-
-
-

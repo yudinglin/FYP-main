@@ -23,14 +23,16 @@ def video_correlation_network():
         return jsonify({"error": "Invalid channel URL or ID"}), 400
 
     try:
-        threshold = float(request.args.get("threshold", "0.7"))
+        threshold = float(request.args.get("threshold", "0.70"))
     except ValueError:
-        threshold = 0.7
+        threshold = 0.70
 
     try:
-        max_videos = int(request.args.get("maxVideos", "10"))
+        max_videos = int(request.args.get("maxVideos", "25"))
+        # Limit to reasonable maximum
+        max_videos = min(max_videos, 500)
     except ValueError:
-        max_videos = 200
+        max_videos = 25
 
     basic = fetch_basic_channel_stats(channel_id)
     if not basic:
@@ -39,15 +41,19 @@ def video_correlation_network():
     playlist_id = basic["uploadsPlaylistId"]
     video_ids = fetch_video_ids(playlist_id, max_videos)
     if not video_ids:
-        return jsonify({"nodes": [], "edges": []}), 200
+        return jsonify({"nodes": [], "edges": [], "rawMetrics": []}), 200
 
-    # take snippet + statistics
+    # Fetch video stats with snippet (includes thumbnail)
     videos = fetch_video_stats(video_ids, with_snippet=True)
 
-    # ---- pandas analysis(remeber to install pandas) ----
+    # Pandas analysis
     df = pd.DataFrame(videos)
     if df.shape[0] < 2:
-        return jsonify({"nodes": df.to_dict(orient="records"), "edges": []}), 200
+        return jsonify({
+            "nodes": df.to_dict(orient="records"),
+            "edges": [],
+            "rawMetrics": df[["id", "title", "views", "likes", "comments", "thumbnail"]].to_dict(orient="records")
+        }), 200
 
     metric_cols = ["views", "likes", "comments"]
     df[metric_cols] = df[metric_cols].astype(float)
@@ -71,18 +77,24 @@ def video_correlation_network():
                     }
                 )
 
+    # Calculate z-scores for views (optional, for future use)
     df["views_zscore"] = (
         (df["views"] - df["views"].mean())
         / (df["views"].std(ddof=0) + 1e-9)
     )
 
+    # Prepare nodes with all necessary fields
     nodes = df[
-        ["id", "title", "publishedAt", "views", "likes", "comments", "views_zscore"]
+        ["id", "title", "publishedAt", "views", "likes", "comments", "views_zscore", "thumbnail"]
+    ].to_dict(orient="records")
+
+    # Prepare rawMetrics for frontend charts
+    rawMetrics = df[
+        ["id", "title", "views", "likes", "comments", "thumbnail", "publishedAt"]
     ].to_dict(orient="records")
 
     return jsonify({
         "nodes": nodes,
         "edges": edges,
-        "rawMetrics": df[["id","title","views","likes","comments","publishedAt"]].to_dict(orient="records")
+        "rawMetrics": rawMetrics
     }), 200
-

@@ -79,6 +79,7 @@ export default function CreatorDashboard() {
         return {
           videoId: v.id || v.videoId || v.videoID || "",
           title: v.title || "Untitled",
+          thumbnail: v.thumbnail || "",
           views,
           likeCount: likes,
           commentCount: comments,
@@ -497,9 +498,21 @@ function LatestVideoCard({ video }) {
     <div className="space-y-3">
       <div className="flex gap-4">
         {/* Thumbnail placeholder */}
-        <div className="w-32 h-20 rounded-lg bg-gradient-to-br from-purple-100 to-blue-100 flex items-center justify-center shrink-0">
-          <span className="text-2xl">🎬</span>
+        <div className="w-32 h-20 rounded-lg overflow-hidden shrink-0 bg-slate-200">
+          {video.thumbnail ? (
+            <img
+              src={video.thumbnail}
+              alt={video.title}
+              className="w-full h-full object-cover"
+              loading="lazy"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center">
+              <span className="text-2xl">🎬</span>
+            </div>
+          )}
         </div>
+
         
         <div className="flex-1 min-w-0">
           <a
