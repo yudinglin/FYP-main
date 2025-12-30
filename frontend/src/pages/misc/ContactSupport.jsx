@@ -6,11 +6,14 @@ export default function ContactSupport() {
   const { user, token } = useAuth();
   const navigate = useNavigate();
 
-  // Only allow non-admin users
-  if (user?.role?.toLowerCase() === "admin") {
-    navigate("/"); // redirect admin back to landing
-    return null;
-  }
+  /* -------------------- STATE -------------------- */
+
+  const [view, setView] = useState("new"); // "new" | "responses"
+  const [tickets, setTickets] = useState([]);
+  const [loadingTickets, setLoadingTickets] = useState(false);
+
+  const [status, setStatus] = useState({ type: null, message: "" });
+  const [submitting, setSubmitting] = useState(false);
 
   const [form, setForm] = useState({
     name: "",
@@ -20,10 +23,21 @@ export default function ContactSupport() {
     message: "",
   });
 
+  /* -------------------- EFFECTS -------------------- */
+
+  // Redirect admins away
+  useEffect(() => {
+    if (user?.role?.toLowerCase() === "admin") {
+      navigate("/");
+    }
+  }, [user, navigate]);
+
+  // Prefill name & email
   useEffect(() => {
     const defaultName = user
       ? `${user.first_name || ""} ${user.last_name || ""}`.trim()
       : "";
+
     setForm((prev) => ({
       ...prev,
       name: prev.name || defaultName,
@@ -31,31 +45,42 @@ export default function ContactSupport() {
     }));
   }, [user]);
 
-  const [status, setStatus] = useState({ type: null, message: "" });
-  const [submitting, setSubmitting] = useState(false);
+  // Fetch user's support tickets + responses
+  useEffect(() => {
+    if (view !== "responses") return;
 
-  const [view, setView] = useState("new"); // "new" or "responses"
+    const fetchTickets = async () => {
+      setLoadingTickets(true);
+      try {
+        const resp = await fetch(
+          "http://localhost:5000/api/support/my-tickets",
+          {
+            headers: {
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
 
-  // Mock previous support responses
-  const mockResponses = [
-    {
-      id: 1,
-      subject: "Issue with analytics",
-      message: "I can't see my latest video stats.",
-      reply: "Hi, your video stats are updating. Please refresh in 10 minutes.",
-      status: "Resolved",
-    },
-    {
-      id: 2,
-      subject: "Billing question",
-      message: "I was charged twice for my plan.",
-      reply: "We have refunded the extra charge. Please check your email.",
-      status: "Resolved",
-    },
-  ];
+        const data = await resp.json();
+        if (!resp.ok) {
+          throw new Error(data.message || "Failed to load tickets");
+        }
+
+        setTickets(data.tickets || []);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoadingTickets(false);
+      }
+    };
+
+    fetchTickets();
+  }, [view, token]);
+
+  /* -------------------- HANDLERS -------------------- */
 
   const handleChange = (e) => {
-    const { name, value, files } = e.target;
+    const { name, value } = e.target;
     setForm({ ...form, [name]: value });
   };
 
@@ -92,19 +117,20 @@ export default function ContactSupport() {
         message: data.message || "Your request has been submitted.",
       });
 
-      setForm({
-        name: payload.name || form.name,
-        email: payload.email || form.email,
+      setForm((prev) => ({
+        ...prev,
         category: "",
         subject: "",
         message: "",
-      });
+      }));
     } catch (err) {
       setStatus({ type: "error", message: err.message });
     } finally {
       setSubmitting(false);
     }
   };
+
+  /* -------------------- UI -------------------- */
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-slate-50 flex items-start justify-center p-6">
@@ -137,14 +163,15 @@ export default function ContactSupport() {
         </nav>
       </aside>
 
-      {/* Main content */}
+      {/* Main Content */}
       <div className="flex-1 max-w-xl w-full">
+        {/* ---------------- NEW REQUEST ---------------- */}
         {view === "new" && (
           <div className="bg-white shadow-lg rounded-2xl p-10 space-y-6">
             <h1 className="text-3xl font-bold text-gray-800">Contact Support</h1>
             <p className="text-gray-600">
-              Have a question or issue? Fill out the form below and our support team
-              will get back to you as soon as possible.
+              Have a question or issue? Fill out the form below and our support
+              team will get back to you as soon as possible.
             </p>
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
@@ -157,7 +184,6 @@ export default function ContactSupport() {
                     value={form.name}
                     onChange={handleChange}
                     className="mt-1 p-2 border border-gray-300 rounded-md"
-                    placeholder="Your name"
                     required
                     disabled={!!user}
                   />
@@ -171,7 +197,6 @@ export default function ContactSupport() {
                     value={form.email}
                     onChange={handleChange}
                     className="mt-1 p-2 border border-gray-300 rounded-md"
-                    placeholder="you@example.com"
                     required
                     disabled={!!user}
                   />
@@ -203,7 +228,6 @@ export default function ContactSupport() {
                   value={form.subject}
                   onChange={handleChange}
                   className="mt-1 p-2 border border-gray-300 rounded-md"
-                  placeholder="Enter subject"
                   required
                 />
               </label>
@@ -216,7 +240,6 @@ export default function ContactSupport() {
                   onChange={handleChange}
                   rows={6}
                   className="mt-1 p-2 border border-gray-300 rounded-md"
-                  placeholder="Write your message here..."
                   required
                 />
               </label>
@@ -236,7 +259,7 @@ export default function ContactSupport() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="mt-1 bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition font-semibold disabled:opacity-70"
+                className="bg-red-600 text-white py-3 rounded-lg hover:bg-red-700 transition font-semibold disabled:opacity-70"
               >
                 {submitting ? "Submitting..." : "Submit"}
               </button>
@@ -244,19 +267,58 @@ export default function ContactSupport() {
           </div>
         )}
 
+        {/* ---------------- RESPONSES ---------------- */}
         {view === "responses" && (
           <div className="bg-white shadow-lg rounded-2xl p-8 space-y-6">
-            <h1 className="text-3xl font-bold text-gray-800">Your Support Responses</h1>
+            <h1 className="text-3xl font-bold text-gray-800">
+              Your Support Responses
+            </h1>
             <p className="text-gray-600">
               View the replies from our support team for your previous requests.
             </p>
 
-            {mockResponses.map((resp) => (
-              <div key={resp.id} className="border border-gray-200 rounded-lg p-4">
-                <p className="font-semibold text-gray-700">{resp.subject}</p>
-                <p className="text-gray-500 mt-1">Message: {resp.message}</p>
-                <p className="text-gray-800 mt-2 font-medium">Reply: {resp.reply}</p>
-                <p className="text-sm text-gray-400 mt-1">Status: {resp.status}</p>
+            {loadingTickets && (
+              <p className="text-gray-500">Loading tickets...</p>
+            )}
+
+            {!loadingTickets && tickets.length === 0 && (
+              <p className="text-gray-500">No support tickets found.</p>
+            )}
+
+            {tickets.map((ticket) => (
+              <div
+                key={ticket.ticket_id}
+                className="border border-gray-200 rounded-lg p-4 space-y-3"
+              >
+                <div>
+                  <p className="font-semibold text-gray-800">
+                    {ticket.subject}
+                  </p>
+                  <p className="text-gray-500 text-sm mt-1">
+                    {ticket.message}
+                  </p>
+                  <p className="text-xs text-gray-400 mt-1">
+                    Status: {ticket.status}
+                  </p>
+                </div>
+
+                {ticket.responses?.length > 0 ? (
+                  <div className="bg-gray-50 border border-gray-200 rounded-md p-3 space-y-2">
+                    <p className="text-sm font-semibold text-gray-700">
+                      Support Replies
+                    </p>
+                    {ticket.responses.map((r) => (
+                      <p
+                        key={r.response_id}
+                        className="text-sm text-gray-700"
+                      >
+                        {r.message}
+                      </p>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-sm text-gray-400">No response yet.</p>
+                )}
               </div>
             ))}
           </div>

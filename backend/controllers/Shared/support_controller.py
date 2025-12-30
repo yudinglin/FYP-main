@@ -104,3 +104,27 @@ def respond_to_ticket(request, ticket_id):
         }, 200
     except Exception as e:
         return {"message": f"Error submitting response: {str(e)}"}, 500
+    
+def get_my_tickets():
+    try:
+        verify_jwt_in_request()
+        identity = get_jwt_identity()
+        user = UserAccount.find_by_email(identity)
+
+        if not user:
+            return {"message": "Unauthorized"}, 401
+
+        tickets = SupportTicket.get_by_user_id(user.user_id)
+
+        tickets_data = []
+        for ticket in tickets:
+            responses = SupportResponse.get_by_ticket_id(ticket.ticket_id)
+            ticket_dict = ticket.to_dict()
+            ticket_dict["responses"] = [r.to_dict() for r in responses]
+            tickets_data.append(ticket_dict)
+
+        return {"tickets": tickets_data}, 200
+
+    except Exception as e:
+        return {"message": f"Error retrieving tickets: {str(e)}"}, 500
+

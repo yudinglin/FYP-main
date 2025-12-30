@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from controllers.Shared.support_controller import submit_ticket, get_all_tickets, respond_to_ticket
+from controllers.Shared.support_controller import submit_ticket, get_all_tickets, respond_to_ticket, get_my_tickets
 
 support_bp = Blueprint("support_bp", __name__, url_prefix="/api")
 
@@ -19,4 +19,9 @@ def get_support_tickets():
 @support_bp.post("/admin/support/tickets/<int:ticket_id>/respond")
 def respond_to_support_ticket(ticket_id):
     response, status = respond_to_ticket(request, ticket_id)
+    return jsonify(response), status
+
+@support_bp.get("/support/my-tickets")
+def get_my_support_tickets():
+    response, status = get_my_tickets()
     return jsonify(response), status

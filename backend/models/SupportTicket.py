@@ -135,3 +135,21 @@ class SupportTicket:
         cursor.close()
         conn.close()
         return True
+
+    @staticmethod
+    def get_by_user_id(user_id: int):
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+        cursor.execute(
+            """
+            SELECT ticket_id, user_id, name, email, subject, message, status, created_at
+            FROM SupportTicket
+            WHERE user_id = %s
+            ORDER BY created_at DESC
+            """,
+            (user_id,),
+        )
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+        return [SupportTicket._from_row(row) for row in rows]
