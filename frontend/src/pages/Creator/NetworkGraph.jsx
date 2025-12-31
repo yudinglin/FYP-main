@@ -107,7 +107,7 @@ export default function NetworkGraph() {
     const fg = fgRef.current;
 
     // Stronger repulsion between nodes
-    fg.d3Force("charge").strength(-400);
+    fg.d3Force("charge").strength(-550);
     
     // Longer links based on weight
     fg.d3Force("link").distance((link) => {
@@ -122,11 +122,11 @@ export default function NetworkGraph() {
     if (collideForce) {
       collideForce
         .radius((node) => {
-          const baseRadius = 15;
-          const viewRadius = Math.sqrt(node.views || 0) / 1500;
+          const baseRadius = 8;
+          const viewRadius = Math.sqrt(node.views || 0) / 3000;
           return baseRadius + viewRadius;
         })
-        .strength(0.9);
+        .strength(0.7);
     }
 
     // Add centering force to keep graph centered
@@ -147,9 +147,9 @@ export default function NetworkGraph() {
   };
 
   const getNodeSize = (views) => {
-    if (!views) return 6;
+    if (!views) return 4;
     // Slightly larger base size for better visibility
-    return 6 + Math.log10(views + 1) * 2.5;
+    return 4 + Math.log10(views + 1) * 1.4;
   };
 
   const nodeTooltip = (node) => {
@@ -596,7 +596,7 @@ export default function NetworkGraph() {
                         <div className="absolute top-4 right-4 bg-white p-3 rounded shadow border text-sm max-w-xs z-10">
                           <div className="font-semibold mb-1">Engagement Rate Legend</div>
                           <p className="text-xs text-slate-500 mb-2">
-                            Engagement Rate = (Likes + Comments) / Views
+                            Shows how strongly viewers interact with a video through likes and comments.
                           </p>
                           <div className="w-full h-4 rounded bg-gradient-to-r from-[#f59e0b] via-[#10b981] to-[#4f46e5] mb-2"></div>
                           <div className="flex justify-between text-xs text-slate-700">
