@@ -83,5 +83,8 @@ def video_correlation_network():
     return jsonify({
         "nodes": nodes,
         "edges": edges,
-        "rawMetrics": df[["id","title","views","likes","comments","publishedAt"]].to_dict(orient="records")
+        "rawMetrics": df[
+            ["id","title","views","likes","comments","publishedAt","thumbnail"]
+        ].to_dict(orient="records")
+
     }), 200

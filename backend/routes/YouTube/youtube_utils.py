@@ -87,7 +87,7 @@ def fetch_video_ids(playlist_id: str, max_videos: int = 50):
 # Retrieve statistical information based on videoIds (shared with videos.list and similarity analysis)
 # UPDATED: Now includes thumbnail support
 
-def fetch_video_stats(video_ids, with_snippet: bool = False):
+def fetch_video_stats(video_ids, with_snippet: bool = True):
     if not video_ids:
         return []
 
