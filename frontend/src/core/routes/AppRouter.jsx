@@ -32,6 +32,10 @@ import EditPricing from "../../pages/Admin/EditPricing.jsx";
 import AdminSupport from "../../pages/Admin/AdminSupport.jsx";
 import AdminProfile from "../../pages/profile/AdminProfile.jsx";
 
+import BusinessNetworkGraph from "../../pages/Business/NetworkGraph.jsx";
+import BusinessCentrality from "../../pages/Business/CentralityMetrics.jsx";
+import BusinessForecasting from "../../pages/Business/PredictiveAnalysis.jsx";
+
 export default function AppRouter() {
   return (
     <Routes>
@@ -141,6 +145,7 @@ export default function AppRouter() {
           </MainLayout>
         }
       />
+      
       <Route
         path="/dashboard/sentiment"
         element={
@@ -149,6 +154,7 @@ export default function AppRouter() {
           </MainLayout>
         }
       />
+
       <Route
         path="/dashboard/business"
         element={
@@ -157,6 +163,33 @@ export default function AppRouter() {
           </MainLayout>
         }
       />
+          <Route
+              path="/dashboard/business/network"
+              element={
+                <MainLayout>
+                  <BusinessNetworkGraph />
+                </MainLayout>
+              }
+            />
+      
+            <Route
+              path="/dashboard/business/centrality"
+              element={
+                 <MainLayout>
+                    <BusinessCentrality />
+                  </MainLayout>
+              }
+            />
+      
+            <Route
+              path="/dashboard/business/forecasting"
+              element={
+                <MainLayout>
+                  <BusinessForecasting />
+                </MainLayout>
+              }
+            />
+      
       <Route
         path="/dashboard/admin"
         element={

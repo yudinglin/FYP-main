@@ -16,6 +16,7 @@ export default function BusinessProfile() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
+  const MAX_CHANNELS = 3;
 
   const industryOptions = [
     "Select your industry",
@@ -121,6 +122,7 @@ export default function BusinessProfile() {
 
   // Function to add a new channel input
   const addChannel = () => {
+    if (youtubeChannels.length >= MAX_CHANNELS) return;
     setYoutubeChannels([...youtubeChannels, ""]);
     setChannelNames([...channelNames, ""]);
   };
@@ -354,6 +356,8 @@ function LinkChannelSection({
   saving,
   onSave,
 }) {
+  const MAX_CHANNELS = 3;
+  
   return (
     <>
       <h1 className="text-xl font-semibold text-slate-900 mb-4">
@@ -422,15 +426,28 @@ function LinkChannelSection({
 
         {/* Add Channel Button */}
         <button
-          type="button"
-          onClick={addChannel}
-          className="flex items-center justify-center gap-2 w-full py-3 rounded-lg border-2 border-dashed border-slate-300 hover:border-sky-400 hover:bg-sky-50 text-slate-500 hover:text-sky-600 transition-colors"
+            type="button"
+            onClick={addChannel}
+            disabled={youtubeChannels.length >= MAX_CHANNELS}
+            className={`flex items-center justify-center gap-2 w-full py-3 rounded-lg border-2 border-dashed transition-colors
+              ${
+                youtubeChannels.length >= MAX_CHANNELS
+                  ? "border-slate-200 text-slate-400 cursor-not-allowed bg-slate-50"
+                  : "border-slate-300 hover:border-sky-400 hover:bg-sky-50 text-slate-500 hover:text-sky-600"
+              }`}
         >
+
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           <span className="text-sm font-medium">Add Another Channel</span>
         </button>
+
+        {youtubeChannels.length >= MAX_CHANNELS && (
+        <p className="text-xs text-red-500 mt-2">
+           You can link up to 3 YouTube channels only.
+        </p>
+         )}
 
         {error && <Message type="error" text={error} />}
         {success && <Message type="success" text={success} />}

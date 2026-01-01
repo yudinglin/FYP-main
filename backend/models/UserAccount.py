@@ -3,7 +3,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 
 
 class UserAccount:
-    def __init__(self, user_id, email, password_hash, first_name, last_name, role, status, youtube_channel=None):
+    def __init__(self, user_id, email, password_hash, first_name, last_name, role, status, youtube_channel=None, youtube_channels=None):
         self.user_id = user_id
         self.email = email
         self.password_hash = password_hash
@@ -11,7 +11,12 @@ class UserAccount:
         self.last_name = last_name
         self.role = role
         self.status = status
-        self.youtube_channel = youtube_channel  # new
+
+        # creator primary channel（单个）
+        self.youtube_channel = youtube_channel
+
+        # business channels（多个）
+        self.youtube_channels = youtube_channels or []
 
     @classmethod
     def from_row(cls, row):
@@ -25,7 +30,7 @@ class UserAccount:
             last_name=row["last_name"],
             role=row["role"],
             status=row["status"],
-            youtube_channel=row.get("youtube_channel")  # new
+            youtube_channel=row.get("youtube_channel"),  # creator 可能会有
         )
 
     def to_dict(self):
@@ -36,7 +41,10 @@ class UserAccount:
             "last_name": self.last_name,
             "role": self.role,
             "status": self.status,
-            "youtube_channel": self.youtube_channel,  # new
+            # creator
+            "youtube_channel": self.youtube_channel,
+            # business
+            "youtube_channels": self.youtube_channels,
         }
 
     # -------------------------------------------------------------------------
@@ -48,19 +56,27 @@ class UserAccount:
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute("""
-        SELECT
-        u.user_id, u.email, u.password_hash, u.first_name, u.last_name, u.role, u.status,
-        yc.youtube_channel_id AS youtube_channel
-        FROM User u
-        LEFT JOIN CreatorProfile cp ON cp.user_id = u.user_id
-        LEFT JOIN YouTubeChannel yc ON yc.channel_id = cp.primary_channel_id
-        WHERE u.email = %s
+            SELECT user_id, email, password_hash, first_name, last_name, role, status
+            FROM User WHERE email = %s
         """, (email,))
         row = cursor.fetchone()
 
+        if not row:
+            cursor.close()
+            conn.close()
+            return None
+
+        user = cls.from_row(row)
+
+        # business （DB -> user.youtube_channels）
+        user.youtube_channels = cls.get_youtube_channels_by_user(user.user_id)
+
+        # creator primary channel
+        user.youtube_channel = cls.get_creator_primary_channel(user.user_id)
+
         cursor.close()
         conn.close()
-        return cls.from_row(row)
+        return user
 
     @classmethod
     def find_by_id(cls, user_id):
@@ -73,12 +89,104 @@ class UserAccount:
         """, (user_id,))
         row = cursor.fetchone()
 
+        if not row:
+            cursor.close()
+            conn.close()
+            return None
+
+        user = cls.from_row(row)
+        user.youtube_channels = cls.get_youtube_channels_by_user(user.user_id)
+        user.youtube_channel = cls.get_creator_primary_channel(user.user_id)
+
         cursor.close()
         conn.close()
-        return cls.from_row(row)
+        return user
 
     # -------------------------------------------------------------------------
-    # USER + PROFILE CREATION (ALL DB WORK DONE HERE)
+    # YouTube channel helpers
+    # -------------------------------------------------------------------------
+    @classmethod
+    def get_youtube_channels_by_user(cls, owner_user_id):
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT youtube_channel_id AS url,
+                   channel_name AS name,
+                   is_primary
+            FROM YouTubeChannel
+            WHERE owner_user_id = %s
+            ORDER BY is_primary DESC, created_at ASC
+        """, (owner_user_id,))
+        rows = cursor.fetchall() or []
+
+        cursor.close()
+        conn.close()
+        # ：{url,name,is_primary}
+        return [
+            {
+                "url": (r.get("url") or "").strip(),
+                "name": (r.get("name") or "").strip(),
+                "is_primary": bool(r.get("is_primary")),
+            }
+            for r in rows
+            if (r.get("url") or "").strip()
+        ]
+
+    @classmethod
+    def get_creator_primary_channel(cls, user_id):
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT yc.youtube_channel_id AS youtube_channel
+            FROM CreatorProfile cp
+            LEFT JOIN YouTubeChannel yc ON yc.channel_id = cp.primary_channel_id
+            WHERE cp.user_id = %s
+        """, (user_id,))
+        row = cursor.fetchone()
+
+        cursor.close()
+        conn.close()
+        return (row.get("youtube_channel") if row else None)
+
+    @classmethod
+    def save_youtube_channels(cls, owner_user_id, channels):
+        if isinstance(channels, list) and len(channels) > 3:
+           channels = channels[:3]
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        # clean primary
+        cursor.execute("""
+            UPDATE YouTubeChannel
+            SET is_primary = 0
+            WHERE owner_user_id = %s
+        """, (owner_user_id,))
+
+        for idx, ch in enumerate(channels):
+            url = (ch.get("url") or "").strip()
+            if not url:
+                continue
+            name = (ch.get("name") or "").strip() or f"Channel {idx+1}"
+            is_primary = 1 if idx == 0 else 0
+
+            # upsert（youtube_channel_id 全局唯一）
+            cursor.execute("""
+                INSERT INTO YouTubeChannel (owner_user_id, youtube_channel_id, channel_name, is_primary)
+                VALUES (%s, %s, %s, %s)
+                ON DUPLICATE KEY UPDATE
+                    owner_user_id = VALUES(owner_user_id),
+                    channel_name = VALUES(channel_name),
+                    is_primary = VALUES(is_primary)
+            """, (owner_user_id, url, name, is_primary))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    # -------------------------------------------------------------------------
+    # USER + PROFILE CREATION
     # -------------------------------------------------------------------------
     @classmethod
     def register_user(cls, email, password, first_name, last_name, role, company_name=None, industry_id=None):
@@ -87,7 +195,6 @@ class UserAccount:
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
-        # 1. Create User
         cursor.execute(
             """
             INSERT INTO User (email, password_hash, first_name, last_name, role)
@@ -97,10 +204,8 @@ class UserAccount:
         )
         conn.commit()
 
-        # Get the newly created user_id
         user_id = cursor.lastrowid
 
-        # 2. Create role-specific profile
         if role == "creator":
             cursor.execute(
                 """
@@ -132,145 +237,16 @@ class UserAccount:
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
-        # 1. Update User table
         cursor.execute("""
             UPDATE User
             SET first_name = %s, last_name = %s
             WHERE email = %s
         """, (first_name, last_name, email))
 
-        # 2. Fetch user_id and role
-        cursor.execute("""
-            SELECT user_id, role FROM User WHERE email = %s
-        """, (email,))
-        row = cursor.fetchone()
-        user_id = row['user_id']
-        role = row['role']
-
-        # 3. Update role-specific profile
-        if role == "creator":
-            display_name = f"{first_name} {last_name}"
-            cursor.execute("""
-                UPDATE CreatorProfile
-                SET display_name = %s
-                WHERE user_id = %s
-            """, (display_name, user_id))
-        elif role == "business":
-            # Optionally update company_name if you want to reflect first/last name
-            pass  # or implement your logic if needed
-
-        conn.commit()
-        cursor.close()
-        conn.close()
-
-        return cls.find_by_email(email)
-
-
-    @classmethod
-    def update_password(cls, email, new_password):
-        hashed_pw = generate_password_hash(new_password)
-
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
-
-        cursor.execute("""
-            UPDATE User SET password_hash = %s WHERE email = %s
-        """, (hashed_pw, email))
-
         conn.commit()
         cursor.close()
         conn.close()
         return cls.find_by_email(email)
 
-    @classmethod
-    def update_status(cls, email, status):
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
-
-        cursor.execute("""
-            UPDATE User SET status = %s WHERE email = %s
-        """, (status, email))
-
-        conn.commit()
-        cursor.close()
-        conn.close()
-        return cls.find_by_email(email)
-
-    # -------------------------------------------------------------------------
-    # MISC
-    # -------------------------------------------------------------------------
     def check_password(self, plain_password):
         return check_password_hash(self.password_hash, plain_password)
-
-    @classmethod
-    def get_all(cls):
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
-
-        cursor.execute("""
-            SELECT user_id, email, password_hash, first_name, last_name, role, status
-            FROM User
-        """)
-        rows = cursor.fetchall()
-
-        cursor.close()
-        conn.close()
-        return [cls.from_row(row) for row in rows]
-
-
-    # -------------------------------------------------------------------------
-    # Channel
-    # -------------------------------------------------------------------------
-    @classmethod
-    def set_creator_primary_channel(cls, email, youtube_channel_id: str):
-        conn = get_connection()
-        cursor = conn.cursor(dictionary=True)
-
-        # 1) get user_id + role
-        cursor.execute("SELECT user_id, role FROM User WHERE email=%s", (email,))
-        row = cursor.fetchone()
-        if not row:
-            cursor.close(); conn.close()
-            return None, "User not found"
-
-        user_id = row["user_id"]
-        role = row["role"]
-        if role != "creator":
-            cursor.close(); conn.close()
-            return None, "Only creator can set primary channel here"
-
-        # 2) insert or update YouTubeChannel
-        # schema has UNIQUE( youtube_channel_id ) so we can upsert
-        cursor.execute("""
-            INSERT INTO YouTubeChannel (owner_user_id, youtube_channel_id, is_primary)
-            VALUES (%s, %s, 1)
-            ON DUPLICATE KEY UPDATE
-                owner_user_id = VALUES(owner_user_id),
-                is_primary = 1
-        """, (user_id, youtube_channel_id))
-
-        # 3) find the channel_id
-        cursor.execute("""
-            SELECT channel_id FROM YouTubeChannel WHERE youtube_channel_id=%s
-        """, (youtube_channel_id,))
-        ch = cursor.fetchone()
-        if not ch:
-            conn.rollback()
-            cursor.close(); conn.close()
-            return None, "Failed to save channel"
-
-        channel_id_pk = ch["channel_id"]
-
-        # 4) update CreatorProfile.primary_channel_id
-        cursor.execute("""
-            UPDATE CreatorProfile
-            SET primary_channel_id=%s
-            WHERE user_id=%s
-        """, (channel_id_pk, user_id))
-
-        conn.commit()
-        cursor.close()
-        conn.close()
-
-        # return updated user (we will enhance to_dict later)
-        return cls.find_by_email(email), None
