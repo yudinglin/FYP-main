@@ -1,5 +1,3 @@
-# backend/routes/YouTube/video_centrality.py
-
 from flask import Blueprint, request, jsonify
 from .youtube_utils import (
     extract_channel_id,
@@ -8,177 +6,250 @@ from .youtube_utils import (
     fetch_video_stats
 )
 import pandas as pd
-import networkx as nx
+from collections import defaultdict
+import re
 
 centrality_bp = Blueprint("video_centrality", __name__, url_prefix="/api/youtube")
 
 
-def normalize_scores(raw_scores):
+def calculate_performance_score(video):
     """
-    Scale a dict of centrality scores to 0-100.
-    Keeps keys intact and avoids division by zero.
+    Calculate a 0-100 performance score for a video based on multiple factors.
     """
-    if not raw_scores:
-        return {}
+    views = float(video.get('views', 0))
+    likes = float(video.get('likes', 0))
+    comments = float(video.get('comments', 0))
+    
+    if views == 0:
+        return 0
+    
+    # Engagement rate (40% weight)
+    engagement_rate = (likes + comments) / views
+    engagement_score = min(engagement_rate * 1000, 40)  # Cap at 40
+    
+    # View count relative score (30% weight) - logarithmic scale
+    view_score = min((views / 10000) * 30, 30) if views > 0 else 0
+    
+    # Like ratio (20% weight)
+    like_ratio = likes / views if views > 0 else 0
+    like_score = min(like_ratio * 200, 20)  # Cap at 20
+    
+    # Comment rate (10% weight)
+    comment_rate = comments / views if views > 0 else 0
+    comment_score = min(comment_rate * 100, 10)  # Cap at 10
+    
+    total_score = engagement_score + view_score + like_score + comment_score
+    return round(min(total_score, 100), 1)
 
-    values = list(raw_scores.values())
-    max_v = max(values)
-    min_v = min(values)
 
-    if max_v == min_v:
-        # If every value is identical, map to 100 when non-zero, else 0
-        base = 100.0 if max_v > 0 else 0.0
-        return {k: round(base, 2) for k in raw_scores}
-
-    scale = max_v - min_v
-    return {k: round(((v - min_v) / scale) * 100.0, 2) for k, v in raw_scores.items()}
-
-
-def classify_roles(nodes, retention_strength, discoverability_score, entry_friendliness):
+def categorize_videos(videos):
     """
-    Assign a primary content role to each video based on creator-friendly metrics.
-    Uses plain language that creators understand immediately.
+    Categorize videos into Winners, Hidden Gems, and Needs Work.
     """
-    role_map = {
-        "retention": "Anchor Video",      # highly connected to similar content
-        "discoverability": "Explorer Video",  # helps viewers discover new topics
-        "entry": "Entry Video",           # best starting point for new viewers
-    }
-
-    roles = {}
-    for node in nodes:
-        retention = retention_strength.get(node, 0.0)
-        discoverability = discoverability_score.get(node, 0.0)
-        entry = entry_friendliness.get(node, 0.0)
-
-        scores = {"retention": retention, "discoverability": discoverability, "entry": entry}
-        primary_metric = max(scores, key=lambda k: scores[k])
-        primary_role = role_map[primary_metric]
-
-        # Plain-English explanations for each role
-        role_explanations = {
-            "Anchor Video": {
-                "description": "This video represents what your channel is all about. It's highly connected to similar content and helps build viewer loyalty.",
-                "action": "Use this as your channel's signature style. Create more videos like this to strengthen your brand identity.",
-                "why_matters": "Viewers who love this video will likely enjoy your other content too. It's your retention builder."
-            },
-            "Explorer Video": {
-                "description": "This video helps viewers discover new topics on your channel. It bridges different themes and keeps people exploring.",
-                "action": "Feature this in playlists and end screens. It's perfect for moving viewers from one interest to another.",
-                "why_matters": "It expands your audience by connecting different viewer interests. Great for growth and discovery."
-            },
-            "Entry Video": {
-                "description": "This is the perfect starting point for new viewers. It's easy to find and leads naturally to your other content.",
-                "action": "Use this as your channel trailer, pin it, or make it the first video in your main playlist.",
-                "why_matters": "First impressions matter. This video helps new viewers understand your channel and want to watch more."
-            }
-        }
-
-        roles[node] = {
-            "primary_role": primary_role,
-            "scores": {
-                "retention_strength": retention,
-                "discoverability_score": discoverability,
-                "entry_friendliness": entry
-            },
-            **role_explanations[primary_role]
-        }
-
-    return roles
-
-
-def build_network_summary(node_count, edge_count):
-    """
-    Build a creator-friendly summary of the content network.
-    Uses plain language instead of technical terms.
-    """
-    if node_count < 2:
-        return {
-            "total_videos": node_count,
-            "total_connections": edge_count,
-            "content_cohesion": 0.0,
-            "cohesion_label": "Building",
-            "cohesion_explanation": "You're just getting started! Keep creating content to see how your videos connect."
-        }
-
-    possible_edges = node_count * (node_count - 1) / 2
-    density = (edge_count / possible_edges) * 100.0 if possible_edges else 0.0
-
-    if density >= 60:
-        label = "Strong"
-        explanation = "Your content feels cohesive and connected. Viewers can easily find related videos they'll enjoy."
-    elif density >= 30:
-        label = "Moderate"
-        explanation = "You balance variety with consistency. Your best videos help guide viewers to discover more."
-    else:
-        label = "Building"
-        explanation = "Your topics are diverse. Consider creating playlists or series to help viewers navigate your content."
-
+    if not videos:
+        return {'winners': [], 'hidden_gems': [], 'needs_work': []}
+    
+    # Calculate scores for all videos
+    for video in videos:
+        video['performance_score'] = calculate_performance_score(video)
+    
+    # Sort by performance score
+    sorted_videos = sorted(videos, key=lambda x: x['performance_score'], reverse=True)
+    
+    # Calculate percentiles
+    total = len(sorted_videos)
+    
+    winners = []
+    hidden_gems = []
+    needs_work = []
+    
+    for idx, video in enumerate(sorted_videos):
+        percentile = (idx / total) * 100
+        views = float(video.get('views', 0))
+        score = video['performance_score']
+        
+        # Winners: Top 30% OR high score
+        if percentile < 30 or score >= 70:
+            winners.append(video)
+        # Hidden Gems: Good engagement but low views
+        elif score >= 50 and views < (sum(v.get('views', 0) for v in videos) / len(videos)):
+            hidden_gems.append(video)
+        # Needs Work: Bottom 30%
+        elif percentile >= 70 or score < 40:
+            needs_work.append(video)
+        else:
+            # Middle ground - could go either way
+            if len(hidden_gems) < len(winners) // 2:
+                hidden_gems.append(video)
+            else:
+                needs_work.append(video)
+    
     return {
-        "total_videos": node_count,
-        "total_connections": edge_count,
-        "content_cohesion": round(density, 2),
-        "cohesion_label": label,
-        "cohesion_explanation": explanation
+        'winners': winners[:10],  # Top 10 winners
+        'hidden_gems': hidden_gems[:5],  # Top 5 hidden gems
+        'needs_work': needs_work[:10]  # Bottom 10 needing work
     }
 
 
-def generate_plain_insights(nodes, retention_strength, discoverability_score, entry_friendliness, summary, videos_map):
+def identify_improvement_opportunities(video):
     """
-    Generate actionable, creator-friendly insights.
-    Sounds like a YouTube growth coach, not a data scientist.
+    Identify specific areas where a video can be improved.
     """
-    insights = []
-
-    # Add summary insight
-    insights.append(summary.get("cohesion_explanation", "Your content is growing!"))
-
-    def top_item(score_map):
-        if not score_map:
-            return None, 0.0
-        top_node = max(score_map, key=score_map.get)
-        return top_node, score_map.get(top_node, 0.0)
-
-    top_retention, retention_val = top_item(retention_strength)
-    top_discover, discover_val = top_item(discoverability_score)
-    top_entry, entry_val = top_item(entry_friendliness)
-
-    # Get video titles for better context
-    def get_video_title(video_id):
-        video = videos_map.get(video_id, {})
-        # Try to get title from various possible fields
-        title = video.get("title") or video.get("snippet", {}).get("title") or f"your video"
-        return title
-
-    if top_retention and retention_val > 50:
-        title = get_video_title(top_retention)
-        insights.append(
-            f"🎯 Your best retention builder: '{title}'. This video keeps viewers watching more of your content. Create similar videos to build a loyal audience."
-        )
+    views = float(video.get('views', 0))
+    likes = float(video.get('likes', 0))
+    comments = float(video.get('comments', 0))
     
-    if top_discover and discover_val > 50:
-        title = get_video_title(top_discover)
-        insights.append(
-            f"🔍 Your best discovery video: '{title}'. This helps viewers explore different topics on your channel. Add it to playlists and end screens to grow your reach."
-        )
+    opportunities = []
     
-    if top_entry and entry_val > 50:
-        title = get_video_title(top_entry)
-        insights.append(
-            f"Your best entry point: '{title}'. Perfect for new viewers! Consider making this your channel trailer or pinning it to help first-time visitors understand your channel."
-        )
+    if views == 0:
+        return [{
+            'issue': 'No views yet',
+            'action': 'Promote this video on social media and in your community',
+            'priority': 'high'
+        }]
+    
+    # Check engagement rate
+    engagement_rate = (likes + comments) / views if views > 0 else 0
+    if engagement_rate < 0.02:
+        opportunities.append({
+            'issue': 'Low engagement rate',
+            'action': 'Add a clear call-to-action asking viewers to like and comment',
+            'priority': 'high'
+        })
+    
+    # Check like ratio
+    like_ratio = likes / views if views > 0 else 0
+    if like_ratio < 0.015:
+        opportunities.append({
+            'issue': 'Low like ratio',
+            'action': 'Improve content quality or add more value to encourage likes',
+            'priority': 'medium'
+        })
+    
+    # Check comment activity
+    comment_rate = comments / views if views > 0 else 0
+    if comment_rate < 0.005:
+        opportunities.append({
+            'issue': 'Not enough comments',
+            'action': 'Ask a question in the video to encourage viewers to comment',
+            'priority': 'medium'
+        })
+    
+    # Check if view count is low
+    if views < 1000:
+        opportunities.append({
+            'issue': 'Low view count',
+            'action': 'Improve thumbnail and title for better click-through rate',
+            'priority': 'high'
+        })
+    
+    if not opportunities:
+        opportunities.append({
+            'issue': 'Video is performing well',
+            'action': 'Use this as a template for future content',
+            'priority': 'low'
+        })
+    
+    return opportunities
 
-    # Overall growth advice
-    if retention_val < 30 and discover_val < 30 and entry_val < 30:
-        insights.append(
-            "Keep creating! As you publish more videos and build connections between them, you'll discover which content works best for retention, discovery, and attracting new viewers."
-        )
-    elif summary.get("cohesion_label") == "Strong":
-        insights.append(
-            "Your content strategy is working! Your videos connect well, which means viewers can easily find more content they'll love. Keep this momentum going."
-        )
 
-    return insights
+def generate_quick_wins(categorized_videos):
+    """
+    Generate actionable quick wins based on video analysis.
+    """
+    quick_wins = []
+    
+    needs_work = categorized_videos['needs_work']
+    hidden_gems = categorized_videos['hidden_gems']
+    
+    # Low-hanging fruit: Videos with potential
+    low_engagement_videos = [v for v in needs_work if float(v.get('views', 0)) > 1000]
+    if low_engagement_videos:
+        quick_wins.append({
+            'title': 'Boost engagement on existing traffic',
+            'description': f'{len(low_engagement_videos)} videos are getting views but low engagement',
+            'action': 'Add calls-to-action and engaging questions to these videos',
+            'impact': 'high',
+            'effort': 'low',
+            'video_count': len(low_engagement_videos)
+        })
+    
+    # Hidden gems that need promotion
+    if hidden_gems:
+        quick_wins.append({
+            'title': 'Promote your hidden gems',
+            'description': f'{len(hidden_gems)} videos have great engagement but low visibility',
+            'action': 'Share these videos on social media and link to them from popular videos',
+            'impact': 'high',
+            'effort': 'low',
+            'video_count': len(hidden_gems)
+        })
+    
+    # Thumbnail/title opportunities
+    poor_ctr_videos = [v for v in needs_work if float(v.get('views', 0)) < 500][:5]
+    if poor_ctr_videos:
+        quick_wins.append({
+            'title': 'Improve thumbnails and titles',
+            'description': f'{len(poor_ctr_videos)} videos likely have poor click-through rates',
+            'action': 'Update thumbnails with bright colors and clear text',
+            'impact': 'medium',
+            'effort': 'medium',
+            'video_count': len(poor_ctr_videos)
+        })
+    
+    # Content duplication opportunity
+    winners = categorized_videos['winners']
+    if len(winners) >= 3:
+        quick_wins.append({
+            'title': 'Double down on what works',
+            'description': f'Your top {min(len(winners), 5)} videos show a clear winning formula',
+            'action': 'Create more content similar to your best performers',
+            'impact': 'high',
+            'effort': 'high',
+            'video_count': min(len(winners), 5)
+        })
+    
+    return quick_wins
+
+
+def calculate_channel_health(videos):
+    """
+    Calculate overall channel health metrics.
+    """
+    if not videos:
+        return {
+            'overall_score': 0,
+            'health_label': 'Unknown',
+            'consistency': 0,
+            'engagement_trend': 'neutral'
+        }
+    
+    # Calculate average performance score
+    avg_score = sum(v.get('performance_score', 0) for v in videos) / len(videos)
+    
+    # Calculate consistency (standard deviation of scores)
+    scores = [v.get('performance_score', 0) for v in videos]
+    mean_score = sum(scores) / len(scores)
+    variance = sum((s - mean_score) ** 2 for s in scores) / len(scores)
+    std_dev = variance ** 0.5
+    consistency = max(0, 100 - std_dev)  # Lower std dev = higher consistency
+    
+    # Determine health label
+    if avg_score >= 70:
+        health_label = 'Excellent'
+    elif avg_score >= 50:
+        health_label = 'Good'
+    elif avg_score >= 30:
+        health_label = 'Fair'
+    else:
+        health_label = 'Needs Improvement'
+    
+    return {
+        'overall_score': round(avg_score, 1),
+        'health_label': health_label,
+        'consistency': round(consistency, 1),
+        'engagement_trend': 'improving' if avg_score > 50 else 'declining'
+    }
 
 
 @centrality_bp.route("/videos.centralityMetrics", methods=["GET"])
@@ -192,190 +263,62 @@ def centrality_metrics():
         return jsonify({"error": "Invalid channel URL or ID"}), 400
 
     try:
-        # Step 1: load videos
+        # Fetch videos
         basic = fetch_basic_channel_stats(channel_id)
         playlist_id = basic["uploadsPlaylistId"]
         video_ids = fetch_video_ids(playlist_id, 50)
-
-        videos = fetch_video_stats(video_ids, with_snippet=False)
+        videos = fetch_video_stats(video_ids, with_snippet=True)
 
         if len(videos) < 2:
             return jsonify({
-                "nodes": [], 
-                "edges": [],
-                "centrality": {
-                    "degree": {},
-                    "betweenness": {},
-                    "closeness": {}
+                "categorized_videos": {
+                    'winners': [],
+                    'hidden_gems': [],
+                    'needs_work': []
                 },
-                "scores": {
-                    "retention_strength": {},
-                    "discoverability_score": {},
-                    "entry_friendliness": {},
-                    "content_influence": {},
+                "quick_wins": [{
+                    'title': 'Keep creating content',
+                    'description': 'You need more videos to analyze performance patterns',
+                    'action': 'Upload at least 5-10 videos to get meaningful insights',
+                    'impact': 'high',
+                    'effort': 'high',
+                    'video_count': 0
+                }],
+                "channel_health": {
+                    'overall_score': 0,
+                    'health_label': 'Getting Started',
+                    'consistency': 0,
+                    'engagement_trend': 'neutral'
                 },
-                "roles": {},
                 "summary": {
                     "total_videos": len(videos),
-                    "total_connections": 0,
-                    "content_cohesion": 0.0,
-                    "cohesion_label": "Building",
-                    "cohesion_explanation": "You're just getting started! Keep creating content to see how your videos connect."
-                },
-                "insights": [
-                    "📹 Keep creating! We need at least two videos to analyze how your content connects and identify your best-performing videos."
-                ],
-                "metadata": {
-                    "threshold": None,
-                    "edge_count": 0,
-                    "has_network": False
+                    "analyzed_videos": 0
                 }
             })
 
-        # Step 2: build corr matrix
-        df = pd.DataFrame(videos)
-        metric_cols = ["views", "likes", "comments"]
-        df[metric_cols] = df[metric_cols].astype(float)
-
-        # Normalize metrics to 0-1 scale for better correlation
-        for col in metric_cols:
-            min_val = df[col].min()
-            max_val = df[col].max()
-            if max_val > min_val:
-                df[f"{col}_norm"] = (df[col] - min_val) / (max_val - min_val)
-            else:
-                df[f"{col}_norm"] = 0.0
-
-        # Compute correlation on normalized data
-        norm_cols = [f"{col}_norm" for col in metric_cols]
-        corr = df[norm_cols].T.corr()
-
-        # Step 3: Build graph with LOWER threshold for more connections
-        G = nx.Graph()
-
-        # Add nodes with attributes
-        for v in videos:
-            G.add_node(
-                v["id"], 
-                views=float(v["views"]), 
-                likes=float(v["likes"]),
-                comments=float(v["comments"])
-            )
-
-        # LOWER threshold: 0.5 instead of 0.7 to create more edges
-        threshold = 0.5
-        edge_count = 0
-        for i in range(len(df)):
-            for j in range(i + 1, len(df)):
-                r = corr.iat[i, j]
-                if pd.notna(r) and r >= threshold:
-                    G.add_edge(df.iloc[i]["id"], df.iloc[j]["id"], weight=float(r))
-                    edge_count += 1
-
-        # Step 4: Compute centrality scores using academically-correct definitions
-        if edge_count > 0 and len(G.nodes()) > 1:
-            degree = nx.degree_centrality(G)
-            betweenness = nx.betweenness_centrality(G, normalized=True)
-            # wf_improved accounts for disconnected components without overstating closeness
-            closeness = nx.closeness_centrality(G, wf_improved=True)
-        else:
-            # FALLBACK: Use engagement-based scoring when no network exists
-            degree = {}
-            betweenness = {}
-            closeness = {}
-            
-            for v in videos:
-                vid = v["id"]
-                views = float(v["views"]) or 1
-                likes = float(v["likes"]) or 0
-                comments = float(v["comments"]) or 0
-                
-                # Degree: based on raw engagement (likes + comments)
-                degree[vid] = (likes + comments) / 1000.0  # normalize
-                
-                # Betweenness: based on engagement rate
-                betweenness[vid] = (likes + comments) / views
-                
-                # Closeness: based on view count (popular = more "central")
-                closeness[vid] = views / 1000000.0  # normalize
-
-            # Normalize to 0-1 range
-            if degree:
-                max_deg = max(degree.values()) or 1
-                degree = {k: v/max_deg for k, v in degree.items()}
-            
-            if betweenness:
-                max_bet = max(betweenness.values()) or 1
-                betweenness = {k: v/max_bet for k, v in betweenness.items()}
-            
-            if closeness:
-                max_clo = max(closeness.values()) or 1
-                closeness = {k: v/max_clo for k, v in closeness.items()}
-
-        # Convert to creator-friendly metric names
-        # Retention Strength = how well this video connects to similar content (degree)
-        # Discoverability Score = how well this video bridges different topics (betweenness)
-        # Entry Friendliness = how easy it is to reach from anywhere (closeness)
-        retention_strength = normalize_scores(degree)
-        discoverability_score = normalize_scores(betweenness)
-        entry_friendliness = normalize_scores(closeness)
-
-        # Build videos map for insights
-        videos_map = {v["id"]: v for v in videos}
-
-        roles = classify_roles(
-            list(G.nodes()),
-            retention_strength,
-            discoverability_score,
-            entry_friendliness,
-        )
-
-        summary = build_network_summary(len(G.nodes()), edge_count)
-        insights = generate_plain_insights(
-            list(G.nodes()),
-            retention_strength,
-            discoverability_score,
-            entry_friendliness,
-            summary,
-            videos_map,
-        )
-
-        # Calculate Content Influence (combination metric for overall importance)
-        content_influence = {}
-        for node in G.nodes():
-            influence = (
-                retention_strength.get(node, 0) * 0.4 +
-                discoverability_score.get(node, 0) * 0.3 +
-                entry_friendliness.get(node, 0) * 0.3
-            )
-            content_influence[node] = round(influence, 2)
-
+        # Categorize videos
+        categorized = categorize_videos(videos)
+        
+        # Add improvement opportunities for needs_work videos
+        for video in categorized['needs_work']:
+            video['improvements'] = identify_improvement_opportunities(video)
+        
+        # Generate quick wins
+        quick_wins = generate_quick_wins(categorized)
+        
+        # Calculate channel health
+        channel_health = calculate_channel_health(videos)
+        
         return jsonify({
-            "nodes": list(G.nodes()),
-            "edges": [
-                {"source": u, "target": v, "weight": d["weight"]} 
-                for u, v, d in G.edges(data=True)
-            ],
-            # Keep raw centrality for technical/advanced view if needed
-            "centrality": {
-                "degree": degree,
-                "betweenness": betweenness,
-                "closeness": closeness,
-            },
-            # Creator-friendly scores (0-100)
-            "scores": {
-                "retention_strength": retention_strength,
-                "discoverability_score": discoverability_score,
-                "entry_friendliness": entry_friendliness,
-                "content_influence": content_influence,
-            },
-            "roles": roles,
-            "summary": summary,
-            "insights": insights,
-            "metadata": {
-                "threshold": threshold,
-                "edge_count": edge_count,
-                "has_network": edge_count > 0
+            "categorized_videos": categorized,
+            "quick_wins": quick_wins,
+            "channel_health": channel_health,
+            "summary": {
+                "total_videos": len(videos),
+                "analyzed_videos": len(videos),
+                "winners_count": len(categorized['winners']),
+                "hidden_gems_count": len(categorized['hidden_gems']),
+                "needs_work_count": len(categorized['needs_work'])
             }
         })
 
