@@ -5,20 +5,29 @@ from models.UserAccount import UserAccount
 profile_bp = Blueprint("profile", __name__, url_prefix="/api")
 
 
+# -------------------------------------------------------------------------
+# GET PROFILE
+# -------------------------------------------------------------------------
 @profile_bp.get("/profile")
 @jwt_required()
 def get_profile_route():
     email = get_jwt_identity()
     user = UserAccount.find_by_email(email)
+
     if not user:
         return jsonify({"message": "User not found"}), 404
+
     return jsonify({"user": user.to_dict()}), 200
 
 
+# -------------------------------------------------------------------------
+# UPDATE BASIC PROFILE
+# -------------------------------------------------------------------------
 @profile_bp.put("/profile")
 @jwt_required()
 def update_profile_route():
     data = request.get_json() or {}
+
     first_name = (data.get("first_name") or "").strip()
     last_name = (data.get("last_name") or "").strip()
 
@@ -27,43 +36,71 @@ def update_profile_route():
 
     email = get_jwt_identity()
     updated_user = UserAccount.update_name(email, first_name, last_name)
+
     if not updated_user:
         return jsonify({"message": "Update failed"}), 400
 
     return jsonify({"user": updated_user.to_dict()}), 200
 
 
+# -------------------------------------------------------------------------
+# SAVE YOUTUBE CHANNELS (CREATOR + BUSINESS)
+# -------------------------------------------------------------------------
 @profile_bp.put("/profile/youtube-channels")
 @jwt_required()
 def save_youtube_channels_route():
     data = request.get_json() or {}
     channels = data.get("channels") or []
+
     if not isinstance(channels, list):
         return jsonify({"message": "channels must be a list"}), 400
-    
-    # ADD HERE: max 3 channels limit
-    MAX_CHANNELS = 3
-    if len(channels) > MAX_CHANNELS:
-        return jsonify({"message": "You can link up to 3 YouTube channels only"}), 400
 
     email = get_jwt_identity()
     user = UserAccount.find_by_email(email)
+
     if not user:
         return jsonify({"message": "User not found"}), 404
 
-    # Normalized input
+    # -----------------------------
+    # Role-based limits
+    # -----------------------------
+    MAX_CHANNELS = 1 if user.role == "creator" else 3
+
+    if len(channels) > MAX_CHANNELS:
+        return jsonify({
+            "message": f"You can link up to {MAX_CHANNELS} YouTube channel(s) only"
+        }), 400
+
+    # -----------------------------
+    # Normalize & validate input
+    # -----------------------------
     cleaned = []
-    for i, ch in enumerate(channels):
+    for idx, ch in enumerate(channels):
         if not isinstance(ch, dict):
             continue
+
         url = (ch.get("url") or "").strip()
         if not url:
             continue
-        name = (ch.get("name") or f"Channel {i+1}").strip()
-        cleaned.append({"url": url, "name": name})
 
-    UserAccount.save_youtube_channels(owner_user_id=user.user_id, channels=cleaned)
+        name = (ch.get("name") or f"Channel {idx + 1}").strip()
 
-    # Return to the latest user (including youtube_channels)
-    fresh = UserAccount.find_by_email(email)
-    return jsonify({"user": fresh.to_dict()}), 200
+        cleaned.append({
+            "url": url,
+            "name": name
+        })
+
+    # Enforce role limit again (safety)
+    cleaned = cleaned[:MAX_CHANNELS]
+
+    # -----------------------------
+    # Persist
+    # -----------------------------
+    UserAccount.save_youtube_channels(
+        owner_user_id=user.user_id,
+        channels=cleaned
+    )
+
+    # Reload fresh user data
+    fresh_user = UserAccount.find_by_email(email)
+    return jsonify({"user": fresh_user.to_dict()}), 200

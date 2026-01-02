@@ -68,7 +68,7 @@ class UserAccount:
 
         user = cls.from_row(row)
 
-        # business （DB -> user.youtube_channels）
+        # YouTube channels for both roles
         user.youtube_channels = cls.get_youtube_channels_by_user(user.user_id)
 
         # creator primary channel
@@ -164,6 +164,7 @@ class UserAccount:
             WHERE owner_user_id = %s
         """, (owner_user_id,))
 
+        primary_channel_id = None
         for idx, ch in enumerate(channels):
             url = (ch.get("url") or "").strip()
             if not url:
@@ -180,6 +181,26 @@ class UserAccount:
                     channel_name = VALUES(channel_name),
                     is_primary = VALUES(is_primary)
             """, (owner_user_id, url, name, is_primary))
+
+            # Get the channel_id for primary
+            if is_primary:
+                cursor.execute("""
+                    SELECT channel_id FROM YouTubeChannel
+                    WHERE youtube_channel_id = %s AND owner_user_id = %s
+                """, (url, owner_user_id))
+                row = cursor.fetchone()
+                if row:
+                    primary_channel_id = row['channel_id']
+
+        # Update CreatorProfile if user is creator
+        cursor.execute("SELECT role FROM User WHERE user_id = %s", (owner_user_id,))
+        user_row = cursor.fetchone()
+        if user_row and user_row['role'] == 'creator':
+            cursor.execute("""
+                UPDATE CreatorProfile
+                SET primary_channel_id = %s
+                WHERE user_id = %s
+            """, (primary_channel_id, owner_user_id))
 
         conn.commit()
         cursor.close()

@@ -19,7 +19,12 @@ export default function Profile() {
     if (user) {
       setFirstName(user.first_name || "");
       setLastName(user.last_name || "");
-      setYoutubeUrl(user.youtube_channel || "");
+      if (user.youtube_channels?.length > 0) {
+        setYoutubeUrl(user.youtube_channels[0].url || "");
+      } else {
+        setYoutubeUrl("");
+      }
+
     }
   }, [user]);
 
@@ -63,13 +68,18 @@ export default function Profile() {
     setSuccess("");
 
     try {
-      const resp = await fetch("http://localhost:5000/api/profile/youtube", {
+      const resp = await fetch("http://localhost:5000/api/profile/youtube-channels", {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ youtube_channel: youtubeUrl }),
+        body: JSON.stringify({
+        channels: youtubeUrl
+          ? [{ url: youtubeUrl, name: "Primary Channel" }]
+          : []
+      }),
+
       });
 
       const data = await resp.json();
