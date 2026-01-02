@@ -91,28 +91,31 @@ export default function BusinessProfile() {
     setSuccess("");
 
     try {
-      // Filter out empty channels
       const validChannels = youtubeChannels
         .map((url, index) => ({
           url: url.trim(),
-          name: channelNames[index]?.trim() || `Channel ${index + 1}`
+          name: channelNames[index]?.trim() || `Channel ${index + 1}`,
+          is_primary: index === 0, // ✅ PRIMARY FLAG
         }))
         .filter(channel => channel.url !== "");
 
-      const resp = await fetch("http://localhost:5000/api/profile/youtube-channels", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ channels: validChannels }),
-      });
+      const resp = await fetch(
+        "http://localhost:5000/api/profile/youtube-channels",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({ channels: validChannels }),
+        }
+      );
 
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.message || "Failed to update channels");
 
       setUser(data.user);
-      setSuccess(`${validChannels.length} YouTube channel(s) saved successfully!`);
+      setSuccess("YouTube channels saved successfully!");
     } catch (err) {
       setError(err.message);
     } finally {
@@ -372,10 +375,23 @@ function LinkChannelSection({
         {youtubeChannels.map((url, index) => (
           <div key={index} className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
             <div className="flex justify-between items-center">
-              <h3 className="text-sm font-medium text-slate-700">
-                Channel {index + 1}
-              </h3>
-              {youtubeChannels.length > 1 && (
+              <h3 className="text-sm font-medium flex items-center gap-2">
+                  <span className="text-slate-700">
+                    Channel {index + 1}
+                  </span>
+
+                  {index === 0 && (
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 font-semibold">
+                      Primary
+                    </span>
+                  )}
+                </h3>
+                {index === 0 && (
+                <p className="text-xs text-slate-400">
+                  This channel will be used as your primary channel across the platform.
+                </p>
+              )}
+              {youtubeChannels.length > 1 && index !== 0 && (
                 <button
                   type="button"
                   onClick={() => removeChannel(index)}
