@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import ReviewBubble from "../../pages/misc/ReviewBubble.jsx";
 import { useAuth } from "../../core/context/AuthContext";
 
 export default function BusinessDashboard() {
@@ -303,6 +304,7 @@ export default function BusinessDashboard() {
           </section>
         </main>
       </div>
+      <ReviewBubble />
     </div>
   );
 }
