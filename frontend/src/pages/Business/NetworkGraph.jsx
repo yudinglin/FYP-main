@@ -375,6 +375,7 @@ export default function NetworkGraphBusiness() {
                 Views
               </h2>
               <div className="space-y-1">
+                <MenuItem icon={BarChart3} label="Summary" view="summary" badge="Default" />
                 <MenuItem icon={Network} label="Network Graph" view="graph" badge="Start Here" />
                 <MenuItem icon={BarChart3} label="Charts" view="charts" />
                 <MenuItem icon={Lightbulb} label="Performance Insights" view="insights" />
@@ -480,87 +481,6 @@ export default function NetworkGraphBusiness() {
 
           {/* Main Content */}
           <div className="flex-1">
-        {/* Controls */}
-        <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-5 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-            <div>
-              <p className="text-xs text-slate-500">Channel</p>
-              <select
-                className="mt-1 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-                value={selectedKey}
-                onChange={(e) => setSelectedKey(e.target.value)}
-              >
-                {options.map((o) => (
-                  <option key={o.key} value={o.key}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <p className="text-xs text-slate-500">Max videos</p>
-              <input
-                className="mt-1 w-28 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-                value={videoInput}
-                onChange={(e) => setVideoInput(e.target.value)}
-                placeholder="25"
-              />
-            </div>
-
-            <button
-              onClick={handleFetchGraph}
-              disabled={loading}
-              className="mt-5 sm:mt-0 inline-flex items-center justify-center rounded-xl bg-slate-900 text-white px-4 py-2 text-sm hover:bg-slate-800 disabled:opacity-60"
-            >
-              {loading ? "Analyzing..." : "Analyze Videos"}
-            </button>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setActiveView("summary")}
-              className={`rounded-xl px-3 py-2 text-sm border ${
-                activeView === "summary"
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              Summary
-            </button>
-            <button
-              onClick={() => setActiveView("graph")}
-              className={`rounded-xl px-3 py-2 text-sm border ${
-                activeView === "graph"
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              Graph
-            </button>
-            <button
-              onClick={() => setActiveView("charts")}
-              className={`rounded-xl px-3 py-2 text-sm border ${
-                activeView === "charts"
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              Charts
-            </button>
-            <button
-              onClick={() => setActiveView("insights")}
-              className={`rounded-xl px-3 py-2 text-sm border ${
-                activeView === "insights"
-                  ? "bg-slate-900 text-white border-slate-900"
-                  : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
-              }`}
-            >
-              Performance Insights
-            </button>
-          </div>
-        </section>
-
         {error ? (
           <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
             <div className="flex items-start gap-3">
