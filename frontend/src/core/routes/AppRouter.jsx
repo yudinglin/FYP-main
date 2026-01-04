@@ -13,6 +13,7 @@ import Login from "../../pages/auth/Login.jsx";
 import Register from "../../pages/auth/Register.jsx";
 import PlansPage from "../../pages/UnregisteredUser/PlansPage.jsx";
 import PaymentPage from "../../pages/UnregisteredUser/PaymentPage.jsx";
+import CardPaymentPage from "../../pages/UnregisteredUser/CardPaymentPage.jsx";
 
 import CreatorDashboard from "../../pages/dashboard/CreatorDashboard.jsx";
 import BusinessDashboard from "../../pages/dashboard/BusinessDashboard.jsx";
@@ -247,6 +248,15 @@ export default function AppRouter() {
         element={
           <MainLayout>
             <AdminProfile />
+          </MainLayout>
+        }
+      />
+
+      <Route
+        path="/card-payment"
+        element={
+          <MainLayout>
+            <CardPaymentPage />
           </MainLayout>
         }
       />

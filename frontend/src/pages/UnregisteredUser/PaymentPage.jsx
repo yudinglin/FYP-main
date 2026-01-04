@@ -47,6 +47,18 @@ export default function PaymentPage() {
   const [error, setError] = useState("");
   const [paymentSuccess, setPaymentSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const handlePayAndRegister = () => {
+    navigate("/card-payment", {
+      state: {
+        email,
+        password,
+        firstName,
+        lastName,
+        role,
+        selectedPlan,
+      },
+    });
+  };
 
   // Fetch plan details from backend (optional - for consistency)
   useEffect(() => {
@@ -297,20 +309,15 @@ export default function PaymentPage() {
               </div>
 
               <div className="pt-4 border-t border-gray-200">
-                <div className="flex justify-between items-center mb-4">
-                  <span className="text-gray-700 font-medium">Total:</span>
-                  <span className="text-2xl font-bold text-gray-900">
-                    ${selectedPlan.price}/mo
-                  </span>
-                </div>
-
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handlePayAndRegister}
                   disabled={busy}
-                  className="w-full py-3 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
+                  className="w-full py-3 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-700 disabled:opacity-60"
                 >
-                  {busy ? "Processing Payment..." : `Pay $${selectedPlan.price} and Register`}
+                  Continue to Payment
                 </button>
+
 
                 <p className="mt-4 text-xs text-gray-500 text-center">
                   By clicking "Pay", you agree to our Terms of Service and Privacy Policy.
