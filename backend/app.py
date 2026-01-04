@@ -21,6 +21,7 @@ from routes.Admin.subscription_plans import subscription_plans_bp
 from routes.YouTube.centrality_metrics import centrality_bp
 from routes.YouTube.video_sentiment import sentiment_bp
 from routes.YouTube.subscriber_prediction import subscriber_predict_bp
+from routes.YouTube.video_performance_comparison import performance_bp
 
 
 load_dotenv()
@@ -49,6 +50,7 @@ app.register_blueprint(comments_bp)
 app.register_blueprint(centrality_bp)
 app.register_blueprint(sentiment_bp)
 app.register_blueprint(subscriber_predict_bp)
+app.register_blueprint(performance_bp)
 
 @app.route('/api/ping')
 def ping():
