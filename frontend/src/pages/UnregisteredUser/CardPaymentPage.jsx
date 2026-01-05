@@ -117,6 +117,7 @@ const CardPaymentPage = () => {
             </div>
             <h2 className="text-2xl font-bold text-gray-800 mb-3">Payment Successful!</h2>
             <p className="text-gray-600 mb-2">Successfully registered</p>
+            <p className="text-gray-600 mb-2">Check your email for invoice</p>
             <p className="text-gray-500 text-sm">Redirecting you to your dashboard...</p>
           </div>
         </div>
