@@ -21,7 +21,7 @@ from routes.Admin.subscription_plans import subscription_plans_bp
 from routes.YouTube.centrality_metrics import centrality_bp
 from routes.YouTube.video_sentiment import sentiment_bp
 from routes.YouTube.subscriber_prediction import subscriber_predict_bp
-from routes.YouTube.video_performance_comparison import performance_bp
+from routes.YouTube.video_correlation_business import performance_bp
 
 
 load_dotenv()

@@ -162,7 +162,7 @@ export default function BusinessDashboard() {
   return (
     <div className="min-h-[calc(100vh-72px)] bg-slate-50">
       <div className="max-w-7xl mx-auto px-6 py-6">
-        <h1 className="text-2xl font-semibold text-slate-900">Welcome back Business User</h1>
+        <h1 className="text-2xl font-semibold text-slate-900">Welcome back  {user?.first_name || "Business"}</h1>
         <p className="mt-1 text-sm text-slate-500 max-w-2xl">
           Default view is <b>All channels (sum)</b>. You can switch to a single channel below.
         </p>

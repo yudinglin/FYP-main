@@ -1140,7 +1140,14 @@ export default function NetworkGraphBusiness() {
   );
 }
 
-function ChannelGraphCard({ title, nodes = [], links = [] }) {
+function ChannelGraphCard({
+    title,
+    nodes = [],
+    links = [],
+    isPrimary = false,
+    benchmarkStats = null,
+  }) {
+
   // Measure the real container size to avoid 0-width canvas issues
   const graphBoxRef = useRef(null);
   const [boxSize, setBoxSize] = useState({ w: 360, h: 260 });
@@ -1251,7 +1258,14 @@ function ChannelGraphCard({ title, nodes = [], links = [] }) {
   }, [starNodes, centerNode, boxSize]);
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-4">
+    <div
+        className={`rounded-2xl p-4 ${
+          isPrimary
+            ? "border-2 border-indigo-500 bg-indigo-50/40"
+            : "border border-slate-100 bg-white"
+        }`}
+      >
+  
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-slate-900 line-clamp-1">{title}</p>
