@@ -19,6 +19,21 @@ class UserAccount:
         self.youtube_channels = youtube_channels or []
 
     @classmethod
+    def get_all(cls):
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT user_id, email, password_hash, first_name, last_name, role, status
+            FROM User
+        """)
+        rows = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+        return [cls.from_row(row) for row in rows]
+
+    @classmethod
     def from_row(cls, row):
         if not row:
             return None
