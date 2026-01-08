@@ -172,7 +172,24 @@ class UserAccount:
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
-        # clean primary
+        # Collect URLs to keep
+        urls_to_keep = [(ch.get("url") or "").strip() for ch in channels if (ch.get("url") or "").strip()]
+
+        # Delete channels not in the new list
+        if urls_to_keep:
+            placeholders = ','.join(['%s'] * len(urls_to_keep))
+            cursor.execute(f"""
+                DELETE FROM YouTubeChannel
+                WHERE owner_user_id = %s AND youtube_channel_id NOT IN ({placeholders})
+            """, (owner_user_id, *urls_to_keep))
+        else:
+            # If no URLs, delete all
+            cursor.execute("""
+                DELETE FROM YouTubeChannel
+                WHERE owner_user_id = %s
+            """, (owner_user_id,))
+
+        # Reset is_primary for remaining channels (though delete above may have removed them)
         cursor.execute("""
             UPDATE YouTubeChannel
             SET is_primary = 0
@@ -197,7 +214,7 @@ class UserAccount:
                     is_primary = VALUES(is_primary)
             """, (owner_user_id, url, name, is_primary))
 
-            # Get the channel_id for primary
+            # Get the channel_id for primary (only for creators)
             if is_primary:
                 cursor.execute("""
                     SELECT channel_id FROM YouTubeChannel

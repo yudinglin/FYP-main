@@ -1,4 +1,4 @@
-# backend/routes/YouTube/video_performance_comparison.py
+# backend/routes/YouTube/video_correlation_business.py
 
 from flask import Blueprint, request, jsonify
 from .youtube_utils import (

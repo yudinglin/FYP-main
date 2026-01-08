@@ -36,7 +36,7 @@ export default function NetworkGraph() {
     setError("");
 
     try {
-      const channelUrl = user.youtube_channel;
+      const channelUrl = user?.youtube_channel;
       if (!channelUrl) {
         setError("No channel URL found. Please add your YouTube channel in settings.");
         setLoading(false);
