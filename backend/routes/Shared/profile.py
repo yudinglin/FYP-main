@@ -64,7 +64,7 @@ def save_youtube_channels_route():
     # -----------------------------
     # Role-based limits
     # -----------------------------
-    MAX_CHANNELS = 1 if user.role == "creator" else 3
+    MAX_CHANNELS = 1 if user.role == "creator" else 5
 
     if len(channels) > MAX_CHANNELS:
         return jsonify({

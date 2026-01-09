@@ -167,8 +167,8 @@ class UserAccount:
 
     @classmethod
     def save_youtube_channels(cls, owner_user_id, channels):
-        if isinstance(channels, list) and len(channels) > 3:
-           channels = channels[:3]
+        if isinstance(channels, list) and len(channels) > 5:
+           channels = channels[:5]
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 

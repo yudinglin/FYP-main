@@ -16,7 +16,7 @@ export default function BusinessProfile() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-  const MAX_CHANNELS = 3;
+  const MAX_CHANNELS = 5;
 
   const industryOptions = [
     "Select your industry",
@@ -359,7 +359,7 @@ function LinkChannelSection({
   saving,
   onSave,
 }) {
-  const MAX_CHANNELS = 3;
+  const MAX_CHANNELS = 5;
   
   return (
     <>
