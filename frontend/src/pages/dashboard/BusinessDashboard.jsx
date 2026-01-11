@@ -18,18 +18,27 @@ export default function BusinessDashboard() {
       .filter((c) => c.url);
   }, [user]);
 
-  // Dropdown: All channels + Single channel
+  // Find primary channel
+  const primaryChannel = useMemo(() => {
+    return channels.find(c => c.is_primary) || channels[0] || null;
+  }, [channels]);
+
+  // Options: Only single channels (no "All channels" option)
   const options = useMemo(() => {
-    const all = { key: "__ALL__", label: "All channels (sum)", url: "" };
-    const singles = channels.map((c, idx) => ({
+    return channels.map((c, idx) => ({
       key: c.url || String(idx),
       label: c.name ? `${c.name}${c.is_primary ? " (Primary)" : ""}` : `${c.url}${c.is_primary ? " (Primary)" : ""}`,
       url: c.url,
+      is_primary: c.is_primary
     }));
-    return [all, ...singles];
   }, [channels]);
 
-  const [selectedKey, setSelectedKey] = useState("__ALL__");
+  // Default to primary channel if available, otherwise first channel
+  const [selectedKey, setSelectedKey] = useState(() => {
+    if (primaryChannel) return primaryChannel.url;
+    if (channels.length > 0) return channels[0].url;
+    return "";
+  });
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -46,10 +55,16 @@ export default function BusinessDashboard() {
 
   // Determine the channelUrls to run based on selectedKey.
   const selectedUrls = useMemo(() => {
-    if (selectedKey === "__ALL__") return channels.map((c) => c.url);
-    const one = options.find((o) => o.key === selectedKey);
-    return one?.url ? [one.url] : [];
-  }, [selectedKey, channels, options]);
+    if (!selectedKey) return [];
+    return [selectedKey];
+  }, [selectedKey]);
+
+  // Update selectedKey when primary channel changes (e.g., on first load)
+  useEffect(() => {
+    if (primaryChannel && !selectedKey) {
+      setSelectedKey(primaryChannel.url);
+    }
+  }, [primaryChannel, selectedKey]);
 
   useEffect(() => {
     async function fetchAll() {
@@ -68,81 +83,66 @@ export default function BusinessDashboard() {
       setLoading(true);
 
       try {
-        // Drag stats from each channel, then sum them.
-        let sumSubs = 0;
-        let sumViews = 0;
-        let sumLikes = 0;
-        let sumComments = 0;
+        const url = selectedUrls[0];
+        const q = encodeURIComponent(url);
 
-        const allVideosForRanking = [];
-        let commentsCollected = [];
+        // channel stats
+        const r1 = await fetch(`http://localhost:5000/api/youtube/channels.list?url=${q}`);
+        if (!r1.ok) throw new Error(`channels.list failed for ${url}`);
+        const d1 = await r1.json();
+        setSubscriberCount(Number(d1.subscriberCount || 0));
+        setViewCount(Number(d1.viewCount || 0));
 
-        for (const url of selectedUrls) {
-          const q = encodeURIComponent(url);
+        // total likes/comments
+        const r2 = await fetch(`http://localhost:5000/api/youtube/videos.list?url=${q}`);
+        if (!r2.ok) throw new Error(`videos.list failed for ${url}`);
+        const d2 = await r2.json();
+        setTotalLikes(Number(d2.totalLikes || 0));
+        setTotalComments(Number(d2.totalComments || 0));
 
-          // channel stats
-          const r1 = await fetch(`http://localhost:5000/api/youtube/channels.list?url=${q}`);
-          if (!r1.ok) throw new Error(`channels.list failed for ${url}`);
-          const d1 = await r1.json();
-          sumSubs += Number(d1.subscriberCount || 0);
-          sumViews += Number(d1.viewCount || 0);
+        // top videos ranking (use correlationNetwork of rawMetrics)
+        const r3 = await fetch(
+          `http://localhost:5000/api/youtube/videos.correlationNetwork?url=${q}&maxVideos=50`
+        );
+        if (r3.ok) {
+          const d3 = await r3.json();
+          const raw = d3.rawMetrics ?? d3.nodes ?? [];
+          const allVideosForRanking = raw.map((v) => {
+            const views = Number(v.views) || 0;
+            const likes = Number(v.likes) || 0;
+            const comments = Number(v.comments) || 0;
+            const engagement = views > 0 ? (likes + comments) / views : 0;
+            return {
+              videoId: v.id || v.videoId || "",
+              title: v.title || "Untitled",
+              views,
+              likes,
+              comments,
+              engagementScore: engagement,
+            };
+          });
 
-          // total likes/comments
-          const r2 = await fetch(`http://localhost:5000/api/youtube/videos.list?url=${q}`);
-          if (!r2.ok) throw new Error(`videos.list failed for ${url}`);
-          const d2 = await r2.json();
-          sumLikes += Number(d2.totalLikes || 0);
-          sumComments += Number(d2.totalComments || 0);
-
-          // top videos ranking (use correlationNetwork of rawMetrics)
-          const r3 = await fetch(
-            `http://localhost:5000/api/youtube/videos.correlationNetwork?url=${q}&maxVideos=50`
-          );
-          if (r3.ok) {
-            const d3 = await r3.json();
-            const raw = d3.rawMetrics ?? d3.nodes ?? [];
-            raw.forEach((v) => {
-              const views = Number(v.views) || 0;
-              const likes = Number(v.likes) || 0;
-              const comments = Number(v.comments) || 0;
-              const engagement = views > 0 ? (likes + comments) / views : 0;
-              allVideosForRanking.push({
-                videoId: v.id || v.videoId || "",
-                title: v.title || "Untitled",
-                views,
-                likes,
-                comments,
-                engagementScore: engagement,
-              });
-            });
-          }
-
-          // Latest comments: 5 comments are pulled from each channel, and the latest 5 comments are merged at the end.
-          const r4 = await fetch(
-            `http://localhost:5000/api/youtube/videos.latestComments?url=${q}&maxResults=5`
-          );
-          if (r4.ok) {
-            const d4 = await r4.json();
-            const arr = Array.isArray(d4.comments) ? d4.comments : [];
-            commentsCollected = commentsCollected.concat(arr);
-          }
+          // Top videos: Sorted by engagement, the top 4 are selected.
+          const top = allVideosForRanking
+            .filter((v) => v.videoId)
+            .sort((a, b) => b.engagementScore - a.engagementScore)
+            .slice(0, 4);
+          setTopVideos(top);
+        } else {
+          setTopVideos([]);
         }
 
-        setSubscriberCount(sumSubs);
-        setViewCount(sumViews);
-        setTotalLikes(sumLikes);
-        setTotalComments(sumComments);
-
-        // Top videos: Sorted by engagement after full merge, the top 4 are selected.
-        const top = allVideosForRanking
-          .filter((v) => v.videoId)
-          .sort((a, b) => b.engagementScore - a.engagementScore)
-          .slice(0, 4);
-        setTopVideos(top);
-
-        // Latest comments: Sort by time field (if applicable), otherwise take the top 5.
-        const latest = commentsCollected.slice(0, 5);
-        setLatestComments(latest);
+        // Latest comments: 5 comments from the channel
+        const r4 = await fetch(
+          `http://localhost:5000/api/youtube/videos.latestComments?url=${q}&maxResults=5`
+        );
+        if (r4.ok) {
+          const d4 = await r4.json();
+          const arr = Array.isArray(d4.comments) ? d4.comments : [];
+          setLatestComments(arr.slice(0, 5));
+        } else {
+          setLatestComments([]);
+        }
       } catch (e) {
         setError(e?.message || "Failed to load business dashboard");
         setSubscriberCount(null);
@@ -164,7 +164,7 @@ export default function BusinessDashboard() {
       <div className="max-w-7xl mx-auto px-6 py-6">
         <h1 className="text-2xl font-semibold text-slate-900">Welcome back  {user?.first_name || "Business"}</h1>
         <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-          Default view is <b>All channels (sum)</b>. You can switch to a single channel below.
+          {primaryChannel ? `Currently viewing: ${primaryChannel.name || primaryChannel.url} (Primary channel)` : "No channels linked"}
         </p>
       </div>
 
@@ -203,14 +203,14 @@ export default function BusinessDashboard() {
           {/* Selector */}
           <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-5 flex items-center justify-between gap-4">
             <div>
-              <p className="text-sm font-semibold text-slate-900">Selected</p>
+              <p className="text-sm font-semibold text-slate-900">Selected Channel</p>
               <p className="text-xs text-slate-500 mt-1">
-                {options.find((o) => o.key === selectedKey)?.label || "—"}
+                {options.find((o) => o.key === selectedKey)?.label || "No channel selected"}
               </p>
             </div>
 
             <div className="flex items-center gap-3">
-              {options.length <= 1 ? (
+              {options.length === 0 ? (
                 <Link to="/business/profile" className="text-sm font-semibold text-blue-600 hover:underline">
                   Go link channels
                 </Link>
