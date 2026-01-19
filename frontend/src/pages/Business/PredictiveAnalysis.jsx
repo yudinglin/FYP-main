@@ -1,28 +1,22 @@
-// frontend/src/pages/Business/PredictiveAnalysisBusiness.jsx
+// frontend/src/pages/Business/PredictiveAnalysis.jsx
 import React, { useEffect, useMemo, useState } from "react";
 import {
   BarChart,
   Bar,
+  LineChart,
+  Line,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
   ResponsiveContainer,
   Cell,
-  PieChart,
-  Pie,
   Legend,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
 } from "recharts";
 import { useAuth } from "../../core/context/AuthContext";
 import {
   TrendingUp,
   TrendingDown,
-  DollarSign,
   Target,
   AlertCircle,
   CheckCircle,
@@ -35,22 +29,32 @@ import {
   Star,
   ThumbsUp,
   Activity,
-  TrendingUpIcon,
   PlayCircle,
+  MessageSquare,
+  Heart,
 } from "lucide-react";
 
-const API_BASE = "http://127.0.0.1:5000";
+// Utility Functions
+function formatNumber(n) {
+  const num = Number(n) || 0;
+  if (num >= 1000000) {
+    return `${(num / 1000000).toFixed(1)}M`;
+  } else if (num >= 1000) {
+    return `${(num / 1000).toFixed(1)}K`;
+  }
+  return num.toLocaleString();
+}
+
+const API_BASE = "http://localhost:5000";
 
 const VIEWS = {
   OVERVIEW: "overview",
-  ROI: "roi",
-  COMPARISON: "comparison",
   GROWTH: "growth",
-  AUDIENCE: "audience",
-  SUBSCRIBERS: "subscribers",
+  COMPARISON: "comparison",
+  ENGAGEMENT: "engagement",
 };
 
-export default function PredictiveAnalysisBusiness() {
+export default function PredictiveAnalysis() {
   const { user } = useAuth();
 
   const channels = useMemo(() => {
@@ -81,10 +85,6 @@ export default function PredictiveAnalysisBusiness() {
   const [subscriberPredictions, setSubscriberPredictions] = useState(null);
   const [predictionsLoading, setPredictionsLoading] = useState(false);
 
-  // Settings
-  const [campaignBudget, setCampaignBudget] = useState(1000);
-  const [productPrice, setProductPrice] = useState(50);
-
   // Initialize with all competitors selected
   useEffect(() => {
     if (competitorChannels.length > 0) {
@@ -92,9 +92,17 @@ export default function PredictiveAnalysisBusiness() {
     }
   }, [competitorChannels]);
 
+  // Auto-analyze when page loads if we have a primary channel
+  useEffect(() => {
+    if (primaryChannel && !analysisData && !loading) {
+      handleAnalyze();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [primaryChannel?.url]);
+
   const handleAnalyze = async () => {
     if (!primaryChannel) {
-      setError("Please set up your YouTube channel first in Business Profile.");
+      setError("Please set up your primary YouTube channel first in your Business Profile.");
       return;
     }
 
@@ -103,10 +111,11 @@ export default function PredictiveAnalysisBusiness() {
     setAnalysisData(null);
 
     try {
+      // Use default values for backend calculations (they won't be shown to user)
       const params = new URLSearchParams({
         primary_url: primaryChannel.url,
-        campaign_budget: campaignBudget.toString(),
-        product_price: productPrice.toString(),
+        campaign_budget: "1000", // Default, not shown to user
+        product_price: "50", // Default, not shown to user
         max_videos: "25",
       });
 
@@ -118,7 +127,7 @@ export default function PredictiveAnalysisBusiness() {
 
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(text || "Failed to analyze");
+        throw new Error(text || "Failed to analyze channels");
       }
 
       const data = await res.json();
@@ -256,9 +265,14 @@ export default function PredictiveAnalysisBusiness() {
 
             const lastPoint = dataPoints[dataPoints.length - 1];
             
-            // Calculate 6-month prediction
-            const futureX = lastPoint.x + 6;
-            const predicted6Months = Math.round(m * futureX + b);
+            // Calculate 3, 6, and 12 month predictions
+            const future3 = lastPoint.x + 3;
+            const future6 = lastPoint.x + 6;
+            const future12 = lastPoint.x + 12;
+            
+            const predicted3Months = Math.round(m * future3 + b);
+            const predicted6Months = Math.round(m * future6 + b);
+            const predicted12Months = Math.round(m * future12 + b);
             
             // Calculate growth metrics
             const avgGrowthPerMonth = m;
@@ -268,7 +282,9 @@ export default function PredictiveAnalysisBusiness() {
             return {
               url,
               currentSubscribers,
+              predicted3Months,
               predicted6Months,
+              predicted12Months,
               avgGrowthPerMonth: Math.round(avgGrowthPerMonth),
               totalGrowth6Months,
               growthRate,
@@ -295,22 +311,17 @@ export default function PredictiveAnalysisBusiness() {
     );
   };
 
-  const MenuItem = ({ icon: Icon, label, view, badge }) => (
+  const MenuItem = ({ icon: Icon, label, view }) => (
     <button
       onClick={() => setSelectedView(view)}
       className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
         selectedView === view
-          ? "bg-indigo-50 text-indigo-700 font-medium"
-          : "text-slate-600 hover:bg-slate-50"
+          ? "bg-indigo-50 text-indigo-700 font-medium border-2 border-indigo-200"
+          : "text-slate-600 hover:bg-slate-50 border-2 border-transparent"
       }`}
     >
       <Icon size={20} />
       <span className="flex-1 text-left">{label}</span>
-      {badge && (
-        <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">
-          {badge}
-        </span>
-      )}
     </button>
   );
 
@@ -320,47 +331,45 @@ export default function PredictiveAnalysisBusiness() {
         {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
-            Channel Performance Dashboard
+            Channel Growth & Performance
           </h1>
           <p className="text-slate-600">
-            Understand your channel's performance and compare with competitors
+            See what's working, understand your audience, and plan your next moves
           </p>
         </div>
 
         <div className="flex gap-6">
           {/* Sidebar */}
-          <div className="w-64 flex flex-col gap-4">
+          <div className="w-56 flex flex-col gap-4">
             {/* Navigation */}
             {analysisData && (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
-                <h2 className="text-sm font-semibold text-slate-700 px-4 py-2 mb-2">
-                  Views
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-2">
+                <h2 className="text-xs font-bold text-slate-600 px-4 py-2 mb-1 uppercase tracking-wide">
+                  Analysis
                 </h2>
                 <div className="space-y-1">
-                  <MenuItem icon={BarChart3} label="Overview" view={VIEWS.OVERVIEW} badge="Default" />
-                  <MenuItem icon={DollarSign} label="Money & ROI" view={VIEWS.ROI} />
-                  <MenuItem icon={Users} label="Compare Channels" view={VIEWS.COMPARISON} />
-                  <MenuItem icon={TrendingUp} label="Growth Trends" view={VIEWS.GROWTH} />
-                  <MenuItem icon={Eye} label="Audience Quality" view={VIEWS.AUDIENCE} />
-                  <MenuItem icon={Activity} label="Subscriber Predictions" view={VIEWS.SUBSCRIBERS} />
+                  <MenuItem icon={BarChart3} label="Overview" view={VIEWS.OVERVIEW} />
+                  <MenuItem icon={TrendingUp} label="Growth Plan" view={VIEWS.GROWTH} />
+                  <MenuItem icon={Users} label="Competition" view={VIEWS.COMPARISON} />
+                  <MenuItem icon={ThumbsUp} label="Engagement" view={VIEWS.ENGAGEMENT} />
                 </div>
               </div>
             )}
 
-            {/* Analysis Settings */}
+            {/* Channel Selection */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
               <h3 className="text-sm font-semibold text-slate-700 mb-3">
-                Analysis Settings
+                Your Channels
               </h3>
 
               <div className="space-y-4">
                 {/* Your Channel */}
                 <div>
-                  <label className="text-sm text-slate-600 block mb-2">Your Channel</label>
+                  <label className="text-sm text-slate-600 block mb-2">Primary Channel</label>
                   {primaryChannel ? (
-                    <div className="p-3 bg-blue-50 rounded-lg border border-blue-200">
+                    <div className="p-3 bg-indigo-50 rounded-lg border-2 border-indigo-200">
                       <div className="flex items-center gap-2">
-                        <CheckCircle size={16} className="text-blue-600" />
+                        <CheckCircle size={16} className="text-indigo-600" />
                         <span className="text-sm font-medium text-slate-900">{primaryChannel.name}</span>
                       </div>
                     </div>
@@ -372,13 +381,9 @@ export default function PredictiveAnalysisBusiness() {
                 </div>
 
                 {/* Competitors */}
-                <div>
-                  <label className="text-sm text-slate-600 block mb-2">Compare With</label>
-                  {competitorChannels.length === 0 ? (
-                    <div className="p-3 bg-slate-50 rounded-lg border border-slate-200">
-                      <span className="text-sm text-slate-600">No competitors added</span>
-                    </div>
-                  ) : (
+                {competitorChannels.length > 0 && (
+                  <div>
+                    <label className="text-sm text-slate-600 block mb-2">Compare With</label>
                     <div className="space-y-2">
                       {competitorChannels.map((ch) => (
                         <label
@@ -389,53 +394,21 @@ export default function PredictiveAnalysisBusiness() {
                             type="checkbox"
                             checked={selectedCompetitors.includes(ch.url)}
                             onChange={() => toggleCompetitor(ch.url)}
-                            className="w-4 h-4 rounded text-blue-600"
+                            className="w-4 h-4 rounded text-indigo-600"
                           />
                           <span className="text-sm text-slate-700">{ch.name}</span>
                         </label>
                       ))}
                     </div>
-                  )}
-                </div>
-
-                {/* Budget */}
-                <div>
-                  <label className="text-sm text-slate-600 block mb-2">
-                    Marketing Budget
-                  </label>
-                  <input
-                    type="number"
-                    min="100"
-                    step="100"
-                    value={campaignBudget}
-                    onChange={(e) => setCampaignBudget(Math.max(100, parseInt(e.target.value) || 1000))}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">Per campaign</p>
-                </div>
-
-                {/* Product Price */}
-                <div>
-                  <label className="text-sm text-slate-600 block mb-2">
-                    Product Price
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    step="10"
-                    value={productPrice}
-                    onChange={(e) => setProductPrice(Math.max(1, parseInt(e.target.value) || 50))}
-                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                  />
-                  <p className="text-xs text-slate-500 mt-1">What you sell</p>
-                </div>
+                  </div>
+                )}
 
                 <button
                   onClick={handleAnalyze}
                   disabled={loading || !primaryChannel}
                   className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {loading ? "Analyzing..." : "Analyze Now"}
+                  {loading ? "Analyzing..." : analysisData ? "Refresh Analysis" : "Analyze Now"}
                 </button>
 
                 {error && (
@@ -449,7 +422,7 @@ export default function PredictiveAnalysisBusiness() {
             {/* Quick Stats */}
             {analysisData && (
               <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl shadow-sm p-4 text-white">
-                <div className="text-sm font-medium mb-3">Channel Overview</div>
+                <div className="text-sm font-medium mb-3">Quick Stats</div>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-indigo-200 text-sm">Subscribers</span>
@@ -458,9 +431,15 @@ export default function PredictiveAnalysisBusiness() {
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-indigo-200 text-sm">Expected ROI</span>
+                    <span className="text-indigo-200 text-sm">Avg Views/Video</span>
                     <span className="font-semibold">
-                      {analysisData.primary_channel.roi_prediction.roi_percentage.toFixed(0)}%
+                      {formatNumber(analysisData.primary_channel.avg_views_per_video)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-indigo-200 text-sm">Engagement</span>
+                    <span className="font-semibold">
+                      {(analysisData.primary_channel.engagement_rate * 100).toFixed(2)}%
                     </span>
                   </div>
                 </div>
@@ -481,22 +460,20 @@ export default function PredictiveAnalysisBusiness() {
                 </div>
               </div>
             ) : !analysisData ? (
-              <EmptyState />
+              <EmptyState primaryChannel={primaryChannel} onAnalyze={handleAnalyze} loading={loading} />
             ) : (
               <>
                 {selectedView === VIEWS.OVERVIEW && <OverviewView data={analysisData} primaryName={primaryChannel?.name} />}
-                {selectedView === VIEWS.ROI && <ROIView data={analysisData} primaryName={primaryChannel?.name} />}
-                {selectedView === VIEWS.COMPARISON && <ComparisonView data={analysisData} primaryName={primaryChannel?.name} />}
-                {selectedView === VIEWS.GROWTH && <GrowthView data={analysisData} primaryName={primaryChannel?.name} />}
-                {selectedView === VIEWS.AUDIENCE && <AudienceView data={analysisData} primaryName={primaryChannel?.name} />}
-                {selectedView === VIEWS.SUBSCRIBERS && (
-                  <SubscriberPredictionsView 
+                {selectedView === VIEWS.GROWTH && (
+                  <GrowthView 
                     predictions={subscriberPredictions} 
                     loading={predictionsLoading}
                     primaryChannel={primaryChannel}
                     competitorChannels={competitorChannels}
                   />
                 )}
+                {selectedView === VIEWS.COMPARISON && <ComparisonView data={analysisData} primaryName={primaryChannel?.name} />}
+                {selectedView === VIEWS.ENGAGEMENT && <EngagementView data={analysisData} primaryName={primaryChannel?.name} />}
               </>
             )}
           </div>
@@ -506,14 +483,204 @@ export default function PredictiveAnalysisBusiness() {
   );
 }
 
-function SubscriberPredictionsView({ predictions, loading, primaryChannel, competitorChannels }) {
+// Empty State Component
+function EmptyState({ primaryChannel, onAnalyze, loading }) {
+  return (
+    <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-12">
+      <div className="flex items-center justify-center h-72">
+        <div className="text-center text-slate-600">
+          <BarChart3 className="mx-auto text-slate-300 mb-4" size={64} />
+          <div className="font-medium text-slate-900 text-xl mb-2">Ready to Analyze?</div>
+          {primaryChannel ? (
+            <>
+              <div className="text-sm text-slate-500 max-w-md mx-auto mb-4">
+                Click "Analyze Now" to see insights about your channel: <strong>{primaryChannel.name}</strong>
+              </div>
+              <button
+                onClick={onAnalyze}
+                disabled={loading}
+                className="bg-indigo-600 text-white px-6 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-60"
+              >
+                {loading ? "Analyzing..." : "Analyze Now"}
+              </button>
+            </>
+          ) : (
+            <div className="text-sm text-slate-500 max-w-md mx-auto">
+              Please set up your primary YouTube channel in your Business Profile first.
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Overview View
+function OverviewView({ data, primaryName }) {
+  const primary = data.primary_channel;
+  const hasCompetitors = data.competitors && data.competitors.length > 0;
+
+  // Calculate key business metrics
+  const videosAnalyzed = primary.total_videos || 0;
+  const monthlyGrowth = primary.avg_views_per_video > 0 ? ((primary.growth_momentum.score / 100) * primary.subscribers * 0.05) : 0;
+  const potentialReach = (primary.subscribers * (primary.engagement_rate * 100)).toFixed(0);
+
+  return (
+    <div className="space-y-6">
+    {/* Executive Summary - 3 Key Stats */}
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        
+        <div className="rounded-2xl bg-white border-2 border-indigo-200 shadow-sm p-6">
+        <div className="text-sm font-medium text-indigo-600 mb-2">Total Subscribers</div>
+        <div className="text-3xl font-bold text-slate-900 mb-1">{formatNumber(primary.subscribers)}</div>
+        <div className="text-xs text-slate-600">Your audience size</div>
+        </div>
+
+        <div className="rounded-2xl bg-white border-2 border-indigo-200 shadow-sm p-6">
+        <div className="text-sm font-medium text-indigo-600 mb-2">Avg Views per Video</div>
+        <div className="text-3xl font-bold text-slate-900 mb-1">{formatNumber(primary.avg_views_per_video)}</div>
+        <div className="text-xs text-slate-600">Content reach</div>
+        </div>
+
+        <div className="rounded-2xl bg-white border-2 border-indigo-200 shadow-sm p-6">
+        <div className="text-sm font-medium text-indigo-600 mb-2">Engagement Rate</div>
+        <div className="text-3xl font-bold text-slate-900 mb-1">
+            {(primary.engagement_rate * 100).toFixed(1)}%
+        </div>
+        <div className="text-xs text-slate-600">Audience interaction</div>
+        </div>
+
+    </div>
+      {/* Growth Status */}
+      <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+          <TrendingUp className="text-indigo-600" size={24} />
+          Your Channel Status
+        </h3>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="p-4 bg-gradient-to-br from-indigo-50 to-blue-50 rounded-xl border-2 border-indigo-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-slate-700">Growth Momentum</span>
+              {primary.growth_momentum.trend === "growing" && <span className="text-2xl">📈</span>}
+              {primary.growth_momentum.trend === "declining" && <span className="text-2xl">📉</span>}
+              {primary.growth_momentum.trend === "stable" && <span className="text-2xl">➡️</span>}
+            </div>
+            <p className="text-xs text-slate-600 mb-3">
+              {primary.growth_momentum.trend === "growing" 
+                ? "Your recent videos are outperforming older content - momentum is positive!"
+                : primary.growth_momentum.trend === "declining"
+                ? "Recent content underperforming - review what made your top videos successful"
+                : "Consistent performance - room for growth with strategic changes"}
+            </p>
+          </div>
+
+          <div className="p-4 bg-gradient-to-br from-orange-50 to-amber-50 rounded-xl border-2 border-amber-200">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-sm font-semibold text-slate-700">Quality Score</span>
+              <span className="text-2xl font-bold text-amber-600">{primary.audience_quality}/100</span>
+            </div>
+            <p className="text-xs text-slate-600">
+              {primary.audience_quality >= 70 
+                ? "✓ Strong! Your audience actively engages"
+                : primary.audience_quality >= 40
+                ? "~ Moderate - good foundation to build on"
+                : "! Needs improvement - focus on engagement"}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Key Recommendations */}
+      {data.recommendations && data.recommendations.length > 0 && (
+        <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
+          <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+            <Zap className="text-amber-500" size={24} />
+            What You Should Do
+          </h3>
+          <div className="space-y-3">
+            {data.recommendations.slice(0, 3).map((rec, idx) => (
+              <RecommendationCard key={idx} recommendation={rec} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Competitive Position - Simplified */}
+      {hasCompetitors && data.competitive_analysis && (
+        <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
+          <h3 className="text-lg font-bold text-slate-900 mb-4">How You Compare</h3>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            <RankCard
+              title="Growth"
+              rank={data.competitive_analysis.rankings.growth}
+              total={data.competitive_analysis.rankings.total_channels}
+            />
+            <RankCard
+              title="Audience"
+              rank={data.competitive_analysis.rankings.audience_quality}
+              total={data.competitive_analysis.rankings.total_channels}
+            />
+            <RankCard
+              title="Engagement"
+              rank={data.competitive_analysis.rankings.audience_quality}
+              total={data.competitive_analysis.rankings.total_channels}
+            />
+            <RankCard
+              title="Consistency"
+              rank={data.competitive_analysis.rankings.growth}
+              total={data.competitive_analysis.rankings.total_channels}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* Strengths & Weaknesses */}
+      {data.competitive_analysis && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {data.competitive_analysis.strengths.length > 0 && (
+            <div className="p-5 bg-slate-50 rounded-lg border-2 border-slate-300">
+              <div className="flex items-center gap-2 mb-3">
+                <CheckCircle className="text-slate-600" size={20} />
+                <h4 className="font-bold text-slate-800 text-sm">Your Strengths</h4>
+              </div>
+              <ul className="space-y-2">
+                {data.competitive_analysis.strengths.map((s, idx) => (
+                  <li key={idx} className="text-xs text-slate-700">• {s}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {data.competitive_analysis.weaknesses.length > 0 && (
+            <div className="p-5 bg-slate-100 rounded-lg border-2 border-slate-300">
+              <div className="flex items-center gap-2 mb-3">
+                <AlertCircle className="text-slate-600" size={20} />
+                <h4 className="font-bold text-slate-800 text-sm">Focus Areas</h4>
+              </div>
+              <ul className="space-y-2">
+                {data.competitive_analysis.weaknesses.map((w, idx) => (
+                  <li key={idx} className="text-xs text-slate-700">• {w}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Growth Predictions View - Simplified for Business Users
+function GrowthView({ predictions, loading, primaryChannel, competitorChannels }) {
   if (loading) {
     return (
       <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-12">
         <div className="flex items-center justify-center h-72">
           <div className="text-center">
             <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-indigo-600 mx-auto mb-4"></div>
-            <div className="text-slate-600">Analyzing subscriber growth predictions...</div>
+            <div className="text-slate-600">Building your growth forecast...</div>
           </div>
         </div>
       </div>
@@ -527,158 +694,165 @@ function SubscriberPredictionsView({ predictions, loading, primaryChannel, compe
           <div className="text-center text-slate-600">
             <Activity className="mx-auto text-slate-300 mb-4" size={64} />
             <div className="font-medium text-slate-900 text-xl mb-2">No Prediction Data</div>
-            <div className="text-sm text-slate-500">Click "Analyze Now" to generate subscriber predictions</div>
+            <div className="text-sm text-slate-500">Click "Analyze Now" to generate growth forecast</div>
           </div>
         </div>
       </div>
     );
   }
 
-  // Find primary channel prediction
   const primaryPrediction = predictions.find(p => p.url === primaryChannel?.url);
   const competitorPredictions = predictions.filter(p => p.url !== primaryChannel?.url && !p.error);
 
-  // Get channel names
   const getChannelName = (url) => {
     if (url === primaryChannel?.url) return primaryChannel?.name || "Your Channel";
     const comp = competitorChannels.find(c => c.url === url);
     return comp?.name || "Competitor";
   };
 
-  // Calculate rankings
   const validPredictions = predictions.filter(p => !p.error);
-  const sortedByGrowthRate = [...validPredictions].sort((a, b) => b.growthRate - a.growthRate);
-  const sortedBy6MonthSubs = [...validPredictions].sort((a, b) => b.predicted6Months - a.predicted6Months);
-  const sortedByMonthlyGrowth = [...validPredictions].sort((a, b) => b.avgGrowthPerMonth - a.avgGrowthPerMonth);
-
-  const primaryRankGrowthRate = sortedByGrowthRate.findIndex(p => p.url === primaryChannel?.url) + 1;
-  const primaryRank6Month = sortedBy6MonthSubs.findIndex(p => p.url === primaryChannel?.url) + 1;
-  const primaryRankMonthly = sortedByMonthlyGrowth.findIndex(p => p.url === primaryChannel?.url) + 1;
-
-  // Prepare chart data for growth comparison
-  const comparisonChartData = validPredictions.map(p => ({
-    name: getChannelName(p.url),
-    current: p.currentSubscribers,
-    predicted: p.predicted6Months,
-    isPrimary: p.url === primaryChannel?.url,
-  }));
 
   return (
     <div className="space-y-6">
-      {/* Your Prediction Card */}
+      {/* Your Forecast - Large Card */}
       {primaryPrediction && !primaryPrediction.error && (
         <div className="rounded-2xl bg-gradient-to-br from-indigo-600 to-indigo-700 shadow-sm p-8 text-white">
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <h2 className="text-3xl font-bold mb-2">{primaryChannel?.name || "Your Channel"}</h2>
-              <p className="text-indigo-100 text-lg">Subscriber Growth Forecast</p>
+          <h2 className="text-2xl font-bold mb-6">{primaryChannel?.name || "Your Channel"} - 6 Month Forecast</h2>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+            <div className="rounded-xl p-5 bg-white/15 backdrop-blur">
+              <div className="text-sm font-medium text-white/90 mb-2">Today</div>
+              <div className="text-3xl font-bold mb-1">{formatNumber(primaryPrediction.currentSubscribers)}</div>
+              <div className="text-xs text-white/80">Current subscribers</div>
             </div>
-            <div className="bg-white/20 px-4 py-2 rounded-full">
-              <span className="text-sm font-semibold">6-Month Outlook</span>
+            
+            <div className="rounded-xl p-5 bg-white/25 border-2 border-white/40 backdrop-blur">
+              <div className="text-sm font-medium text-white/90 mb-2">In 6 Months</div>
+              <div className="text-3xl font-bold mb-1">{formatNumber(primaryPrediction.predicted6Months)}</div>
+              <div className="text-xs text-white/80">
+                +{formatNumber(primaryPrediction.totalGrowth6Months)} subscribers
+              </div>
+            </div>
+            
+            <div className="rounded-xl p-5 bg-indigo-400/20 border-2 border-white/40 backdrop-blur">
+              <div className="text-sm font-medium text-white/90 mb-2">Growth Rate</div>
+              <div className="text-3xl font-bold mb-1">{primaryPrediction.growthRate.toFixed(1)}%</div>
+              <div className="text-xs text-white/80">Expected growth</div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="rounded-xl p-4 bg-white/15">
-              <div className="flex items-center gap-2 mb-2">
-                <Users size={20} className="text-white/90" />
-                <span className="text-sm text-white/90 font-medium">Current</span>
+          {/* Mini Chart */}
+          {primaryPrediction.history && primaryPrediction.history.length > 0 && (
+            <div className="mt-4 p-4 bg-white/10 rounded-xl backdrop-blur">
+              <div className="text-xs font-semibold text-white/90 mb-3">12-Month Trend</div>
+              <div className="h-[180px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={primaryPrediction.history.slice(-12)}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                    <XAxis 
+                      dataKey="date" 
+                      stroke="rgba(255,255,255,0.5)"
+                      style={{ fontSize: '11px' }}
+                      tickFormatter={(value) => {
+                        const date = new Date(value);
+                        return `${date.getMonth() + 1}/${date.getFullYear().toString().slice(-2)}`;
+                      }}
+                    />
+                    <YAxis 
+                      stroke="rgba(255,255,255,0.5)"
+                      style={{ fontSize: '11px' }}
+                      tickFormatter={(value) => formatNumber(value)}
+                    />
+                    <Tooltip 
+                      contentStyle={{
+                        backgroundColor: 'rgba(0,0,0,0.8)',
+                        border: 'none',
+                        borderRadius: '8px',
+                        color: '#fff'
+                      }}
+                      formatter={(value) => formatNumber(value)}
+                    />
+                    <Line 
+                      type="monotone" 
+                      dataKey="subscribers" 
+                      stroke="#ffffff" 
+                      strokeWidth={2}
+                      dot={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
               </div>
-              <div className="text-2xl font-bold mb-1">{formatNumber(primaryPrediction.currentSubscribers)}</div>
-              <div className="text-sm text-white/80">subscribers</div>
             </div>
-            
-            <div className="rounded-xl p-4 bg-white/25 border-2 border-white/40">
-              <div className="flex items-center gap-2 mb-2">
-                <TrendingUp size={20} className="text-white/90" />
-                <span className="text-sm text-white/90 font-medium">Projected (6mo)</span>
-              </div>
-              <div className="text-2xl font-bold mb-1">{formatNumber(primaryPrediction.predicted6Months)}</div>
-              <div className="text-sm text-white/80">
-                +{formatNumber(primaryPrediction.totalGrowth6Months)} gain
-              </div>
-            </div>
-            
-            <div className="rounded-xl p-4 bg-white/15">
-              <div className="flex items-center gap-2 mb-2">
-                <Activity size={20} className="text-white/90" />
-                <span className="text-sm text-white/90 font-medium">Growth Rate</span>
-              </div>
-              <div className="text-2xl font-bold mb-1">{primaryPrediction.growthRate.toFixed(1)}%</div>
-              <div className="text-sm text-white/80">over 6 months</div>
-            </div>
-            
-            <div className="rounded-xl p-4 bg-white/15">
-              <div className="flex items-center gap-2 mb-2">
-                <Star size={20} className="text-white/90" />
-                <span className="text-sm text-white/90 font-medium">Monthly Avg</span>
-              </div>
-              <div className="text-2xl font-bold mb-1">+{formatNumber(primaryPrediction.avgGrowthPerMonth)}</div>
-              <div className="text-sm text-white/80">subscribers/month</div>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
-      {/* Rankings */}
-      {validPredictions.length > 1 && (
+      {/* Growth Insights */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-          <h3 className="text-xl font-bold text-slate-900 mb-4">Your Competitive Position</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className={`p-4 rounded-xl border-2 ${primaryRankGrowthRate === 1 ? 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-300' : 'bg-slate-50 border-slate-200'}`}>
-              <p className="text-xs font-medium text-slate-600 mb-1">Growth Rate Rank</p>
-              <div className="flex items-end gap-2">
-                <span className={`text-3xl font-bold ${primaryRankGrowthRate === 1 ? 'text-amber-600' : 'text-slate-700'}`}>
-                  #{primaryRankGrowthRate}
-                </span>
-                <span className="text-lg text-slate-600 mb-1">/ {validPredictions.length}</span>
-              </div>
-              {primaryRankGrowthRate === 1 && <p className="text-xs text-amber-700 mt-1 font-semibold">🏆 Fastest Growth</p>}
-            </div>
-            
-            <div className={`p-4 rounded-xl border-2 ${primaryRank6Month === 1 ? 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-300' : 'bg-slate-50 border-slate-200'}`}>
-              <p className="text-xs font-medium text-slate-600 mb-1">6-Month Size Rank</p>
-              <div className="flex items-end gap-2">
-                <span className={`text-3xl font-bold ${primaryRank6Month === 1 ? 'text-amber-600' : 'text-slate-700'}`}>
-                  #{primaryRank6Month}
-                </span>
-                <span className="text-lg text-slate-600 mb-1">/ {validPredictions.length}</span>
-              </div>
-              {primaryRank6Month === 1 && <p className="text-xs text-amber-700 mt-1 font-semibold">🏆 Largest Projected</p>}
-            </div>
-            
-            <div className={`p-4 rounded-xl border-2 ${primaryRankMonthly === 1 ? 'bg-gradient-to-br from-yellow-50 to-amber-50 border-yellow-300' : 'bg-slate-50 border-slate-200'}`}>
-              <p className="text-xs font-medium text-slate-600 mb-1">Monthly Velocity Rank</p>
-              <div className="flex items-end gap-2">
-                <span className={`text-3xl font-bold ${primaryRankMonthly === 1 ? 'text-amber-600' : 'text-slate-700'}`}>
-                  #{primaryRankMonthly}
-                </span>
-                <span className="text-lg text-slate-600 mb-1">/ {validPredictions.length}</span>
-              </div>
-              {primaryRankMonthly === 1 && <p className="text-xs text-amber-700 mt-1 font-semibold">🏆 Best Monthly Gain</p>}
-            </div>
+          <h3 className="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
+            <TrendingUp className="text-indigo-600" size={20} />
+            What This Means
+          </h3>
+          <div className="space-y-3 text-sm text-slate-700">
+            <p>
+              <strong>Monthly Growth:</strong> +{formatNumber(primaryPrediction.avgGrowthPerMonth)} subscribers/month
+            </p>
+            <p>
+              <strong>6-Month Target:</strong> Reach {formatNumber(primaryPrediction.predicted6Months)} subscribers
+            </p>
+            <p className="text-xs text-slate-500">
+              Based on your current content performance and engagement patterns
+            </p>
           </div>
         </div>
-      )}
 
-      {/* Growth Comparison Chart */}
+        <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
+          <h3 className="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
+            <Zap className="text-amber-500" size={20} />
+            To Hit This Target
+          </h3>
+          <ul className="space-y-2 text-sm text-slate-700">
+            <li className="flex items-start gap-2">
+              <span className="text-amber-500 mt-0.5">✓</span>
+              <span>Maintain upload consistency</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-amber-500 mt-0.5">✓</span>
+              <span>Increase engagement (replies to comments)</span>
+            </li>
+            <li className="flex items-start gap-2">
+              <span className="text-amber-500 mt-0.5">✓</span>
+              <span>Optimize thumbnails & titles</span>
+            </li>
+          </ul>
+        </div>
+      </div>
+
+      {/* Comparison */}
       {validPredictions.length > 1 && (
         <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-          <h3 className="text-xl font-bold text-slate-900 mb-4">Growth Comparison: Current vs 6-Month Projection</h3>
-          <div className="h-[400px]">
+          <h3 className="text-lg font-bold text-slate-900 mb-4">How Your Growth Compares</h3>
+          <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                data={comparisonChartData}
+                data={validPredictions.map(p => ({
+                  name: getChannelName(p.url),
+                  current: p.currentSubscribers,
+                  predicted: p.predicted6Months,
+                  isPrimary: p.url === primaryChannel?.url,
+                }))}
                 margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
               >
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" angle={-15} textAnchor="end" height={80} />
+                <XAxis dataKey="name" angle={-15} textAnchor="end" height={80} style={{ fontSize: '12px' }} />
                 <YAxis 
                   tickFormatter={(value) => {
                     if (value >= 1000000) return `${(value / 1000000).toFixed(1)}M`;
                     if (value >= 1000) return `${(value / 1000).toFixed(1)}K`;
                     return value.toString();
                   }}
+                  style={{ fontSize: '12px' }}
                 />
                 <Tooltip 
                   formatter={(value) => formatNumber(value)}
@@ -689,405 +863,26 @@ function SubscriberPredictionsView({ predictions, loading, primaryChannel, compe
                   }}
                 />
                 <Legend />
-                <Bar dataKey="current" name="Current Subscribers" radius={[8, 8, 0, 0]}>
-                  {comparisonChartData.map((entry, index) => (
-                    <Cell key={`cell-current-${index}`} fill={entry.isPrimary ? "#4f46e5" : "#94a3b8"} />
+                <Bar dataKey="current" name="Current" radius={[8, 8, 0, 0]}>
+                  {validPredictions.map((_, index) => (
+                    <Cell key={`cell-current-${index}`} fill={validPredictions[index].url === primaryChannel?.url ? "#4f46e5" : "#cbd5e1"} />
                   ))}
                 </Bar>
-                <Bar dataKey="predicted" name="Predicted (6 months)" radius={[8, 8, 0, 0]}>
-                  {comparisonChartData.map((entry, index) => (
-                    <Cell key={`cell-predicted-${index}`} fill={entry.isPrimary ? "#10b981" : "#22c55e"} />
+                <Bar dataKey="predicted" name="6-Month Forecast" radius={[8, 8, 0, 0]}>
+                  {validPredictions.map((_, index) => (
+                    <Cell key={`cell-predicted-${index}`} fill={validPredictions[index].url === primaryChannel?.url ? "#6366f1" : "#e0e7ff"} />
                   ))}
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
           </div>
-          <p className="text-center text-sm text-slate-500 mt-4">
-            Dark colors = Your channel | Light colors = Competitors
-          </p>
-        </div>
-      )}
-
-      {/* Detailed Comparison Table */}
-      {validPredictions.length > 1 && (
-        <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-          <h3 className="text-xl font-bold text-slate-900 mb-4">Detailed Growth Comparison</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="border-b-2 border-slate-300">
-                  <th className="text-left py-3 px-4 font-semibold text-slate-700">Channel</th>
-                  <th className="text-right py-3 px-4 font-semibold text-slate-700">Current</th>
-                  <th className="text-right py-3 px-4 font-semibold text-slate-700">6-Month</th>
-                  <th className="text-right py-3 px-4 font-semibold text-slate-700">Total Gain</th>
-                  <th className="text-right py-3 px-4 font-semibold text-slate-700">Growth %</th>
-                  <th className="text-right py-3 px-4 font-semibold text-slate-700">Monthly Avg</th>
-                </tr>
-              </thead>
-              <tbody>
-                {validPredictions.map((pred, idx) => {
-                  const isPrimary = pred.url === primaryChannel?.url;
-                  return (
-                    <tr 
-                      key={idx} 
-                      className={`border-b border-slate-100 ${isPrimary ? 'bg-indigo-50/30' : 'hover:bg-slate-50'}`}
-                    >
-                      <td className="py-3 px-4">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-slate-900">{getChannelName(pred.url)}</span>
-                          {isPrimary && (
-                            <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold">
-                              You
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="text-right py-3 px-4 text-slate-700 font-medium">
-                        {formatNumber(pred.currentSubscribers)}
-                      </td>
-                      <td className="text-right py-3 px-4 text-slate-900 font-bold">
-                        {formatNumber(pred.predicted6Months)}
-                      </td>
-                      <td className="text-right py-3 px-4 text-green-600 font-bold">
-                        +{formatNumber(pred.totalGrowth6Months)}
-                      </td>
-                      <td className="text-right py-3 px-4 font-bold">
-                        <span className={pred.growthRate > 20 ? 'text-green-600' : pred.growthRate > 10 ? 'text-blue-600' : 'text-slate-600'}>
-                          {pred.growthRate.toFixed(1)}%
-                        </span>
-                      </td>
-                      <td className="text-right py-3 px-4 text-slate-700 font-medium">
-                        +{formatNumber(pred.avgGrowthPerMonth)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {/* Insights */}
-      {primaryPrediction && !primaryPrediction.error && validPredictions.length > 1 && (
-        <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <Zap className="text-amber-500" size={20} />
-            <h3 className="text-xl font-bold text-slate-900">Growth Insights</h3>
-          </div>
-          
-          <div className="space-y-3">
-            {/* Growth Rate Insight */}
-            {primaryRankGrowthRate === 1 ? (
-              <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                <div className="flex items-start gap-3">
-                  <CheckCircle className="text-green-600 mt-0.5 flex-shrink-0" size={20} />
-                  <div>
-                    <h4 className="font-bold text-green-900 mb-1">🎉 Fastest Growth Rate!</h4>
-                    <p className="text-sm text-green-800">
-                      Your channel is projected to grow at {primaryPrediction.growthRate.toFixed(1)}%, the highest among all channels analyzed. 
-                      Keep up your current content strategy!
-                    </p>
-                  </div>
-                </div>
-              </div>
-            ) : (
-              <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
-                <div className="flex items-start gap-3">
-                  <Info className="text-blue-600 mt-0.5 flex-shrink-0" size={20} />
-                  <div>
-                    <h4 className="font-bold text-blue-900 mb-1">Growth Rate Opportunity</h4>
-                    <p className="text-sm text-blue-800">
-                      You're ranked #{primaryRankGrowthRate} in growth rate ({primaryPrediction.growthRate.toFixed(1)}%). 
-                      The leader is growing at {sortedByGrowthRate[0].growthRate.toFixed(1)}%. 
-                      Analyze their content strategy to accelerate your growth.
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-
-            {/* Velocity Insight */}
-            <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
-              <div className="flex items-start gap-3">
-                <Activity className="text-indigo-600 mt-0.5 flex-shrink-0" size={20} />
-                <div>
-                  <h4 className="font-bold text-indigo-900 mb-1">Monthly Growth Velocity</h4>
-                  <p className="text-sm text-indigo-800">
-                    You're gaining an average of {formatNumber(primaryPrediction.avgGrowthPerMonth)} subscribers per month. 
-                    {primaryRankMonthly === 1 
-                      ? " This is the highest monthly gain among all channels! 🚀" 
-                      : ` To match the top performer, you'd need to gain ${formatNumber(sortedByMonthlyGrowth[0].avgGrowthPerMonth)} per month.`
-                    }
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Time to Milestone */}
-            {(() => {
-              const milestones = [100000, 250000, 500000, 1000000, 2500000, 5000000, 10000000];
-              const nextMilestone = milestones.find(m => m > primaryPrediction.currentSubscribers);
-              
-              if (nextMilestone && primaryPrediction.avgGrowthPerMonth > 0) {
-                const monthsToMilestone = Math.ceil((nextMilestone - primaryPrediction.currentSubscribers) / primaryPrediction.avgGrowthPerMonth);
-                const milestoneLabel = nextMilestone >= 1000000 ? `${nextMilestone / 1000000}M` : `${nextMilestone / 1000}K`;
-                
-                return (
-                  <div className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-                    <div className="flex items-start gap-3">
-                      <Target className="text-purple-600 mt-0.5 flex-shrink-0" size={20} />
-                      <div>
-                        <h4 className="font-bold text-purple-900 mb-1">Next Milestone: {milestoneLabel} Subscribers</h4>
-                        <p className="text-sm text-purple-800">
-                          At your current growth rate, you'll reach {milestoneLabel} subscribers in approximately {monthsToMilestone} months 
-                          ({new Date(Date.now() + monthsToMilestone * 30 * 24 * 60 * 60 * 1000).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}).
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                );
-              }
-              return null;
-            })()}
-          </div>
         </div>
       )}
     </div>
   );
 }
 
-// Components
-
-function EmptyState() {
-  return (
-    <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-12">
-      <div className="flex items-center justify-center h-72">
-        <div className="text-center text-slate-600">
-          <BarChart3 className="mx-auto text-slate-300 mb-4" size={64} />
-          <div className="font-medium text-slate-900 text-xl mb-2">Ready to Analyze?</div>
-          <div className="text-sm text-slate-500 max-w-md mx-auto">
-            Fill in your campaign details on the left and click "Analyze Now" to see insights about your channel
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function OverviewView({ data, primaryName }) {
-  const primary = data.primary_channel;
-  const hasCompetitors = data.competitors && data.competitors.length > 0;
-
-  return (
-    <div className="space-y-6">
-      {/* Hero Card */}
-      <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 shadow-sm p-8 text-white">
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <h2 className="text-3xl font-bold mb-2">{primaryName || "Your Channel"}</h2>
-            <p className="text-blue-100 text-lg">{formatNumber(primary.subscribers)} subscribers</p>
-          </div>
-          <GrowthBadge trend={primary.growth_momentum.trend} />
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <MetricCard
-            icon={Eye}
-            label="Campaign Reach"
-            value={formatNumber(primary.campaign_reach.predicted_reach)}
-            subtitle="people per campaign"
-          />
-          <MetricCard
-            icon={DollarSign}
-            label="Expected Profit"
-            value={formatMoney(primary.roi_prediction.profit)}
-            subtitle={`${primary.roi_prediction.roi_percentage.toFixed(0)}% ROI`}
-            highlight
-          />
-          <MetricCard
-            icon={Activity}
-            label="Audience Quality"
-            value={`${primary.audience_quality}/100`}
-            subtitle="engagement score"
-          />
-          <MetricCard
-            icon={Star}
-            label="Consistency"
-            value={`${primary.consistency_score}/100`}
-            subtitle="performance stability"
-          />
-        </div>
-      </div>
-
-      {/* Recommendations */}
-      {data.recommendations && data.recommendations.length > 0 && (
-        <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-          <h3 className="text-xl font-bold text-slate-900 mb-4 flex items-center gap-2">
-            <Zap className="text-amber-500" />
-            What You Should Do
-          </h3>
-          <div className="space-y-3">
-            {data.recommendations.map((rec, idx) => (
-              <RecommendationCard key={idx} recommendation={rec} />
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Competitive Position */}
-      {hasCompetitors && data.competitive_analysis && (
-        <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-          <h3 className="text-xl font-bold text-slate-900 mb-4">Your Position vs Competitors</h3>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <RankCard
-              title="ROI"
-              rank={data.competitive_analysis.rankings.roi}
-              total={data.competitive_analysis.rankings.total_channels}
-            />
-            <RankCard
-              title="Reach"
-              rank={data.competitive_analysis.rankings.reach}
-              total={data.competitive_analysis.rankings.total_channels}
-            />
-            <RankCard
-              title="Audience"
-              rank={data.competitive_analysis.rankings.audience_quality}
-              total={data.competitive_analysis.rankings.total_channels}
-            />
-            <RankCard
-              title="Growth"
-              rank={data.competitive_analysis.rankings.growth}
-              total={data.competitive_analysis.rankings.total_channels}
-            />
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {data.competitive_analysis.strengths.length > 0 && (
-              <div className="p-4 bg-green-50 rounded-lg border border-green-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <ThumbsUp className="text-green-600" size={20} />
-                  <h4 className="font-bold text-green-900">Your Strengths</h4>
-                </div>
-                <ul className="space-y-1">
-                  {data.competitive_analysis.strengths.map((s, idx) => (
-                    <li key={idx} className="text-sm text-green-800 flex items-start gap-2">
-                      <span className="text-green-600 mt-0.5">✓</span>
-                      <span>{s}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-
-            {data.competitive_analysis.weaknesses.length > 0 && (
-              <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
-                <div className="flex items-center gap-2 mb-2">
-                  <AlertCircle className="text-amber-600" size={20} />
-                  <h4 className="font-bold text-amber-900">Areas to Improve</h4>
-                </div>
-                <ul className="space-y-1">
-                  {data.competitive_analysis.weaknesses.map((w, idx) => (
-                    <li key={idx} className="text-sm text-amber-800 flex items-start gap-2">
-                      <span className="text-amber-600 mt-0.5">!</span>
-                      <span>{w}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ROIView({ data, primaryName }) {
-  const primary = data.primary_channel;
-  const allChannels = [
-    { name: primaryName || "You", ...primary, isPrimary: true },
-    ...data.competitors.map(c => ({ ...c, isPrimary: false }))
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-        <h3 className="text-2xl font-semibold text-slate-900 mb-6">Return on Investment Analysis</h3>
-        
-        {/* Your ROI Breakdown */}
-        <div className="mb-8 p-6 bg-gradient-to-br from-green-50 to-emerald-50 rounded-xl border-2 border-green-200">
-          <h4 className="text-lg font-bold text-slate-900 mb-4">Your Campaign Projection</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <ROIMetric label="Investment" value={formatMoney(primary.roi_prediction.cost)} />
-            <ROIMetric label="Expected Revenue" value={formatMoney(primary.roi_prediction.revenue)} />
-            <ROIMetric label="Profit" value={formatMoney(primary.roi_prediction.profit)} highlight />
-            <ROIMetric label="ROI" value={`${primary.roi_prediction.roi_percentage.toFixed(0)}%`} highlight />
-          </div>
-          
-          <div className="mt-4 p-4 bg-white rounded-lg">
-            <p className="text-sm text-slate-700">
-              <strong>What this means:</strong> For every $100 you spend, you'll make about{" "}
-              <span className="font-bold text-green-600">
-                ${(100 + primary.roi_prediction.roi_percentage).toFixed(0)}
-              </span>
-              {" "}back. You'll reach <strong>{formatNumber(primary.campaign_reach.predicted_reach)}</strong> people and get approximately{" "}
-              <strong>{primary.roi_prediction.sales.toFixed(0)} sales</strong>.
-            </p>
-          </div>
-        </div>
-
-        {/* ROI Comparison Chart */}
-        {data.competitors.length > 0 && (
-          <div>
-            <h4 className="text-lg font-bold text-slate-900 mb-4">ROI Comparison</h4>
-            <div className="h-[350px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={allChannels.map(c => ({
-                    name: c.isPrimary ? "You" : c.channel_name,
-                    roi: c.roi_prediction.roi_percentage,
-                    profit: c.roi_prediction.profit,
-                    isPrimary: c.isPrimary
-                  }))}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" angle={-15} textAnchor="end" height={80} />
-                  <YAxis label={{ value: 'ROI %', angle: -90, position: 'insideLeft' }} />
-                  <Tooltip 
-                    content={({ active, payload }) => {
-                      if (active && payload && payload.length) {
-                        return (
-                          <div className="bg-white p-3 rounded-lg border-2 border-slate-200 shadow-lg">
-                            <p className="font-bold">{payload[0].payload.name}</p>
-                            <p className="text-sm">ROI: {payload[0].value.toFixed(1)}%</p>
-                            <p className="text-sm">Profit: {formatMoney(payload[0].payload.profit)}</p>
-                          </div>
-                        );
-                      }
-                      return null;
-                    }}
-                  />
-                  <Bar dataKey="roi" radius={[8, 8, 0, 0]}>
-                    {allChannels.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.isPrimary ? "#10b981" : "#6366f1"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <p className="text-center text-sm text-slate-500 mt-4">
-              Green = Your channel | Purple = Competitors
-            </p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
+// Comparison View - Simplified
 function ComparisonView({ data, primaryName }) {
   const primary = data.primary_channel;
   const competitors = data.competitors;
@@ -1098,8 +893,8 @@ function ComparisonView({ data, primaryName }) {
         <div className="flex items-center justify-center h-72">
           <div className="text-center text-slate-600">
             <Users className="mx-auto text-slate-300 mb-4" size={64} />
-            <h3 className="text-xl font-bold text-slate-900 mb-2">No Competitors Selected</h3>
-            <p className="text-slate-600">Select competitors from the sidebar to see comparisons</p>
+            <h3 className="text-xl font-bold text-slate-900 mb-2">No Channels Selected</h3>
+            <p className="text-slate-600">Select channels to compare from the sidebar</p>
           </div>
         </div>
       </div>
@@ -1108,26 +903,25 @@ function ComparisonView({ data, primaryName }) {
 
   return (
     <div className="space-y-6">
+      {/* Competition Overview */}
       <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-        <h3 className="text-2xl font-semibold text-slate-900 mb-6">Channel Comparison</h3>
+        <h2 className="text-2xl font-bold text-slate-900 mb-6">Competitive Landscape</h2>
 
-        {/* Your Channel Card */}
-        <div className="mb-6">
-          <h4 className="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-            <Award className="text-blue-600" />
-            Your Channel (Baseline)
-          </h4>
-          <ChannelComparisonCard
-            channel={primary}
-            channelName={primaryName || "Your Channel"}
-            isPrimary
-          />
+        {/* Your Channel Highlight */}
+        <div className="mb-6 p-5 rounded-xl bg-gradient-to-br from-indigo-50 to-blue-50 border-2 border-indigo-300">
+          <div className="flex items-start justify-between">
+            <div>
+              <h3 className="text-lg font-bold text-slate-900">{primaryName || "Your Channel"}</h3>
+              <p className="text-sm text-slate-600 mt-1">{formatNumber(primary.subscribers)} subscribers</p>
+            </div>
+            <div className="px-3 py-1 bg-indigo-600 text-white text-xs font-bold rounded-full">You</div>
+          </div>
         </div>
 
         {/* Competitor Cards */}
-        <div>
-          <h4 className="text-sm font-bold text-slate-700 mb-3">Competitors</h4>
-          <div className="grid grid-cols-1 gap-4">
+        <div className="mb-6">
+          <h3 className="font-semibold text-slate-900 text-sm mb-3 uppercase tracking-wide text-slate-600">Competitors</h3>
+          <div className="space-y-3">
             {competitors.map((comp, idx) => (
               <ChannelComparisonCard
                 key={idx}
@@ -1140,219 +934,217 @@ function ComparisonView({ data, primaryName }) {
         </div>
       </div>
 
-      {/* Multi-metric Radar */}
+      {/* Metrics Comparison */}
       <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-        <h3 className="text-xl font-bold text-slate-900 mb-4">Performance Radar</h3>
-        <div className="h-[400px]">
+        <h3 className="text-lg font-bold text-slate-900 mb-4">Performance Metrics</h3>
+        <div className="h-[300px]">
           <ResponsiveContainer width="100%" height="100%">
-            <RadarChart data={[
-              {
-                metric: 'ROI Score',
-                you: Math.min(100, primary.roi_prediction.roi_percentage),
-                avgComp: competitors.reduce((sum, c) => sum + Math.min(100, c.roi_prediction.roi_percentage), 0) / competitors.length
-              },
-              {
-                metric: 'Audience Quality',
-                you: primary.audience_quality,
-                avgComp: competitors.reduce((sum, c) => sum + c.audience_quality, 0) / competitors.length
-              },
-              {
-                metric: 'Growth',
-                you: primary.growth_momentum.score,
-                avgComp: competitors.reduce((sum, c) => sum + c.growth_momentum.score, 0) / competitors.length
-              },
-              {
-                metric: 'Consistency',
-                you: primary.consistency_score,
-                avgComp: competitors.reduce((sum, c) => sum + c.consistency_score, 0) / competitors.length
-              },
-              {
-                metric: 'Engagement',
-                you: primary.engagement_rate * 10000,
-                avgComp: competitors.reduce((sum, c) => sum + c.engagement_rate * 10000, 0) / competitors.length
-              },
-            ]}>
-              <PolarGrid />
-              <PolarAngleAxis dataKey="metric" />
-              <PolarRadiusAxis angle={90} domain={[0, 100]} />
-              <Radar name="You" dataKey="you" stroke="#10b981" fill="#10b981" fillOpacity={0.5} />
-              <Radar name="Avg Competitor" dataKey="avgComp" stroke="#6366f1" fill="#6366f1" fillOpacity={0.3} />
+            <BarChart
+              data={[
+                { name: primaryName || "You", ...primary, isPrimary: true },
+                ...competitors.map(c => ({ name: c.channel_name, ...c, isPrimary: false }))
+              ]}
+              margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+            >
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="name" angle={-15} textAnchor="end" height={80} style={{ fontSize: '12px' }} />
+              <YAxis domain={[0, 100]} style={{ fontSize: '12px' }} />
+              <Tooltip />
               <Legend />
-            </RadarChart>
+              <Bar dataKey="audience_quality" name="Audience Quality" radius={[8, 8, 0, 0]}>
+                {[
+                  { isPrimary: true },
+                  ...competitors.map(() => ({ isPrimary: false }))
+                ].map((entry, index) => (
+                  <Cell key={`cell-quality-${index}`} fill={entry.isPrimary ? "#4f46e5" : "#cbd5e1"} />
+                ))}
+              </Bar>
+              <Bar dataKey="consistency_score" name="Consistency" radius={[8, 8, 0, 0]}>
+                {[
+                  { isPrimary: true },
+                  ...competitors.map(() => ({ isPrimary: false }))
+                ].map((entry, index) => (
+                  <Cell key={`cell-consistency-${index}`} fill={entry.isPrimary ? "#6366f1" : "#e0e7ff"} />
+                ))}
+              </Bar>
+              <Bar dataKey="growth_momentum.score" name="Growth Score" radius={[8, 8, 0, 0]}>
+                {[
+                  { isPrimary: true },
+                  ...competitors.map(() => ({ isPrimary: false }))
+                ].map((entry, index) => (
+                  <Cell key={`cell-growth-${index}`} fill={entry.isPrimary ? "#f59e0b" : "#fde68a"} />
+                ))}
+              </Bar>
+            </BarChart>
           </ResponsiveContainer>
         </div>
       </div>
-    </div>
-  );
-}
 
-function GrowthView({ data, primaryName }) {
-  const allChannels = [
-    { name: primaryName || "You", ...data.primary_channel, isPrimary: true },
-    ...data.competitors.map(c => ({ ...c, isPrimary: false }))
-  ];
-
-  return (
-    <div className="space-y-6">
-      <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-        <h3 className="text-2xl font-semibold text-slate-900 mb-6">Growth & Momentum Analysis</h3>
-
-        {/* Your Growth */}
-        <div className="mb-6 p-6 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-xl border-2 border-blue-200">
-          <div className="flex items-start justify-between mb-4">
-            <div>
-              <h4 className="text-lg font-bold text-slate-900 mb-1">Your Channel Growth</h4>
-              <p className="text-sm text-slate-600">Based on recent video performance</p>
-            </div>
-            <GrowthBadge trend={data.primary_channel.growth_momentum.trend} large />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 bg-white rounded-lg">
-              <p className="text-sm text-slate-600 mb-1">Growth Score</p>
-              <div className="flex items-end gap-2">
-                <span className="text-3xl font-bold text-slate-900">
-                  {data.primary_channel.growth_momentum.score}
-                </span>
-                <span className="text-lg text-slate-600 mb-1">/100</span>
-              </div>
-            </div>
-            <div className="p-4 bg-white rounded-lg">
-              <p className="text-sm text-slate-600 mb-1">Consistency Score</p>
-              <div className="flex items-end gap-2">
-                <span className="text-3xl font-bold text-slate-900">
-                  {data.primary_channel.consistency_score}
-                </span>
-                <span className="text-lg text-slate-600 mb-1">/100</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="mt-4 p-4 bg-white rounded-lg">
-            <p className="text-sm text-slate-700">
-              <strong>What this means:</strong>{" "}
-              {data.primary_channel.growth_momentum.trend === "growing" 
-                ? "Your recent videos are performing better than older ones. Keep up the momentum!"
-                : data.primary_channel.growth_momentum.trend === "declining"
-                ? "Your recent videos are getting fewer views. Time to refresh your content strategy."
-                : "Your performance is steady. Consider experimenting to drive growth."}
-            </p>
-          </div>
+      {/* Key Takeaways */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="p-5 bg-slate-50 rounded-lg border-2 border-slate-300">
+          <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-3">
+            <CheckCircle size={18} className="text-slate-600" />
+            Your Advantages
+          </h4>
+          <ul className="space-y-2 text-sm text-slate-700">
+            {data.competitive_analysis?.strengths.map((s, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className="text-slate-600 mt-0.5 flex-shrink-0">✓</span>
+                <span>{s}</span>
+              </li>
+            ))}
+          </ul>
         </div>
 
-        {/* Growth Comparison */}
-        {data.competitors.length > 0 && (
-          <div>
-            <h4 className="text-lg font-bold text-slate-900 mb-4">Growth Comparison</h4>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={allChannels.map(c => ({
-                    name: c.isPrimary ? "You" : c.channel_name,
-                    score: c.growth_momentum.score,
-                    isPrimary: c.isPrimary
-                  }))}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" angle={-15} textAnchor="end" height={80} />
-                  <YAxis domain={[0, 100]} />
-                  <Tooltip />
-                  <Bar dataKey="score" radius={[8, 8, 0, 0]}>
-                    {allChannels.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.isPrimary ? "#10b981" : "#6366f1"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </div>
-        )}
+        <div className="p-5 bg-slate-100 rounded-lg border-2 border-slate-300">
+          <h4 className="font-bold text-slate-800 flex items-center gap-2 mb-3">
+            <AlertCircle size={18} className="text-slate-600" />
+            Areas to Improve
+          </h4>
+          <ul className="space-y-2 text-sm text-slate-700">
+            {data.competitive_analysis?.weaknesses.map((w, i) => (
+              <li key={i} className="flex items-start gap-2">
+                <span className="text-slate-600 mt-0.5 flex-shrink-0">!</span>
+                <span>{w}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
       </div>
     </div>
   );
 }
 
-function AudienceView({ data, primaryName }) {
+// Engagement View - Simplified
+function EngagementView({ data, primaryName }) {
+  const primary = data.primary_channel;
   const allChannels = [
-    { name: primaryName || "You", ...data.primary_channel, isPrimary: true },
+    { name: primaryName || "You", ...primary, isPrimary: true },
     ...data.competitors.map(c => ({ ...c, isPrimary: false }))
   ];
 
+  const engagementLevel = primary.audience_quality >= 70 ? "Excellent" : primary.audience_quality >= 40 ? "Good" : "Needs Work";
+
   return (
     <div className="space-y-6">
+      {/* Your Engagement - Large Summary */}
       <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-        <h3 className="text-2xl font-semibold text-slate-900 mb-6">Audience Quality Analysis</h3>
+        <h2 className="text-2xl font-bold text-slate-900 mb-6">Audience Engagement</h2>
 
-        {/* Your Audience */}
-        <div className="mb-6 p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border-2 border-purple-200">
-          <h4 className="text-lg font-bold text-slate-900 mb-4">Your Audience Quality</h4>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
-            <div className="p-4 bg-white rounded-lg">
-              <p className="text-sm text-slate-600 mb-1">Quality Score</p>
-              <div className="flex items-end gap-2">
-                <span className="text-3xl font-bold text-slate-900">
-                  {data.primary_channel.audience_quality}
-                </span>
-                <span className="text-lg text-slate-600 mb-1">/100</span>
-              </div>
-            </div>
-            <div className="p-4 bg-white rounded-lg">
-              <p className="text-sm text-slate-600 mb-1">Avg Views per Video</p>
-              <p className="text-2xl font-bold text-slate-900">
-                {formatNumber(data.primary_channel.avg_views_per_video)}
-              </p>
-            </div>
-            <div className="p-4 bg-white rounded-lg">
-              <p className="text-sm text-slate-600 mb-1">Engagement Rate</p>
-              <p className="text-2xl font-bold text-slate-900">
-                {(data.primary_channel.engagement_rate * 100).toFixed(2)}%
-              </p>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <div className="p-5 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border-2 border-purple-200">
+            <div className="text-xs font-semibold text-slate-600 mb-2">ENGAGEMENT LEVEL</div>
+            <div className="text-3xl font-bold text-slate-900 mb-2">{engagementLevel}</div>
+            <div className="text-sm text-slate-600">Quality Score: {primary.audience_quality}/100</div>
           </div>
 
-          <div className="p-4 bg-white rounded-lg">
-            <p className="text-sm text-slate-700">
-              <strong>What this means:</strong>{" "}
-              {data.primary_channel.audience_quality >= 70
-                ? "You have a highly engaged audience! They actively interact with your content through likes and comments."
-                : data.primary_channel.audience_quality >= 40
-                ? "Your audience is moderately engaged. There's room to improve interaction."
-                : "Your audience engagement needs work. Focus on creating content that encourages likes, comments, and shares."}
-            </p>
+          <div className="p-5 bg-gradient-to-br from-blue-50 to-cyan-50 rounded-xl border-2 border-blue-200">
+            <div className="text-xs font-semibold text-slate-600 mb-2">ENGAGEMENT RATE</div>
+            <div className="text-3xl font-bold text-slate-900 mb-2">
+              {(primary.engagement_rate * 100).toFixed(2)}%
+            </div>
+            <div className="text-sm text-slate-600">Likes + Comments per 100 views</div>
+          </div>
+
+          <div className="p-5 bg-gradient-to-br from-indigo-50 to-slate-50 rounded-xl border-2 border-slate-300">
+            <div className="text-xs font-semibold text-slate-600 mb-2">AVG VIEWS/VIDEO</div>
+            <div className="text-3xl font-bold text-slate-900 mb-2">
+              {formatNumber(primary.avg_views_per_video)}
+            </div>
+            <div className="text-sm text-slate-600">Content reach</div>
           </div>
         </div>
 
-        {/* Quality Comparison */}
-        {data.competitors.length > 0 && (
-          <div>
-            <h4 className="text-lg font-bold text-slate-900 mb-4">Audience Quality Comparison</h4>
-            <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart
-                  data={allChannels.map(c => ({
-                    name: c.isPrimary ? "You" : c.channel_name,
-                    quality: c.audience_quality,
-                    engagement: c.engagement_rate * 10000,
-                    isPrimary: c.isPrimary
-                  }))}
-                  margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
-                >
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" angle={-15} textAnchor="end" height={80} />
-                  <YAxis domain={[0, 100]} />
-                  <Tooltip />
-                  <Bar dataKey="quality" radius={[8, 8, 0, 0]}>
-                    {allChannels.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.isPrimary ? "#10b981" : "#6366f1"} />
-                    ))}
-                  </Bar>
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+        {/* Engagement Insight */}
+        <div className="p-5 bg-indigo-50 rounded-xl border-2 border-indigo-200">
+          <h3 className="font-semibold text-slate-900 mb-2 flex items-center gap-2">
+            <Info size={20} className="text-indigo-600" />
+            What This Means
+          </h3>
+          <p className="text-sm text-slate-700 mb-3">
+            {primary.audience_quality >= 70
+              ? "✓ You have a highly engaged audience! They actively interact with your content through likes and comments. This is a strong indicator of a healthy community. Keep creating quality content that encourages interaction."
+              : primary.audience_quality >= 40
+              ? "~ Your audience is moderately engaged. Focus on encouraging more interaction by asking questions, responding to all comments, and creating content that promotes sharing. Even small improvements can grow your reach."
+              : "! Your audience engagement needs improvement. Start by responding quickly to comments, asking questions in your videos, and creating content that naturally encourages likes/shares. Engagement is key to growth."}
+          </p>
+        </div>
+      </div>
+
+      {/* Comparison with Competitors */}
+      {data.competitors.length > 0 && (
+        <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
+          <h3 className="text-xl font-bold text-slate-900 mb-4">How You Compare</h3>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={allChannels.map(c => ({
+                  name: c.isPrimary ? "You" : c.channel_name,
+                  quality: c.audience_quality,
+                  engagement: c.engagement_rate * 10000,
+                  isPrimary: c.isPrimary
+                }))}
+                margin={{ top: 20, right: 30, left: 20, bottom: 60 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" angle={-15} textAnchor="end" height={80} style={{ fontSize: '12px' }} />
+                <YAxis domain={[0, 100]} style={{ fontSize: '12px' }} />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="quality" name="Audience Quality Score" radius={[8, 8, 0, 0]}>
+                  {allChannels.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={entry.isPrimary ? "#6366f1" : "#cbd5e1"} />
+                  ))}
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
-        )}
+        </div>
+      )}
+
+      {/* Engagement Tips */}
+      <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+          <Zap className="text-indigo-600" size={20} />
+          Boost Engagement
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
+            <h4 className="font-bold text-sm text-amber-900 mb-2">Quick Wins</h4>
+            <ul className="space-y-2 text-xs text-amber-800">
+              <li className="flex items-start gap-2">
+                <span>✓</span>
+                <span>Respond to every comment in first hour</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span>✓</span>
+                <span>Ask questions that require answers</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span>✓</span>
+                <span>Pin your best comment or question</span>
+              </li>
+            </ul>
+          </div>
+          <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <h4 className="font-bold text-sm text-blue-900 mb-2">Content Ideas</h4>
+            <ul className="space-y-2 text-xs text-blue-800">
+              <li className="flex items-start gap-2">
+                <span>✓</span>
+                <span>Create polls & surveys in cards</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span>✓</span>
+                <span>End videos with clear calls-to-action</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <span>✓</span>
+                <span>Feature audience comments</span>
+              </li>
+            </ul>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1360,9 +1152,9 @@ function AudienceView({ data, primaryName }) {
 
 // Helper Components
 
-function MetricCard({ icon: Icon, label, value, subtitle, highlight }) {
+function MetricCard({ icon: Icon, label, value, subtitle }) {
   return (
-    <div className={`rounded-xl p-4 ${highlight ? "bg-white/25 border-2 border-white/40" : "bg-white/15"}`}>
+    <div className="rounded-xl p-4 bg-white/15">
       <div className="flex items-center gap-2 mb-2">
         <Icon size={20} className="text-white/90" />
         <span className="text-sm text-white/90 font-medium">{label}</span>
@@ -1373,19 +1165,19 @@ function MetricCard({ icon: Icon, label, value, subtitle, highlight }) {
   );
 }
 
-function GrowthBadge({ trend, large }) {
+function GrowthBadge({ trend }) {
   const badges = {
-    growing: { icon: TrendingUp, text: "Growing", color: "bg-green-500", textColor: "text-white" },
+    growing: { icon: TrendingUp, text: "Growing", color: "bg-indigo-600", textColor: "text-white" },
     declining: { icon: TrendingDown, text: "Declining", color: "bg-red-500", textColor: "text-white" },
-    stable: { icon: TrendingUpIcon, text: "Stable", color: "bg-blue-500", textColor: "text-white" },
+    stable: { icon: Activity, text: "Stable", color: "bg-blue-500", textColor: "text-white" },
   };
 
   const badge = badges[trend] || badges.stable;
   const Icon = badge.icon;
 
   return (
-    <div className={`${badge.color} ${badge.textColor} px-4 py-2 rounded-full flex items-center gap-2 ${large ? 'text-base' : 'text-sm'} font-semibold`}>
-      <Icon size={large ? 20 : 16} />
+    <div className={`${badge.color} ${badge.textColor} px-4 py-2 rounded-full flex items-center gap-2 text-sm font-semibold`}>
+      <Icon size={16} />
       {badge.text}
     </div>
   );
@@ -1393,7 +1185,7 @@ function GrowthBadge({ trend, large }) {
 
 function RecommendationCard({ recommendation }) {
   const colors = {
-    success: { bg: "from-green-50 to-green-100", border: "border-green-300", icon: "bg-green-500" },
+    success: { bg: "from-slate-50 to-slate-100", border: "border-slate-300", icon: "bg-indigo-600" },
     warning: { bg: "from-amber-50 to-amber-100", border: "border-amber-300", icon: "bg-amber-500" },
     info: { bg: "from-blue-50 to-blue-100", border: "border-blue-300", icon: "bg-blue-500" },
   };
@@ -1438,50 +1230,36 @@ function RankCard({ title, rank, total }) {
   );
 }
 
-function ROIMetric({ label, value, highlight }) {
-  return (
-    <div className={`p-4 rounded-lg ${highlight ? 'bg-green-100 border-2 border-green-300' : 'bg-white border border-slate-200'}`}>
-      <p className={`text-sm mb-1 ${highlight ? 'text-green-700 font-semibold' : 'text-slate-600'}`}>{label}</p>
-      <p className={`text-2xl font-bold ${highlight ? 'text-green-900' : 'text-slate-900'}`}>{value}</p>
-    </div>
-  );
-}
-
 function ChannelComparisonCard({ channel, channelName, isPrimary, primary }) {
-  const reachDiff = primary ? ((channel.campaign_reach.predicted_reach / primary.campaign_reach.predicted_reach - 1) * 100) : 0;
-  const roiDiff = primary ? ((channel.roi_prediction.roi_percentage / primary.roi_prediction.roi_percentage - 1) * 100) : 0;
+  const engagementDiff = primary ? ((channel.engagement_rate - primary.engagement_rate) / primary.engagement_rate * 100) : 0;
+  const qualityDiff = primary ? (channel.audience_quality - primary.audience_quality) : 0;
 
   return (
-    <div className={`p-5 rounded-xl border-2 ${isPrimary ? 'bg-gradient-to-br from-blue-50 to-indigo-50 border-blue-300' : 'bg-white border-slate-200'}`}>
+    <div className={`p-5 rounded-xl border-2 ${isPrimary ? 'bg-gradient-to-br from-indigo-50 to-blue-50 border-indigo-300' : 'bg-white border-slate-200'}`}>
       <div className="flex items-start justify-between mb-4">
         <div>
           <h4 className="text-lg font-bold text-slate-900">{channelName}</h4>
           <p className="text-sm text-slate-600">{formatNumber(channel.subscribers)} subscribers</p>
         </div>
         {!isPrimary && (
-          <div className={`px-3 py-1 rounded-full text-sm font-semibold ${roiDiff > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
-            {roiDiff > 0 ? 'Ahead' : 'Behind'} You
+          <div className={`px-3 py-1 rounded-full text-sm font-semibold ${qualityDiff > 0 ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+            {qualityDiff > 0 ? 'Ahead' : 'Behind'} You
           </div>
         )}
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         <div className={`p-3 rounded-lg ${isPrimary ? 'bg-white' : 'bg-slate-50'}`}>
-          <p className="text-xs text-slate-600 mb-1">Campaign Reach</p>
-          <p className="text-sm font-bold text-slate-900">{formatNumber(channel.campaign_reach.predicted_reach)}</p>
-          {!isPrimary && (
-            <p className={`text-xs font-semibold mt-1 ${reachDiff >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-              {reachDiff >= 0 ? '+' : ''}{reachDiff.toFixed(0)}%
-            </p>
-          )}
+          <p className="text-xs text-slate-600 mb-1">Avg Views</p>
+          <p className="text-sm font-bold text-slate-900">{formatNumber(channel.avg_views_per_video)}</p>
         </div>
 
         <div className={`p-3 rounded-lg ${isPrimary ? 'bg-white' : 'bg-slate-50'}`}>
-          <p className="text-xs text-slate-600 mb-1">Expected ROI</p>
-          <p className="text-sm font-bold text-slate-900">{channel.roi_prediction.roi_percentage.toFixed(0)}%</p>
-          {!isPrimary && (
-            <p className={`text-xs font-semibold mt-1 ${roiDiff >= 0 ? 'text-red-600' : 'text-green-600'}`}>
-              {roiDiff >= 0 ? '+' : ''}{roiDiff.toFixed(0)}%
+          <p className="text-xs text-slate-600 mb-1">Engagement</p>
+          <p className="text-sm font-bold text-slate-900">{(channel.engagement_rate * 100).toFixed(2)}%</p>
+          {!isPrimary && engagementDiff !== 0 && (
+            <p className={`text-xs font-semibold mt-1 ${engagementDiff >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+              {engagementDiff >= 0 ? '+' : ''}{engagementDiff.toFixed(1)}%
             </p>
           )}
         </div>
@@ -1489,35 +1267,19 @@ function ChannelComparisonCard({ channel, channelName, isPrimary, primary }) {
         <div className={`p-3 rounded-lg ${isPrimary ? 'bg-white' : 'bg-slate-50'}`}>
           <p className="text-xs text-slate-600 mb-1">Audience Quality</p>
           <p className="text-sm font-bold text-slate-900">{channel.audience_quality}/100</p>
+          {!isPrimary && qualityDiff !== 0 && (
+            <p className={`text-xs font-semibold mt-1 ${qualityDiff >= 0 ? 'text-red-600' : 'text-green-600'}`}>
+              {qualityDiff >= 0 ? '+' : ''}{qualityDiff}
+            </p>
+          )}
         </div>
 
         <div className={`p-3 rounded-lg ${isPrimary ? 'bg-white' : 'bg-slate-50'}`}>
-          <p className="text-xs text-slate-600 mb-1">Growth Score</p>
+          <p className="text-xs text-slate-600 mb-1">Growth</p>
           <p className="text-sm font-bold text-slate-900">{channel.growth_momentum.score}/100</p>
+          <p className="text-xs text-slate-500 mt-1">{channel.growth_momentum.trend}</p>
         </div>
       </div>
     </div>
   );
-}
-
-// Utility Functions
-
-function formatNumber(n) {
-  const num = Number(n) || 0;
-  if (num >= 1000000) {
-    return `${(num / 1000000).toFixed(1)}M`;
-  } else if (num >= 1000) {
-    return `${(num / 1000).toFixed(1)}K`;
-  }
-  return num.toLocaleString();
-}
-
-function formatMoney(n) {
-  const num = Number(n) || 0;
-  if (num >= 1000000) {
-    return `${(num / 1000000).toFixed(1)}M`;
-  } else if (num >= 1000) {
-    return `${(num / 1000).toFixed(1)}K`;
-  }
-  return `${num.toLocaleString()}`;
 }
