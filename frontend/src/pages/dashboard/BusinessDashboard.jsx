@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import { Download, FileChartLine, FileText, SlidersHorizontal, X } from "lucide-react";
 import ReviewBubble from "../../pages/misc/ReviewBubble.jsx";
 import { useAuth } from "../../core/context/AuthContext";
 
@@ -50,6 +51,16 @@ export default function BusinessDashboard() {
 
   const [topVideos, setTopVideos] = useState([]);
   const [latestComments, setLatestComments] = useState([]);
+
+  const [reportRange, setReportRange] = useState("weekly");
+  const [includeSections, setIncludeSections] = useState({
+    kpis: true,
+    topVideos: true,
+    comments: false,
+  });
+  const [reportNotes, setReportNotes] = useState("");
+  const [exportMessage, setExportMessage] = useState("");
+  const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
   const navigate = useNavigate();
 
@@ -159,13 +170,130 @@ export default function BusinessDashboard() {
     fetchAll();
   }, [selectedUrls]);
 
+  const reportSummary = useMemo(() => {
+    const engagementRate =
+      viewCount && viewCount > 0 ? ((Number(totalLikes || 0) + Number(totalComments || 0)) / Number(viewCount)) * 100 : 0;
+
+    return {
+      timeRangeLabel: reportRange === "monthly" ? "Last 30 days" : "Last 7 days",
+      subscriberCount: formatNum(subscriberCount),
+      viewCount: formatNum(viewCount),
+      totalLikes: formatNum(totalLikes),
+      totalComments: formatNum(totalComments),
+      engagementRate: `${engagementRate.toFixed(2)}%`,
+      topVideos: topVideos.slice(0, 4),
+      notes: reportNotes.trim(),
+      template: "Standard",
+      generatedAt: new Date().toLocaleString(),
+    };
+  }, [reportRange, subscriberCount, viewCount, totalLikes, totalComments, topVideos, reportNotes]);
+
+  useEffect(() => {
+    if (!exportMessage) return undefined;
+    const t = setTimeout(() => setExportMessage(""), 3200);
+    return () => clearTimeout(t);
+  }, [exportMessage]);
+
+  const handleToggleSection = (key) => {
+    setIncludeSections((prev) => ({ ...prev, [key]: !prev[key] }));
+  };
+
+  const handleExportPDF = () => {
+    if (!selectedUrls.length) {
+      setExportMessage("Link a channel before exporting a report.");
+      return;
+    }
+
+    const html = buildPrintableReport(reportSummary, includeSections);
+    const win = window.open("", "_blank", "width=900,height=1000");
+    if (!win) {
+      setExportMessage("Popup blocked. Please allow popups to export.");
+      return;
+    }
+    win.document.write(html);
+    win.document.close();
+    win.focus();
+    win.print();
+    setExportMessage("Print dialog opened. Save as PDF to download.");
+  };
+
+  const handleExportExcel = () => {
+    if (!selectedUrls.length) {
+      setExportMessage("Link a channel before exporting a report.");
+      return;
+    }
+
+    const rows = [];
+    rows.push(["Report Template", reportSummary.template]);
+    rows.push(["Time Range", reportSummary.timeRangeLabel]);
+    rows.push(["Generated At", reportSummary.generatedAt]);
+    rows.push([]);
+    rows.push(["KPIs"]);
+    rows.push(["Subscribers", reportSummary.subscriberCount]);
+    rows.push(["Views", reportSummary.viewCount]);
+    rows.push(["Likes", reportSummary.totalLikes]);
+    rows.push(["Comments", reportSummary.totalComments]);
+    rows.push(["Engagement Rate", reportSummary.engagementRate]);
+    rows.push([]);
+
+    if (includeSections.topVideos) {
+      rows.push(["Top Videos"]);
+      rows.push(["Title", "Views", "Likes", "Comments", "Engagement %"]);
+      reportSummary.topVideos.forEach((v) => {
+        rows.push([
+          v.title || "Untitled",
+          formatNum(v.views),
+          formatNum(v.likes),
+          formatNum(v.comments),
+          `${(v.engagementScore * 100).toFixed(2)}%`,
+        ]);
+      });
+      rows.push([]);
+    }
+
+    if (includeSections.comments) {
+      rows.push(["Latest Comments"]);
+      rows.push(["Author", "Text", "Published At"]);
+      latestComments.forEach((c) => {
+        rows.push([c.author || "Unknown", (c.text || c.comment || "").replace(/"/g, '""'), c.publishedAt || ""]);
+      });
+      rows.push([]);
+    }
+
+    if (reportSummary.notes) {
+      rows.push(["Notes", reportSummary.notes.replace(/"/g, '""')]);
+    }
+
+    const csv = rows.map((r) => r.map((v) => `"${v ?? ""}"`).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `business-report-${reportRange}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setExportMessage("Report downloaded as CSV (openable in Excel).");
+  };
+
   return (
     <div className="min-h-[calc(100vh-72px)] bg-slate-50">
       <div className="max-w-7xl mx-auto px-6 py-6">
-        <h1 className="text-2xl font-semibold text-slate-900">Welcome back  {user?.first_name || "Business"}</h1>
-        <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-          {primaryChannel ? `Currently viewing: ${primaryChannel.name || primaryChannel.url} (Primary channel)` : "No channels linked"}
-        </p>
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h1 className="text-2xl font-semibold text-slate-900">Welcome back  {user?.first_name || "Business"}</h1>
+            <p className="mt-1 text-sm text-slate-500 max-w-2xl">
+              {primaryChannel ? `Currently viewing: ${primaryChannel.name || primaryChannel.url} (Primary channel)` : "No channels linked"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setIsReportModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 text-white px-4 py-2 text-sm font-semibold shadow-sm hover:bg-slate-800 transition"
+          >
+            <FileChartLine size={18} />
+            Generate report
+          </button>
+        </div>
       </div>
 
       <div className="max-w-7xl mx-auto px-6 pb-10 flex gap-6">
@@ -304,6 +432,26 @@ export default function BusinessDashboard() {
           </section>
         </main>
       </div>
+
+      {/* Report Generation Modal */}
+      {isReportModalOpen && (
+        <ReportModal
+          isOpen={isReportModalOpen}
+          onClose={() => setIsReportModalOpen(false)}
+          reportRange={reportRange}
+          setReportRange={setReportRange}
+          includeSections={includeSections}
+          handleToggleSection={handleToggleSection}
+          reportNotes={reportNotes}
+          setReportNotes={setReportNotes}
+          reportSummary={reportSummary}
+          latestComments={latestComments}
+          handleExportPDF={handleExportPDF}
+          handleExportExcel={handleExportExcel}
+          exportMessage={exportMessage}
+        />
+      )}
+
       <ReviewBubble />
     </div>
   );
@@ -358,4 +506,287 @@ function formatNum(n) {
   const x = Number(n);
   if (Number.isNaN(x)) return "--";
   return x.toLocaleString();
+}
+
+function TogglePill({ label, active, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-full px-3 py-1 text-xs font-semibold border transition ${
+        active
+          ? "bg-slate-900 text-white border-slate-900"
+          : "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
+      }`}
+    >
+      {label}
+    </button>
+  );
+}
+
+function PreviewRow({ label, value }) {
+  return (
+    <div className="flex justify-between text-sm">
+      <span className="text-slate-600">{label}</span>
+      <span className="text-slate-900 font-semibold">{value}</span>
+    </div>
+  );
+}
+
+function buildPrintableReport(summary, includeSections) {
+  const safe = (v) => String(v ?? "").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const kpiRows = includeSections.kpis
+    ? `
+      <h3 style="margin:16px 0 8px;font-size:14px;">KPIs (${safe(summary.timeRangeLabel)})</h3>
+      <table style="width:100%;border-collapse:collapse;font-size:12px;">
+        <tr><td style="padding:6px;border:1px solid #e5e7eb;">Subscribers</td><td style="padding:6px;border:1px solid #e5e7eb;">${safe(summary.subscriberCount)}</td></tr>
+        <tr><td style="padding:6px;border:1px solid #e5e7eb;">Views</td><td style="padding:6px;border:1px solid #e5e7eb;">${safe(summary.viewCount)}</td></tr>
+        <tr><td style="padding:6px;border:1px solid #e5e7eb;">Likes</td><td style="padding:6px;border:1px solid #e5e7eb;">${safe(summary.totalLikes)}</td></tr>
+        <tr><td style="padding:6px;border:1px solid #e5e7eb;">Comments</td><td style="padding:6px;border:1px solid #e5e7eb;">${safe(summary.totalComments)}</td></tr>
+        <tr><td style="padding:6px;border:1px solid #e5e7eb;">Engagement rate</td><td style="padding:6px;border:1px solid #e5e7eb;">${safe(summary.engagementRate)}</td></tr>
+      </table>
+    `
+    : "";
+
+  const topVideos = includeSections.topVideos
+    ? `
+      <h3 style="margin:16px 0 8px;font-size:14px;">Top videos</h3>
+      ${
+        (summary.topVideos || []).length === 0
+          ? '<p style="color:#6b7280;font-size:12px;">No engagement data available</p>'
+          : `<table style="width:100%;border-collapse:collapse;font-size:12px;">
+              <tr>
+                <th style="padding:6px;border:1px solid #e5e7eb;text-align:left;">Title</th>
+                <th style="padding:6px;border:1px solid #e5e7eb;text-align:left;">Views</th>
+                <th style="padding:6px;border:1px solid #e5e7eb;text-align:left;">Engagement %</th>
+              </tr>
+              ${summary.topVideos
+                .map(
+                  (v) =>
+                    `<tr>
+                      <td style="padding:6px;border:1px solid #e5e7eb;">${safe(v.title)}</td>
+                      <td style="padding:6px;border:1px solid #e5e7eb;">${safe(formatNum(v.views))}</td>
+                      <td style="padding:6px;border:1px solid #e5e7eb;">${safe((v.engagementScore * 100).toFixed(2))}%</td>
+                    </tr>`
+                )
+                .join("")}
+            </table>`
+      }
+    `
+    : "";
+
+  const notes = summary.notes
+    ? `<h3 style="margin:16px 0 8px;font-size:14px;">Notes</h3><p style="font-size:12px;line-height:1.5;">${safe(summary.notes)}</p>`
+    : "";
+
+  return `
+    <html>
+      <head>
+        <title>Business Report</title>
+      </head>
+      <body style="font-family:Inter,Arial,sans-serif;padding:32px;color:#0f172a;">
+        <h1 style="margin:0 0 4px;font-size:20px;">Business analytics report</h1>
+        <p style="margin:0 0 16px;color:#475569;font-size:12px;">Template: ${safe(
+          summary.template
+        )} · ${safe(summary.timeRangeLabel)} · Generated at ${safe(summary.generatedAt)}</p>
+        <div style="padding:16px;border:1px solid #e5e7eb;border-radius:12px;">
+          ${kpiRows}
+          ${topVideos}
+          ${notes}
+        </div>
+      </body>
+    </html>
+  `;
+}
+
+function ReportModal({
+  isOpen,
+  onClose,
+  reportRange,
+  setReportRange,
+  includeSections,
+  handleToggleSection,
+  reportNotes,
+  setReportNotes,
+  reportSummary,
+  latestComments,
+  handleExportPDF,
+  handleExportExcel,
+  exportMessage,
+}) {
+  if (!isOpen) return null;
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-5xl max-h-[90vh] bg-white rounded-2xl shadow-xl overflow-hidden flex flex-col"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200">
+          <div>
+            <div className="flex items-center gap-2">
+              <FileText size={18} className="text-slate-700" />
+              <p className="text-sm font-semibold text-slate-900">Report generation & export</p>
+            </div>
+            <p className="text-xs text-slate-500 mt-1">
+              Generate PDF/Excel reports with weekly/monthly filters and reusable templates.
+            </p>
+            {exportMessage && (
+              <p className="mt-1 text-xs text-emerald-600 font-medium">{exportMessage}</p>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 rounded-lg hover:bg-slate-100 transition"
+          >
+            <X size={20} className="text-slate-600" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4">
+            <div className="lg:col-span-2 space-y-3">
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-slate-700 flex items-center gap-2">
+                  <SlidersHorizontal size={14} />
+                  Filters
+                </label>
+                <div className="grid grid-cols-1 gap-2">
+                  <select
+                    value={reportRange}
+                    onChange={(e) => setReportRange(e.target.value)}
+                    className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  >
+                    <option value="weekly">Weekly report</option>
+                    <option value="monthly">Monthly report</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-slate-700">Include sections</p>
+                <div className="flex flex-wrap gap-2">
+                  <TogglePill
+                    label="KPIs"
+                    active={includeSections.kpis}
+                    onClick={() => handleToggleSection("kpis")}
+                  />
+                  <TogglePill
+                    label="Top videos"
+                    active={includeSections.topVideos}
+                    onClick={() => handleToggleSection("topVideos")}
+                  />
+                  <TogglePill
+                    label="Recent comments"
+                    active={includeSections.comments}
+                    onClick={() => handleToggleSection("comments")}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <p className="text-xs font-semibold text-slate-700">Custom notes / template tweaks</p>
+                <textarea
+                  value={reportNotes}
+                  onChange={(e) => setReportNotes(e.target.value)}
+                  rows={4}
+                  className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm"
+                  placeholder="Add recommendations, campaign highlights, or template instructions."
+                />
+              </div>
+            </div>
+
+            <div className="lg:col-span-3 rounded-xl border border-slate-100 bg-slate-50 p-4">
+              <p className="text-xs font-semibold text-slate-700 mb-2">Preview</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {includeSections.kpis && (
+                  <div className="rounded-lg bg-white border border-slate-100 p-3">
+                    <p className="text-xs text-slate-500">KPIs ({reportSummary.timeRangeLabel})</p>
+                    <div className="mt-2 space-y-2 text-sm text-slate-900">
+                      <PreviewRow label="Subscribers" value={reportSummary.subscriberCount} />
+                      <PreviewRow label="Views" value={reportSummary.viewCount} />
+                      <PreviewRow label="Likes" value={reportSummary.totalLikes} />
+                      <PreviewRow label="Comments" value={reportSummary.totalComments} />
+                      <PreviewRow label="Engagement rate" value={reportSummary.engagementRate} />
+                    </div>
+                  </div>
+                )}
+
+                {includeSections.topVideos && (
+                  <div className="rounded-lg bg-white border border-slate-100 p-3">
+                    <p className="text-xs text-slate-500">Top videos</p>
+                    <ul className="mt-2 space-y-2 text-sm text-slate-900">
+                      {reportSummary.topVideos.length === 0 ? (
+                        <li className="text-slate-500 text-xs">No engagement data available</li>
+                      ) : (
+                        reportSummary.topVideos.map((v) => (
+                          <li key={v.videoId} className="flex justify-between gap-2">
+                            <span className="truncate">{v.title}</span>
+                            <span className="text-xs text-slate-500">
+                              {(v.engagementScore * 100).toFixed(1)}%
+                            </span>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  </div>
+                )}
+
+                {includeSections.comments && (
+                  <div className="rounded-lg bg-white border border-slate-100 p-3 md:col-span-2">
+                    <p className="text-xs text-slate-500">Recent comments</p>
+                    <ul className="mt-2 space-y-1.5 text-sm text-slate-900">
+                      {latestComments.length === 0 ? (
+                        <li className="text-slate-500 text-xs">No recent comments</li>
+                      ) : (
+                        latestComments.slice(0, 3).map((c, idx) => (
+                          <li key={idx} className="flex justify-between gap-2">
+                            <span className="truncate">{c.text || c.comment || "—"}</span>
+                            <span className="text-xs text-slate-500">{c.author || ""}</span>
+                          </li>
+                        ))
+                      )}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-slate-200 bg-slate-50">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 text-sm font-semibold text-slate-700 rounded-lg border border-slate-200 hover:bg-white transition"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleExportPDF}
+            className="inline-flex items-center gap-2 rounded-lg bg-slate-900 text-white px-4 py-2 text-sm font-semibold hover:bg-slate-800 transition"
+          >
+            <FileText size={16} />
+            Export PDF
+          </button>
+          <button
+            type="button"
+            onClick={handleExportExcel}
+            className="inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-50 transition"
+          >
+            <Download size={16} />
+            Export Excel
+          </button>
+        </div>
+      </div>
+    </div>
+  );
 }

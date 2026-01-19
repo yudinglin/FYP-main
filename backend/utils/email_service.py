@@ -270,3 +270,4 @@ This is an automated email. Please do not reply to this message.
 
 # Global instance
 email_service = EmailService()
+

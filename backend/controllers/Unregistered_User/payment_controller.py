@@ -153,3 +153,4 @@ def process_payment_and_register(request):
         cursor.close()
         conn.close()
         return {"message": f"Error: {str(e)}"}, 500
+

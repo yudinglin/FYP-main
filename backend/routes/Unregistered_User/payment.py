@@ -14,3 +14,4 @@ def process_payment():
     """Process payment and register user (simulated payment)"""
     response, status = process_payment_and_register(request)
     return jsonify(response), status
+

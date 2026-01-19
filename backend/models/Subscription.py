@@ -95,3 +95,4 @@ class Subscription:
         cursor.close()
         conn.close()
         return cls.from_row(row)
+

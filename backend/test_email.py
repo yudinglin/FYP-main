@@ -59,3 +59,4 @@ else:
         print("   Skipped test email send.")
 
 print("\n" + "=" * 50)
+
