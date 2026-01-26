@@ -14,7 +14,28 @@ import {
   LabelList,
 } from "recharts";
 import { useAuth } from "../../core/context/AuthContext";
-import { BarChart3, Network, AlertCircle, Lightbulb, CheckCircle, TrendingUp, TrendingDown } from "lucide-react";
+import { 
+  BarChart3, 
+  Network, 
+  AlertCircle, 
+  Lightbulb, 
+  CheckCircle, 
+  TrendingUp, 
+  TrendingDown,
+  Rocket,
+  ThumbsUp,
+  Zap,
+  Target,
+  Eye,
+  Video,
+  Heart,
+  MessageCircle,
+  Users,
+  Star,
+  Sprout,
+  Trophy,
+  ArrowUp
+} from "lucide-react";
 
 const API_BASE = "http://127.0.0.1:5000";
 
@@ -648,9 +669,9 @@ export default function NetworkGraphBusiness() {
                   </div>
                 ) : selectedKey === "__ALL__" && perChannelGraphs.length > 0 ? (
                   <>
-                    {/* Scatter Charts - One per channel */}
+                    {/* Scatter Charts - Competitive Analysis */}
                     <div>
-                      <h2 className="text-xl font-semibold text-slate-900 mb-4">Engagement Rate vs Views by Channel</h2>
+                      <h2 className="text-xl font-semibold text-slate-900 mb-4">Performance Comparison: You vs Competition</h2>
                       <div className={`grid grid-cols-1 ${perChannelGraphs.length === 2 ? "lg:grid-cols-2" : "lg:grid-cols-3"} gap-6`}>
                         {perChannelGraphs.map((ch, idx) => {
                           const channelInfo = channels.find(c => c.url === ch.url);
@@ -681,7 +702,7 @@ export default function NetworkGraphBusiness() {
                                   <h3 className="text-lg font-semibold text-slate-900">{channelName}</h3>
                                   {isPrimary && (
                                     <span className="text-xs px-2 py-1 rounded-full bg-indigo-600 text-white font-semibold">
-                                      Primary
+                                      Your Channel
                                     </span>
                                   )}
                                 </div>
@@ -717,10 +738,10 @@ export default function NetworkGraphBusiness() {
                       </div>
                     </div>
 
-                    {/* Bar Charts - One per channel */}
+                    {/* Bar Charts - Competitive Analysis */}
                     <div>
                       <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-semibold text-slate-900">Top 10 Videos by Channel</h2>
+                        <h2 className="text-xl font-semibold text-slate-900">Top Performing Content: You vs Competition</h2>
                         <select
                           className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
                           value={barMetric}
@@ -764,7 +785,7 @@ export default function NetworkGraphBusiness() {
                                 <h3 className="text-lg font-semibold text-slate-900">{channelName}</h3>
                                 {isPrimary && (
                                   <span className="text-xs px-2 py-1 rounded-full bg-indigo-600 text-white font-semibold">
-                                    Primary
+                                    Your Channel
                                   </span>
                                 )}
                               </div>
@@ -903,229 +924,386 @@ export default function NetworkGraphBusiness() {
               </div>
             ) : (
               <>
-                {/* Primary Channel Metrics Cards */}
+                {/* Business-Friendly Summary */}
                 {(() => {
                   const primaryChannel = channels.find(c => c.is_primary) || channels[0];
                   const primaryChannelMetrics = performanceData.channel_metrics?.find(
                     cm => cm.channel_url === primaryChannel?.url
                   ) || performanceData.channel_metrics?.[0];
-                  const primaryChannelName = primaryChannel?.name || "your primary channel";
+                  const primaryChannelName = primaryChannel?.name || "your channel";
 
                   if (!primaryChannelMetrics) return null;
 
+                  const engagementPercentile = primaryChannelMetrics.percentiles?.engagement_rate || 0;
+                  const viewsPercentile = primaryChannelMetrics.percentiles?.avg_views || 0;
+                  const likesPercentile = primaryChannelMetrics.percentiles?.likes_per_1k || 0;
+                  
+                  // Simplified performance assessment
+                  const getPerformanceLevel = (percentile) => {
+                    if (percentile >= 75) return { level: "Excellent", color: "green", icon: Rocket };
+                    if (percentile >= 50) return { level: "Good", color: "blue", icon: ThumbsUp };
+                    if (percentile >= 25) return { level: "Fair", color: "amber", icon: Zap };
+                    return { level: "Needs Work", color: "rose", icon: Target };
+                  };
+
+                  const reachLevel = getPerformanceLevel(viewsPercentile);
+                  const engagementLevel = getPerformanceLevel(engagementPercentile);
+                  const likabilityLevel = getPerformanceLevel(likesPercentile);
+
                   return (
-                    <section>
-                      <div className="mb-4 flex items-center gap-2">
-                        <h2 className="text-xl font-semibold text-slate-900">Performance: {primaryChannelName}</h2>
-                        <span className="text-xs px-2 py-1 rounded-full bg-indigo-600 text-white font-semibold">
-                          Primary Channel
-                        </span>
+                    <section className="rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 p-6 mb-6">
+                      <div className="mb-6">
+                        <h2 className="text-xl font-bold text-slate-900 mb-2">How is {primaryChannelName} performing?</h2>
+                        <p className="text-slate-600">Here's what your numbers tell us about your channel's health</p>
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                        <MetricCard
-                          label="Average Views per Video"
-                          value={formatNum(primaryChannelMetrics.avg_views || 0)}
-                          percentile={primaryChannelMetrics.percentiles?.avg_views || 0}
-                          industryAvg={formatNum(performanceData.comparison?.avg_views?.industry_avg || 0)}
-                        />
-                        <MetricCard
-                          label="Engagement Rate"
-                          value={`${((primaryChannelMetrics.engagement_rate || 0) * 100).toFixed(2)}%`}
-                          percentile={primaryChannelMetrics.percentiles?.engagement_rate || 0}
-                          industryAvg={`${((performanceData.comparison?.engagement_rate?.industry_avg || 0) * 100).toFixed(2)}%`}
-                        />
-                        <MetricCard
-                          label="Likes per 1K Views"
-                          value={primaryChannelMetrics.likes_per_1k_views?.toFixed(1) || "0"}
-                          percentile={primaryChannelMetrics.percentiles?.likes_per_1k || 0}
-                          industryAvg={performanceData.comparison?.likes_per_1k?.industry_avg?.toFixed(1) || "0"}
-                        />
+
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {/* Reach */}
+                        <div className="bg-white rounded-xl p-5 border border-slate-200">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                              reachLevel.color === 'green' ? 'bg-green-100' : 
+                              reachLevel.color === 'blue' ? 'bg-blue-100' : 
+                              reachLevel.color === 'amber' ? 'bg-amber-100' : 'bg-rose-100'
+                            }`}>
+                              <reachLevel.icon className={`${
+                                reachLevel.color === 'green' ? 'text-green-600' : 
+                                reachLevel.color === 'blue' ? 'text-blue-600' : 
+                                reachLevel.color === 'amber' ? 'text-amber-600' : 'text-rose-600'
+                              }`} size={20} />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-slate-900">Audience Reach</h3>
+                              <p className="text-xs text-slate-500">How many people see your videos</p>
+                            </div>
+                          </div>
+                          <div className={`text-lg font-bold mb-2 ${
+                            reachLevel.color === 'green' ? 'text-green-600' : 
+                            reachLevel.color === 'blue' ? 'text-blue-600' : 
+                            reachLevel.color === 'amber' ? 'text-amber-600' : 'text-rose-600'
+                          }`}>
+                            {reachLevel.level}
+                          </div>
+                          <p className="text-sm text-slate-600">
+                            {reachLevel.level === "Excellent" ? "Your videos are reaching lots of people! Keep it up." :
+                             reachLevel.level === "Good" ? "You're reaching a decent audience. Room to grow." :
+                             reachLevel.level === "Fair" ? "Your reach is okay, but there's potential for more." :
+                             "Your videos need more visibility. Let's work on that."}
+                          </p>
+                        </div>
+
+                        {/* Engagement */}
+                        <div className="bg-white rounded-xl p-5 border border-slate-200">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                              engagementLevel.color === 'green' ? 'bg-green-100' : 
+                              engagementLevel.color === 'blue' ? 'bg-blue-100' : 
+                              engagementLevel.color === 'amber' ? 'bg-amber-100' : 'bg-rose-100'
+                            }`}>
+                              <engagementLevel.icon className={`${
+                                engagementLevel.color === 'green' ? 'text-green-600' : 
+                                engagementLevel.color === 'blue' ? 'text-blue-600' : 
+                                engagementLevel.color === 'amber' ? 'text-amber-600' : 'text-rose-600'
+                              }`} size={20} />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-slate-900">Viewer Interest</h3>
+                              <p className="text-xs text-slate-500">How much people interact with your content</p>
+                            </div>
+                          </div>
+                          <div className={`text-lg font-bold mb-2 ${
+                            engagementLevel.color === 'green' ? 'text-green-600' : 
+                            engagementLevel.color === 'blue' ? 'text-blue-600' : 
+                            engagementLevel.color === 'amber' ? 'text-amber-600' : 'text-rose-600'
+                          }`}>
+                            {engagementLevel.level}
+                          </div>
+                          <p className="text-sm text-slate-600">
+                            {engagementLevel.level === "Excellent" ? "People love interacting with your content!" :
+                             engagementLevel.level === "Good" ? "Viewers are engaging well with your videos." :
+                             engagementLevel.level === "Fair" ? "Some interaction, but could be more engaging." :
+                             "Viewers aren't interacting much. Let's make content more engaging."}
+                          </p>
+                        </div>
+
+                        {/* Content Quality */}
+                        <div className="bg-white rounded-xl p-5 border border-slate-200">
+                          <div className="flex items-center gap-3 mb-3">
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                              likabilityLevel.color === 'green' ? 'bg-green-100' : 
+                              likabilityLevel.color === 'blue' ? 'bg-blue-100' : 
+                              likabilityLevel.color === 'amber' ? 'bg-amber-100' : 'bg-rose-100'
+                            }`}>
+                              <likabilityLevel.icon className={`${
+                                likabilityLevel.color === 'green' ? 'text-green-600' : 
+                                likabilityLevel.color === 'blue' ? 'text-blue-600' : 
+                                likabilityLevel.color === 'amber' ? 'text-amber-600' : 'text-rose-600'
+                              }`} size={20} />
+                            </div>
+                            <div>
+                              <h3 className="font-semibold text-slate-900">Content Appeal</h3>
+                              <p className="text-xs text-slate-500">How much people like what you create</p>
+                            </div>
+                          </div>
+                          <div className={`text-lg font-bold mb-2 ${
+                            likabilityLevel.color === 'green' ? 'text-green-600' : 
+                            likabilityLevel.color === 'blue' ? 'text-blue-600' : 
+                            likabilityLevel.color === 'amber' ? 'text-amber-600' : 'text-rose-600'
+                          }`}>
+                            {likabilityLevel.level}
+                          </div>
+                          <p className="text-sm text-slate-600">
+                            {likabilityLevel.level === "Excellent" ? "Your content really resonates with viewers!" :
+                             likabilityLevel.level === "Good" ? "People generally like your content." :
+                             likabilityLevel.level === "Fair" ? "Your content gets some positive response." :
+                             "Your content needs to connect better with viewers."}
+                          </p>
+                        </div>
                       </div>
                     </section>
                   );
                 })()}
 
-                {/* Performance Insights */}
-                {performanceData.insights && performanceData.insights.length > 0 && (
-                  <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-                    <div className="flex items-center gap-2 mb-4">
-                      <Lightbulb className="text-amber-500" size={20} />
-                      <h2 className="text-lg font-semibold text-slate-900">Performance Insights</h2>
-                    </div>
-                    
-                    {/* Channel Performance Summary */}
-                    {performanceData.channel_metrics && performanceData.channel_metrics.length > 0 && (
-                      <div className="mb-6 p-4 bg-slate-50 rounded-xl border border-slate-200">
-                        <h3 className="text-sm font-semibold text-slate-900 mb-3">Channel Performance Overview</h3>
-                        <div className="space-y-2">
-                          {performanceData.channel_metrics.map((channel, idx) => {
-                            const channelInfo = channels.find(c => c.url === channel.channel_url);
-                            const isPrimary = channelInfo?.is_primary || idx === 0;
-                            const channelName = channelInfo?.name || `Channel ${idx + 1}`;
-                            
-                            return (
-                              <div key={idx} className="flex items-center justify-between p-2 bg-white rounded-lg border border-slate-200">
-                                <div className="flex items-center gap-2">
-                                  <span className="text-sm font-medium text-slate-900">
-                                    {channelName}
-                                    {isPrimary && (
-                                      <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold">
-                                        Primary
-                                      </span>
-                                    )}
-                                  </span>
-                                </div>
-                                <div className="flex items-center gap-4 text-xs text-slate-600">
-                                  <span>{formatNum(channel.avg_views)} avg views</span>
-                                  <span>{(channel.engagement_rate * 100).toFixed(2)}% engagement</span>
-                                </div>
-                              </div>
-                            );
-                          })}
+                {/* Simple Key Insights */}
+                {(() => {
+                  const primaryChannel = channels.find(c => c.is_primary) || channels[0];
+                  const primaryChannelMetrics = performanceData.channel_metrics?.find(
+                    cm => cm.channel_url === primaryChannel?.url
+                  ) || performanceData.channel_metrics?.[0];
+                  const primaryChannelName = primaryChannel?.name || "your channel";
+
+                  if (!primaryChannelMetrics) return null;
+
+                  const avgViews = primaryChannelMetrics.avg_views || 0;
+                  const totalVideos = primaryChannelMetrics.num_videos || 0;
+
+                  return (
+                    <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6 mb-6">
+                      <h2 className="text-lg font-semibold text-slate-900 mb-4">Quick Stats</h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                            <Video className="text-blue-600" size={24} />
+                          </div>
+                          <div>
+                            <div className="text-2xl font-bold text-slate-900">{totalVideos}</div>
+                            <div className="text-sm text-slate-600">videos analyzed</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                            <Eye className="text-green-600" size={24} />
+                          </div>
+                          <div>
+                            <div className="text-2xl font-bold text-slate-900">{formatNum(avgViews)}</div>
+                            <div className="text-sm text-slate-600">average views per video</div>
+                          </div>
                         </div>
                       </div>
-                    )}
+                    </section>
+                  );
+                })()}
 
-                    {(() => {
-                      const primaryChannel = channels.find(c => c.is_primary) || channels[0];
-                      const primaryChannelMetrics = performanceData.channel_metrics?.find(
-                        cm => cm.channel_url === primaryChannel?.url
-                      ) || performanceData.channel_metrics?.[0];
-                      const primaryChannelName = primaryChannel?.name || "your primary channel";
+                {/* What This Means for Your Business */}
+                {(() => {
+                  const primaryChannel = channels.find(c => c.is_primary) || channels[0];
+                  const primaryChannelMetrics = performanceData.channel_metrics?.find(
+                    cm => cm.channel_url === primaryChannel?.url
+                  ) || performanceData.channel_metrics?.[0];
+                  const primaryChannelName = primaryChannel?.name || "your channel";
 
-                      if (!primaryChannelMetrics) return null;
+                  if (!primaryChannelMetrics) return null;
 
-                      // Generate insights for primary channel
-                      const INDUSTRY_BENCHMARKS = {
-                        engagement_rate: { excellent: 0.05, good: 0.02, average: 0.01, below_average: 0.005 },
-                        views_per_video: { excellent: 50000, good: 10000, average: 3000, below_average: 500 },
-                        comments_per_1000_views: { excellent: 10, good: 5, average: 2, below_average: 1 },
-                      };
+                  const insights = generateBusinessFriendlyInsights(primaryChannelMetrics, primaryChannelName);
 
-                      const primaryInsights = [];
-                      const engagementRate = primaryChannelMetrics.engagement_rate || 0;
-                      const avgViews = primaryChannelMetrics.avg_views || 0;
-                      const commentsPer1k = primaryChannelMetrics.comments_per_1k_views || 0;
-
-                      if (engagementRate >= INDUSTRY_BENCHMARKS.engagement_rate.excellent) {
-                        primaryInsights.push({
-                          type: "positive",
-                          title: "Excellent Engagement Rate",
-                          description: `Your primary channel "${primaryChannelName}" has an engagement rate of ${(engagementRate * 100).toFixed(2)}%, placing it in the top 10% of channels.`,
-                          recommendation: "Continue creating content that resonates with your audience. Consider doubling down on your best-performing video topics.",
-                        });
-                      } else if (engagementRate < INDUSTRY_BENCHMARKS.engagement_rate.average) {
-                        primaryInsights.push({
-                          type: "warning",
-                          title: "Low Engagement Rate",
-                          description: `Your primary channel "${primaryChannelName}" has an engagement rate of ${(engagementRate * 100).toFixed(2)}%, which is below the industry average.`,
-                          recommendation: "Focus on creating more engaging content. Ask questions in your videos, create compelling thumbnails, and encourage viewers to like and comment.",
-                        });
-                      }
-
-                      if (avgViews >= INDUSTRY_BENCHMARKS.views_per_video.excellent) {
-                        primaryInsights.push({
-                          type: "positive",
-                          title: "Strong View Performance",
-                          description: `Your primary channel "${primaryChannelName}" averages ${formatNum(avgViews)} views per video, which is exceptional.`,
-                          recommendation: "Your content is reaching a wide audience. Consider optimizing upload frequency to maintain momentum.",
-                        });
-                      } else if (avgViews < INDUSTRY_BENCHMARKS.views_per_video.average) {
-                        primaryInsights.push({
-                          type: "warning",
-                          title: "Views Below Average",
-                          description: `Your primary channel "${primaryChannelName}" averages ${formatNum(avgViews)} views per video, which is below industry standards.`,
-                          recommendation: "Improve video titles, thumbnails, and SEO. Consider collaborating with other creators or promoting your videos on other platforms.",
-                        });
-                      }
-
-                      if (commentsPer1k >= INDUSTRY_BENCHMARKS.comments_per_1000_views.good) {
-                        primaryInsights.push({
-                          type: "positive",
-                          title: "Strong Community Engagement",
-                          description: `Your primary channel "${primaryChannelName}" is getting ${commentsPer1k.toFixed(1)} comments per 1,000 views, indicating active viewer participation.`,
-                          recommendation: "Keep engaging with comments to build a stronger community. Consider creating content that encourages discussion.",
-                        });
-                      }
-
-                      return (
-                        <div className="space-y-4">
-                          {primaryInsights.map((insight, idx) => (
-                            <div
-                              key={idx}
-                              className={`p-4 rounded-xl border ${
-                                insight.type === "positive"
-                                  ? "bg-green-50 border-green-200"
-                                  : "bg-orange-50 border-orange-200"
-                              }`}
-                            >
-                              <div className="flex items-start gap-3">
-                                {insight.type === "positive" ? (
-                                  <CheckCircle className="text-green-600 mt-0.5 flex-shrink-0" size={20} />
-                                ) : (
-                                  <AlertCircle className="text-orange-600 mt-0.5 flex-shrink-0" size={20} />
-                                )}
-                                <div className="flex-1">
-                                  <h3 className="font-semibold text-slate-900 mb-1">{insight.title}</h3>
-                                  <p className="text-sm text-slate-700 mb-2">{insight.description}</p>
-                                  <div className="mt-2 p-2 bg-white rounded-lg border border-slate-200">
-                                    <p className="text-xs font-medium text-slate-600 mb-1">Recommendation:</p>
-                                    <p className="text-sm text-slate-700">{insight.recommendation}</p>
-                                  </div>
+                  return (
+                    <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
+                      <div className="flex items-center gap-2 mb-6">
+                        <Lightbulb className="text-amber-500" size={20} />
+                        <h2 className="text-lg font-semibold text-slate-900">What This Means for Your Business</h2>
+                      </div>
+                      
+                      <div className="space-y-6">
+                        {insights.map((insight, idx) => (
+                          <div key={idx} className={`p-4 rounded-xl border-l-4 ${insight.borderColor} ${insight.bgColor}`}>
+                            <div className="flex items-start gap-3">
+                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                insight.bgColor === 'bg-green-50' ? 'bg-green-100' :
+                                insight.bgColor === 'bg-blue-50' ? 'bg-blue-100' :
+                                insight.bgColor === 'bg-amber-50' ? 'bg-amber-100' :
+                                'bg-orange-100'
+                              }`}>
+                                <insight.icon className={`${
+                                  insight.bgColor === 'bg-green-50' ? 'text-green-600' :
+                                  insight.bgColor === 'bg-blue-50' ? 'text-blue-600' :
+                                  insight.bgColor === 'bg-amber-50' ? 'text-amber-600' :
+                                  'text-orange-600'
+                                }`} size={20} />
+                              </div>
+                              <div className="flex-1">
+                                <h3 className="font-semibold text-slate-900 mb-2">{insight.title}</h3>
+                                <p className="text-slate-700 mb-3 leading-relaxed">{insight.explanation}</p>
+                                <div className="bg-white p-3 rounded-lg border border-slate-200">
+                                  <p className="text-sm font-medium text-slate-900 mb-1 flex items-center gap-1">
+                                    <CheckCircle size={14} className="text-blue-600" />
+                                    What you should do:
+                                  </p>
+                                  <p className="text-sm text-slate-700">{insight.action}</p>
                                 </div>
                               </div>
                             </div>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* Simple Action Plan */}
+                      <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                        <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                          <Target className="text-blue-600" size={16} />
+                          Your Next 3 Steps
+                        </h3>
+                        <div className="space-y-2">
+                          {insights.slice(0, 3).map((insight, idx) => (
+                            <div key={idx} className="flex items-start gap-3">
+                              <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                                {idx + 1}
+                              </div>
+                              <p className="text-sm text-slate-700">{insight.simpleAction}</p>
+                            </div>
                           ))}
                         </div>
-                      );
-                    })()}
-                  </section>
-                )}
+                      </div>
+                    </section>
+                  );
+                })()}
 
-                {/* Channel Comparison Table (if multiple channels) */}
+                {/* Multi-Channel Comparison (if multiple channels) */}
                 {performanceData.channel_metrics && performanceData.channel_metrics.length > 1 && (
                   <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-                    <h2 className="text-lg font-semibold text-slate-900 mb-4">Channel Breakdown</h2>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr className="border-b border-slate-200">
-                            <th className="text-left py-3 px-4 font-semibold text-slate-700">Channel</th>
-                            <th className="text-right py-3 px-4 font-semibold text-slate-700">Videos</th>
-                            <th className="text-right py-3 px-4 font-semibold text-slate-700">Avg Views</th>
-                            <th className="text-right py-3 px-4 font-semibold text-slate-700">Engagement</th>
-                            <th className="text-right py-3 px-4 font-semibold text-slate-700">Likes/1K</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {performanceData.channel_metrics.map((channel, idx) => {
-                            const channelInfo = channels.find(c => c.url === channel.channel_url);
-                            const isPrimary = channelInfo?.is_primary || idx === 0;
-                            const channelName = channelInfo?.name || `Channel ${idx + 1}`;
-                            
-                            return (
-                              <tr key={idx} className={`border-b border-slate-100 hover:bg-slate-50 ${isPrimary ? "bg-indigo-50/30" : ""}`}>
-                                <td className="py-3 px-4 text-slate-900">
+                    <h2 className="text-lg font-semibold text-slate-900 mb-4">How You Compare to Others</h2>
+                    <p className="text-sm text-slate-600 mb-4">
+                      See how your channel stacks up against similar channels in your space
+                    </p>
+                    
+                    <div className="space-y-3">
+                      {performanceData.channel_metrics.map((channel, idx) => {
+                        const channelInfo = channels.find(c => c.url === channel.channel_url);
+                        const isPrimary = channelInfo?.is_primary || idx === 0;
+                        const channelName = isPrimary ? (channelInfo?.name || "Your Channel") : `Competitor ${idx}`;
+                        
+                        // Simple performance assessment
+                        const engagementPercentile = channel.percentiles?.engagement_rate || 0;
+                        const viewsPercentile = channel.percentiles?.avg_views || 0;
+                        const overallPerformance = (engagementPercentile + viewsPercentile) / 2;
+                        
+                        const getPerformanceEmoji = (score) => {
+                          if (score >= 75) return Rocket;
+                          if (score >= 50) return ThumbsUp;
+                          if (score >= 25) return Zap;
+                          return Target;
+                        };
+
+                        const getPerformanceText = (score) => {
+                          if (score >= 75) return "Doing great!";
+                          if (score >= 50) return "Good performance";
+                          if (score >= 25) return "Room to improve";
+                          return "Needs attention";
+                        };
+                        
+                        return (
+                          <div key={idx} className={`p-4 rounded-xl border ${isPrimary ? "border-indigo-300 bg-indigo-50/30" : "border-slate-200 bg-slate-50"}`}>
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                  overallPerformance >= 75 ? 'bg-green-100' :
+                                  overallPerformance >= 50 ? 'bg-blue-100' :
+                                  overallPerformance >= 25 ? 'bg-amber-100' : 'bg-rose-100'
+                                }`}>
+                                  {(() => {
+                                    const IconComponent = getPerformanceEmoji(overallPerformance);
+                                    return <IconComponent className={`${
+                                      overallPerformance >= 75 ? 'text-green-600' :
+                                      overallPerformance >= 50 ? 'text-blue-600' :
+                                      overallPerformance >= 25 ? 'text-amber-600' : 'text-rose-600'
+                                    }`} size={20} />;
+                                  })()}
+                                </div>
+                                <div>
                                   <div className="flex items-center gap-2">
-                                    <span className="font-medium">{channelName}</span>
+                                    <span className="font-medium text-slate-900">{channelName}</span>
                                     {isPrimary && (
                                       <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold">
-                                        Primary
+                                        Your Channel
                                       </span>
                                     )}
                                   </div>
-                                </td>
-                                <td className="py-3 px-4 text-right text-slate-700">{channel.num_videos}</td>
-                                <td className="py-3 px-4 text-right text-slate-700">{formatNum(channel.avg_views)}</td>
-                                <td className="py-3 px-4 text-right text-slate-700">
-                                  {(channel.engagement_rate * 100).toFixed(2)}%
-                                </td>
-                                <td className="py-3 px-4 text-right text-slate-700">{channel.likes_per_1k_views.toFixed(1)}</td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
+                                  <div className="text-sm text-slate-600">{getPerformanceText(overallPerformance)}</div>
+                                </div>
+                              </div>
+                              <div className="text-right text-sm text-slate-600">
+                                <div>{formatNum(channel.avg_views)} avg views</div>
+                                <div>{channel.num_videos} videos</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+
+                    {/* Competitive Analysis Insight */}
+                    <div className="mt-4 p-4 bg-slate-50 rounded-xl">
+                      <h3 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                        <Lightbulb className="text-amber-500" size={16} />
+                        Competitive Analysis
+                      </h3>
+                      {(() => {
+                        const userChannel = performanceData.channel_metrics.find(channel => {
+                          const channelInfo = channels.find(c => c.url === channel.channel_url);
+                          return channelInfo?.is_primary;
+                        }) || performanceData.channel_metrics[0];
+                        
+                        const competitors = performanceData.channel_metrics.filter(channel => {
+                          const channelInfo = channels.find(c => c.url === channel.channel_url);
+                          return !channelInfo?.is_primary && channel !== performanceData.channel_metrics[0];
+                        });
+                        
+                        if (competitors.length === 0) {
+                          return (
+                            <p className="text-sm text-slate-700">
+                              Add competitor channels to see how you stack up against similar creators in your space.
+                            </p>
+                          );
+                        }
+
+                        const userScore = (userChannel.percentiles?.engagement_rate || 0) + (userChannel.percentiles?.avg_views || 0);
+                        const betterThanCount = competitors.filter(comp => {
+                          const compScore = (comp.percentiles?.engagement_rate || 0) + (comp.percentiles?.avg_views || 0);
+                          return userScore > compScore;
+                        }).length;
+                        
+                        if (betterThanCount === competitors.length) {
+                          return (
+                            <p className="text-sm text-slate-700">
+                              <span className="font-medium text-green-600">Great news!</span> Your channel is outperforming 
+                              all the competitor channels you're tracking. Keep up the excellent work!
+                            </p>
+                          );
+                        } else if (betterThanCount > competitors.length / 2) {
+                          return (
+                            <p className="text-sm text-slate-700">
+                              <span className="font-medium text-blue-600">You're doing well!</span> Your channel is performing 
+                              better than {betterThanCount} out of {competitors.length} competitors you're tracking.
+                            </p>
+                          );
+                        } else {
+                          return (
+                            <p className="text-sm text-slate-700">
+                              <span className="font-medium text-amber-600">Room for growth:</span> You're currently behind 
+                              some competitors, but this gives you clear targets to aim for. Focus on the strategies that work for the top performers.
+                            </p>
+                          );
+                        }
+                      })()}
                     </div>
                   </section>
                 )}
@@ -1429,6 +1607,351 @@ function MetricCard({ label, value, percentile, industryAvg }) {
           }`}
           style={{ width: `${Math.min(percentile, 100)}%` }}
         />
+      </div>
+    </div>
+  );
+}
+
+// Enhanced metric card with explanations and trends
+function EnhancedMetricCard({ label, value, percentile, industryAvg, explanation, trend = "stable" }) {
+  const getPercentileColor = (p) => {
+    if (p >= 75) return "text-green-600";
+    if (p >= 50) return "text-blue-600";
+    if (p >= 25) return "text-amber-600";
+    return "text-rose-600";
+  };
+
+  const getPercentileLabel = (p) => {
+    if (p >= 90) return "Top 10%";
+    if (p >= 75) return "Top 25%";
+    if (p >= 50) return "Above Average";
+    if (p >= 25) return "Below Average";
+    return "Needs Improvement";
+  };
+
+  const getTrendIcon = (trend) => {
+    if (trend === "up") return <TrendingUp className="text-green-600" size={14} />;
+    if (trend === "down") return <TrendingDown className="text-rose-600" size={14} />;
+    return null;
+  };
+
+  return (
+    <div className="rounded-2xl border border-slate-100 bg-white p-5 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex items-start justify-between mb-2">
+        <p className="text-xs text-slate-500">{label}</p>
+        {getTrendIcon(trend)}
+      </div>
+      <p className="text-2xl font-semibold text-slate-900 mb-2">{value}</p>
+      <p className="text-xs text-slate-600 mb-3 leading-relaxed">{explanation}</p>
+      <div className="flex items-center justify-between mb-3">
+        <span className={`text-xs font-medium ${getPercentileColor(percentile)}`}>
+          {getPercentileLabel(percentile)}
+        </span>
+        <span className="text-xs text-slate-500">Industry: {industryAvg}</span>
+      </div>
+      <div className="w-full bg-slate-200 rounded-full h-1.5">
+        <div
+          className={`h-1.5 rounded-full transition-all duration-500 ${
+            percentile >= 75 ? "bg-green-500" : percentile >= 50 ? "bg-blue-500" : percentile >= 25 ? "bg-amber-500" : "bg-rose-500"
+          }`}
+          style={{ width: `${Math.min(percentile, 100)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
+// Business-friendly insights generator (simplified for non-technical users)
+function generateBusinessFriendlyInsights(channelMetrics, channelName) {
+  const insights = [];
+  
+  const engagementPercentile = channelMetrics.percentiles?.engagement_rate || 0;
+  const viewsPercentile = channelMetrics.percentiles?.avg_views || 0;
+  const likesPercentile = channelMetrics.percentiles?.likes_per_1k || 0;
+  const avgViews = channelMetrics.avg_views || 0;
+
+  // Reach insights (simplified)
+  if (viewsPercentile >= 75) {
+    insights.push({
+      icon: Rocket,
+      title: "Your videos are getting great visibility!",
+      explanation: `Your videos are reaching more people than most other channels. This means your content is being discovered well and your audience is growing.`,
+      action: "Keep doing what you're doing! Consider posting more frequently to reach even more people.",
+      simpleAction: "Post videos more regularly to keep the momentum going",
+      bgColor: "bg-green-50",
+      borderColor: "border-l-green-500"
+    });
+  } else if (viewsPercentile < 30) {
+    insights.push({
+      icon: ArrowUp,
+      title: "Let's get more eyes on your content",
+      explanation: `Your videos aren't reaching as many people as they could. This usually means we need to work on making your content more discoverable.`,
+      action: "Focus on better video titles, eye-catching thumbnails, and sharing your videos on social media to reach more people.",
+      simpleAction: "Improve your video titles and thumbnails to attract more viewers",
+      bgColor: "bg-blue-50",
+      borderColor: "border-l-blue-500"
+    });
+  }
+
+  // Engagement insights (simplified)
+  if (engagementPercentile >= 70) {
+    insights.push({
+      icon: Heart,
+      title: "People love interacting with your content!",
+      explanation: `Your viewers are actively liking and commenting on your videos, which is fantastic! This shows they're really connecting with what you create.`,
+      action: "Keep creating content that sparks conversation. Reply to comments to build an even stronger community.",
+      simpleAction: "Respond to more comments to build a stronger community",
+      bgColor: "bg-green-50",
+      borderColor: "border-l-green-500"
+    });
+  } else if (engagementPercentile < 40) {
+    insights.push({
+      icon: MessageCircle,
+      title: "Let's get people more involved",
+      explanation: `Your viewers aren't interacting with your videos as much as they could. This might mean they're watching but not feeling compelled to engage.`,
+      action: "Ask questions in your videos, encourage viewers to comment, and create content that invites discussion.",
+      simpleAction: "Ask viewers questions in your videos to encourage comments",
+      bgColor: "bg-amber-50",
+      borderColor: "border-l-amber-500"
+    });
+  }
+
+  // Content quality insights (simplified)
+  if (likesPercentile >= 70) {
+    insights.push({
+      icon: Star,
+      title: "Your content quality is impressive!",
+      explanation: `People are hitting the like button on your videos more than average, which means they genuinely enjoy what you're creating.`,
+      action: "Analyze your most-liked videos to understand what resonates with your audience, then create more similar content.",
+      simpleAction: "Look at your most popular videos and make more content like that",
+      bgColor: "bg-green-50",
+      borderColor: "border-l-green-500"
+    });
+  } else if (likesPercentile < 35) {
+    insights.push({
+      icon: Target,
+      title: "There's room to improve content appeal",
+      explanation: `Your videos might not be connecting with viewers as strongly as they could. This could be about content style, topics, or presentation.`,
+      action: "Try different content formats, focus on topics your audience cares about, and pay attention to what gets the best response.",
+      simpleAction: "Experiment with different video topics and styles to see what works best",
+      bgColor: "bg-orange-50",
+      borderColor: "border-l-orange-500"
+    });
+  }
+
+  // Growth opportunity insights
+  if (avgViews < 1000) {
+    insights.push({
+      icon: Sprout,
+      title: "You're in the growth phase",
+      explanation: `Every successful channel starts somewhere! You're building your foundation, and with the right strategies, you can grow your audience significantly.`,
+      action: "Focus on consistency - post regularly, engage with your audience, and be patient. Growth takes time but it will come.",
+      simpleAction: "Stay consistent with posting and be patient - growth takes time",
+      bgColor: "bg-blue-50",
+      borderColor: "border-l-blue-500"
+    });
+  } else if (avgViews > 10000) {
+    insights.push({
+      icon: Trophy,
+      title: "You've built a solid audience!",
+      explanation: `Getting over 10,000 views per video is a significant achievement. You've proven there's demand for your content.`,
+      action: "Consider monetization opportunities, collaborations with other creators, or expanding your content topics to grow even further.",
+      simpleAction: "Explore ways to monetize your success and collaborate with other creators",
+      bgColor: "bg-green-50",
+      borderColor: "border-l-green-500"
+    });
+  }
+
+  // If no specific insights, provide general encouragement
+  if (insights.length === 0) {
+    insights.push({
+      icon: ThumbsUp,
+      title: "You're on the right track!",
+      explanation: `Your channel is performing steadily. Every creator's journey is unique, and consistent effort is the key to long-term success.`,
+      action: "Keep creating content you're passionate about, stay consistent with your posting schedule, and engage with your audience.",
+      simpleAction: "Keep creating consistently and engaging with your audience",
+      bgColor: "bg-blue-50",
+      borderColor: "border-l-blue-500"
+    });
+  }
+
+  return insights.slice(0, 4); // Limit to 4 insights max
+}
+
+// Smart insights generator
+function generateSmartInsights(channelMetrics, channelName, performanceData) {
+  const insights = [];
+  
+  const engagementRate = channelMetrics.engagement_rate || 0;
+  const avgViews = channelMetrics.avg_views || 0;
+  const likesPerK = channelMetrics.likes_per_1k_views || 0;
+  const commentsPerK = channelMetrics.comments_per_1k_views || 0;
+  
+  const engagementPercentile = channelMetrics.percentiles?.engagement_rate || 0;
+  const viewsPercentile = channelMetrics.percentiles?.avg_views || 0;
+  const likesPercentile = channelMetrics.percentiles?.likes_per_1k || 0;
+
+  // Industry benchmarks
+  const industryEngagement = performanceData.comparison?.engagement_rate?.industry_avg || 0.015;
+  const industryViews = performanceData.comparison?.avg_views?.industry_avg || 5000;
+  const industryLikes = performanceData.comparison?.likes_per_1k?.industry_avg || 15;
+
+  // Engagement insights
+  if (engagementPercentile >= 80) {
+    insights.push({
+      type: "success",
+      priority: "high",
+      title: "Outstanding Audience Engagement",
+      description: `Your ${(engagementRate * 100).toFixed(2)}% engagement rate puts you in the top 20% of creators. Your audience is highly active and invested in your content.`,
+      recommendation: "Leverage this strong engagement by creating more interactive content, hosting live sessions, or launching community polls to maintain this momentum.",
+      action: "Create more interactive content like Q&As, polls, or community posts to maintain high engagement",
+      actionable: true,
+      icon: "trophy"
+    });
+  } else if (engagementPercentile < 25) {
+    insights.push({
+      type: "warning",
+      priority: "high",
+      title: "Engagement Needs Attention",
+      description: `Your ${(engagementRate * 100).toFixed(2)}% engagement rate is below industry standards. This suggests viewers aren't actively interacting with your content.`,
+      recommendation: "Focus on creating more compelling calls-to-action, ask questions throughout your videos, and respond to comments to encourage interaction.",
+      action: "Add clear calls-to-action in your videos asking viewers to like, comment, and subscribe",
+      actionable: true,
+      icon: "alert"
+    });
+  }
+
+  // Views insights
+  if (viewsPercentile >= 75) {
+    insights.push({
+      type: "success",
+      priority: "medium",
+      title: "Strong Reach Performance",
+      description: `With ${avgViews.toLocaleString()} average views per video, you're reaching a substantial audience and outperforming most creators in your space.`,
+      recommendation: "Consider increasing your upload frequency or expanding to related topics to capitalize on your strong reach.",
+      action: "Maintain consistent upload schedule and consider expanding content topics",
+      actionable: true,
+      icon: "trending-up"
+    });
+  } else if (viewsPercentile < 30) {
+    insights.push({
+      type: "improvement",
+      priority: "high",
+      title: "Opportunity to Expand Reach",
+      description: `Your average of ${avgViews.toLocaleString()} views per video suggests there's significant room to grow your audience.`,
+      recommendation: "Optimize your video titles and thumbnails for better click-through rates, and consider promoting your content on other social platforms.",
+      action: "Improve video titles, thumbnails, and cross-promote on other social media platforms",
+      actionable: true,
+      icon: "target"
+    });
+  }
+
+  // Content quality insights
+  if (likesPercentile >= 70 && engagementPercentile >= 60) {
+    insights.push({
+      type: "success",
+      priority: "medium",
+      title: "High-Quality Content Recognition",
+      description: `Your ${likesPerK.toFixed(1)} likes per 1K views indicates viewers genuinely appreciate your content quality.`,
+      recommendation: "Document what makes your most-liked videos successful and apply those elements to future content.",
+      action: "Analyze your top-performing videos and replicate their successful elements",
+      actionable: true,
+      icon: "heart"
+    });
+  }
+
+  // Growth opportunity insights
+  if (commentsPerK >= 5) {
+    insights.push({
+      type: "success",
+      priority: "low",
+      title: "Strong Community Building",
+      description: `Your ${commentsPerK.toFixed(1)} comments per 1K views shows you're building an engaged community that wants to interact.`,
+      recommendation: "Continue fostering this community by responding to comments and creating content that sparks discussion.",
+      action: "Respond to more comments and create discussion-focused content",
+      actionable: true,
+      icon: "users"
+    });
+  }
+
+  // Comparative insights for multi-channel
+  if (performanceData.channel_metrics && performanceData.channel_metrics.length > 1) {
+    const otherChannels = performanceData.channel_metrics.filter(c => c.channel_url !== channelMetrics.channel_url);
+    const avgOtherEngagement = otherChannels.reduce((sum, c) => sum + (c.engagement_rate || 0), 0) / otherChannels.length;
+    
+    if (engagementRate > avgOtherEngagement * 1.2) {
+      insights.push({
+        type: "insight",
+        priority: "medium",
+        title: "Cross-Channel Strategy Opportunity",
+        description: `This channel significantly outperforms your others in engagement. Consider applying its successful strategies across your channel network.`,
+        recommendation: "Analyze what content types and posting strategies work best here, then adapt them for your other channels.",
+        action: "Apply successful strategies from this channel to your other channels",
+        actionable: true,
+        icon: "lightbulb"
+      });
+    }
+  }
+
+  // Sort by priority and limit to most important insights
+  const priorityOrder = { high: 3, medium: 2, low: 1 };
+  return insights
+    .sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority])
+    .slice(0, 5);
+}
+
+// Insight card component
+function InsightCard({ insight }) {
+  const getInsightStyle = (type) => {
+    switch (type) {
+      case "success":
+        return "bg-green-50 border-green-200 text-green-800";
+      case "warning":
+        return "bg-amber-50 border-amber-200 text-amber-800";
+      case "improvement":
+        return "bg-blue-50 border-blue-200 text-blue-800";
+      case "insight":
+        return "bg-purple-50 border-purple-200 text-purple-800";
+      default:
+        return "bg-slate-50 border-slate-200 text-slate-800";
+    }
+  };
+
+  const getIcon = (iconName) => {
+    switch (iconName) {
+      case "trophy":
+        return <CheckCircle className="text-green-600" size={20} />;
+      case "alert":
+        return <AlertCircle className="text-amber-600" size={20} />;
+      case "trending-up":
+        return <TrendingUp className="text-blue-600" size={20} />;
+      case "target":
+        return <BarChart3 className="text-blue-600" size={20} />;
+      case "heart":
+        return <CheckCircle className="text-green-600" size={20} />;
+      case "users":
+        return <Network className="text-indigo-600" size={20} />;
+      case "lightbulb":
+        return <Lightbulb className="text-purple-600" size={20} />;
+      default:
+        return <Lightbulb className="text-slate-600" size={20} />;
+    }
+  };
+
+  return (
+    <div className={`p-4 rounded-xl border ${getInsightStyle(insight.type)}`}>
+      <div className="flex items-start gap-3">
+        <div className="flex-shrink-0 mt-0.5">
+          {getIcon(insight.icon)}
+        </div>
+        <div className="flex-1">
+          <h3 className="font-semibold text-slate-900 mb-1">{insight.title}</h3>
+          <p className="text-sm text-slate-700 mb-3 leading-relaxed">{insight.description}</p>
+          <div className="p-3 bg-white rounded-lg border border-slate-200">
+            <p className="text-xs font-medium text-slate-600 mb-1">💡 Recommendation:</p>
+            <p className="text-sm text-slate-700">{insight.recommendation}</p>
+          </div>
+        </div>
       </div>
     </div>
   );
