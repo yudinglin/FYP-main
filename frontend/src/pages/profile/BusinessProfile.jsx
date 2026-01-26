@@ -1,9 +1,11 @@
-// src/pages/profile/Profile.jsx
+// src/pages/profile/BusinessProfile.jsx
 import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../core/context/AuthContext";
 
 export default function BusinessProfile() {
-  const { user, token, setUser } = useAuth();
+  const { user, token, setUser, logout } = useAuth();
+  const navigate = useNavigate();
 
   const [activeSection, setActiveSection] = useState("profile");
 
@@ -17,6 +19,13 @@ export default function BusinessProfile() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
   const MAX_CHANNELS = 5;
+
+  // Subscription state
+  const [subscription, setSubscription] = useState(null);
+  const [plan, setPlan] = useState(null);
+  const [payments, setPayments] = useState([]);
+  const [loadingSubscription, setLoadingSubscription] = useState(false);
+  const [availablePlans, setAvailablePlans] = useState([]);
 
   const industryOptions = [
     "Select your industry",
@@ -49,6 +58,48 @@ export default function BusinessProfile() {
       }
     }
   }, [user]);
+
+  useEffect(() => {
+    if (activeSection === "subscription" && token) {
+      fetchSubscriptionInfo();
+      fetchAvailablePlans();
+    }
+  }, [activeSection, token]);
+
+  async function fetchSubscriptionInfo() {
+    if (!token) return;
+    
+    setLoadingSubscription(true);
+    try {
+      const resp = await fetch("http://localhost:5000/api/profile/subscription", {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await resp.json();
+      if (resp.ok) {
+        setSubscription(data.subscription);
+        setPlan(data.plan);
+        setPayments(data.payments || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch subscription:", err);
+    } finally {
+      setLoadingSubscription(false);
+    }
+  }
+
+  async function fetchAvailablePlans() {
+    try {
+      const resp = await fetch("http://localhost:5000/api/pricing");
+      const data = await resp.json();
+      if (resp.ok) {
+        setAvailablePlans(data.plans || []);
+      }
+    } catch (err) {
+      console.error("Failed to fetch plans:", err);
+    }
+  }
 
   async function handleSaveProfile() {
     if (!token) return setError("You are not logged in.");
@@ -202,6 +253,23 @@ export default function BusinessProfile() {
               onSave={handleSaveChannels}
             />
           )}
+
+          {activeSection === "subscription" && (
+            <SubscriptionSection
+              user={user}
+              subscription={subscription}
+              plan={plan}
+              payments={payments}
+              availablePlans={availablePlans}
+              loading={loadingSubscription}
+              token={token}
+              onUpdate={fetchSubscriptionInfo}
+              onCancel={() => {
+                logout();
+                navigate("/");
+              }}
+            />
+          )}
         </main>
       </div>
     </div>
@@ -214,6 +282,7 @@ function ProfileSidebar({ activeSection, onSectionChange }) {
   const items = [
     { label: "Profile", value: "profile" },
     { label: "Link Channel", value: "linkChannel" },
+    { label: "Subscription", value: "subscription" },
   ];
 
   return (
@@ -536,5 +605,330 @@ function Message({ type, text }) {
     >
       {text}
     </p>
+  );
+}
+
+/* ================= Subscription Section ================= */
+
+function SubscriptionSection({
+  user,
+  subscription,
+  plan,
+  payments,
+  availablePlans,
+  loading,
+  token,
+  onUpdate,
+  onCancel,
+}) {
+  const [updating, setUpdating] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [error, setError] = useState("");
+  const [success, setSuccess] = useState("");
+  const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+
+  // Filter available plans - show both creator and business plans for switching
+  // Both creator and business users can switch to either plan
+  const filteredPlans = availablePlans.filter((p) => {
+    // Show plans that match the user's role OR are available to both
+    if (user?.role === "creator") {
+      return p.target_role === "creator" || p.target_role === "BOTH";
+    } else if (user?.role === "business") {
+      return p.target_role === "business" || p.target_role === "BOTH";
+    }
+    return true;
+  });
+
+  // Get all alternative plans (excluding current plan)
+  const alternativePlans = filteredPlans.filter(
+    (p) => p.plan_id !== plan?.plan_id
+  );
+
+  async function handleUpdatePlan(planName) {
+    if (!token || !planName) {
+      setError("Please select a plan");
+      return;
+    }
+
+    setUpdating(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const resp = await fetch("http://localhost:5000/api/profile/subscription", {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          plan_name: planName,
+        }),
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.message || "Failed to update subscription");
+
+      setSuccess("Subscription updated successfully! Check your email for confirmation.");
+      onUpdate();
+    } catch (err) {
+      setError(err.message);
+    } finally {
+      setUpdating(false);
+    }
+  }
+
+  async function handleCancelSubscription() {
+    if (!token) return;
+
+    setCancelling(true);
+    setError("");
+    setSuccess("");
+
+    try {
+      const resp = await fetch("http://localhost:5000/api/profile/subscription", {
+        method: "DELETE",
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data.message || "Failed to cancel subscription");
+
+      // Subscription cancelled - log out user and redirect
+      setShowCancelConfirm(false);
+      // Small delay to show success message, then logout
+      setTimeout(() => {
+        onCancel();
+      }, 1500);
+    } catch (err) {
+      setError(err.message);
+      setCancelling(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <>
+        <h1 className="text-xl font-semibold text-slate-900 mb-4">
+          Subscription Management
+        </h1>
+        <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-6">
+          <p className="text-sm text-slate-600">Loading subscription information...</p>
+        </section>
+      </>
+    );
+  }
+
+  if (!subscription) {
+    return (
+      <>
+        <h1 className="text-xl font-semibold text-slate-900 mb-4">
+          Subscription Management
+        </h1>
+        <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-6">
+          <p className="text-sm text-slate-600">No active subscription found.</p>
+        </section>
+      </>
+    );
+  }
+
+  const isCancelled = subscription.status === "CANCELLED";
+
+  return (
+    <>
+      <h1 className="text-xl font-semibold text-slate-900 mb-4">
+        Subscription Management
+      </h1>
+
+      {/* Current Subscription */}
+      <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-6 space-y-4 mb-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg font-semibold text-slate-900">Current Subscription</h2>
+          <span
+            className={`px-3 py-1 rounded-full text-xs font-semibold ${
+              isCancelled
+                ? "bg-red-100 text-red-700"
+                : "bg-emerald-100 text-emerald-700"
+            }`}
+          >
+            {subscription.status}
+          </span>
+        </div>
+
+        {plan && (
+          <div className="space-y-2">
+            <div className="flex justify-between items-center py-2 border-b border-slate-100">
+              <span className="text-sm text-slate-600">Plan Name:</span>
+              <span className="text-sm font-semibold text-slate-900">{plan.name}</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-slate-100">
+              <span className="text-sm text-slate-600">Monthly Price:</span>
+              <span className="text-sm font-semibold text-slate-900">
+                ${plan.price_monthly.toFixed(2)}
+              </span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-slate-100">
+              <span className="text-sm text-slate-600">Max Channels:</span>
+              <span className="text-sm font-semibold text-slate-900">{plan.max_channels}</span>
+            </div>
+            <div className="flex justify-between items-center py-2 border-b border-slate-100">
+              <span className="text-sm text-slate-600">Max Saved Graphs:</span>
+              <span className="text-sm font-semibold text-slate-900">{plan.max_saved_graphs}</span>
+            </div>
+            <div className="flex justify-between items-center py-2">
+              <span className="text-sm text-slate-600">Start Date:</span>
+              <span className="text-sm font-semibold text-slate-900">
+                {new Date(subscription.start_date).toLocaleDateString()}
+              </span>
+            </div>
+            {subscription.end_date && (
+              <div className="flex justify-between items-center py-2">
+                <span className="text-sm text-slate-600">End Date:</span>
+                <span className="text-sm font-semibold text-slate-900">
+                  {new Date(subscription.end_date).toLocaleDateString()}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+      </section>
+
+      {/* Change Plan */}
+      {!isCancelled && alternativePlans.length > 0 && (
+        <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-6 space-y-4 mb-6">
+          <h2 className="text-lg font-semibold text-slate-900">Change Plan</h2>
+          <p className="text-sm text-slate-600">
+            Switch to a different subscription plan. You can change from {plan?.name} to any of the available plans below.
+          </p>
+
+          <div className="space-y-4">
+            {alternativePlans.map((altPlan) => (
+              <div
+                key={altPlan.plan_id}
+                className="border border-slate-200 rounded-lg p-4 space-y-3"
+              >
+                <div className="flex justify-between items-start">
+                  <div className="flex-1">
+                    <h3 className="text-base font-semibold text-slate-900">{altPlan.name}</h3>
+                    {altPlan.description && (
+                      <p className="text-xs text-slate-500 mt-1">{altPlan.description}</p>
+                    )}
+                  </div>
+                  <div className="text-right">
+                    <p className="text-lg font-bold text-slate-900">
+                      ${altPlan.price_monthly.toFixed(2)}
+                    </p>
+                    <p className="text-xs text-slate-500">per month</p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 text-sm pt-2 border-t border-slate-100">
+                  <div>
+                    <span className="text-slate-600">Max Channels:</span>
+                    <span className="ml-2 font-semibold text-slate-900">{altPlan.max_channels}</span>
+                  </div>
+                  <div>
+                    <span className="text-slate-600">Max Saved Graphs:</span>
+                    <span className="ml-2 font-semibold text-slate-900">{altPlan.max_saved_graphs}</span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleUpdatePlan(altPlan.name)}
+                  disabled={updating}
+                  className="w-full px-4 py-2 rounded-lg bg-blue-600 text-white text-sm hover:bg-blue-700 disabled:opacity-50 font-medium"
+                >
+                  {updating ? "Updating..." : `Switch to ${altPlan.name} Plan`}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Cancel Subscription */}
+      {!isCancelled && (
+        <section className="rounded-2xl bg-white shadow-sm border border-red-200 p-6 space-y-4 mb-6">
+          <h2 className="text-lg font-semibold text-red-700">Cancel Subscription</h2>
+          <p className="text-sm text-slate-600">
+            Cancelling your subscription will end your access to premium features. You will be logged out and become an unregistered user.
+          </p>
+
+          {!showCancelConfirm ? (
+            <button
+              onClick={() => setShowCancelConfirm(true)}
+              className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm hover:bg-red-700"
+            >
+              Cancel Subscription
+            </button>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-sm font-semibold text-red-700">
+                Are you sure you want to cancel your subscription? You will be logged out immediately.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCancelSubscription}
+                  disabled={cancelling}
+                  className="px-4 py-2 rounded-lg bg-red-600 text-white text-sm hover:bg-red-700 disabled:opacity-50"
+                >
+                  {cancelling ? "Cancelling..." : "Yes, Cancel"}
+                </button>
+                <button
+                  onClick={() => setShowCancelConfirm(false)}
+                  disabled={cancelling}
+                  className="px-4 py-2 rounded-lg bg-slate-200 text-slate-700 text-sm hover:bg-slate-300 disabled:opacity-50"
+                >
+                  No, Keep Subscription
+                </button>
+              </div>
+            </div>
+          )}
+        </section>
+      )}
+
+      {/* Payment History */}
+      {payments.length > 0 && (
+        <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-6 space-y-4">
+          <h2 className="text-lg font-semibold text-slate-900">Payment History</h2>
+          <div className="space-y-2">
+            {payments.map((payment) => (
+              <div
+                key={payment.payment_id}
+                className="flex justify-between items-center py-3 border-b border-slate-100 last:border-0"
+              >
+                <div>
+                  <p className="text-sm font-semibold text-slate-900">
+                    Payment #{payment.payment_id}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {new Date(payment.payment_date).toLocaleDateString()}
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-semibold text-slate-900">
+                    ${Number(payment.amount).toFixed(2)} {payment.currency}
+                  </p>
+                  <span
+                    className={`text-xs px-2 py-1 rounded-full ${
+                      payment.status === "SUCCESS"
+                        ? "bg-emerald-100 text-emerald-700"
+                        : "bg-red-100 text-red-700"
+                    }`}
+                  >
+                    {payment.status}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {error && <Message type="error" text={error} />}
+      {success && <Message type="success" text={success} />}
+    </>
   );
 }

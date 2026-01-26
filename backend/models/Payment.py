@@ -75,3 +75,21 @@ class Payment:
         conn.close()
         return cls.from_row(row)
 
+    @classmethod
+    def find_by_subscription_id(cls, subscription_id):
+        """Find all payments for a subscription"""
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT payment_id, subscription_id, amount, currency, payment_date, status, method
+            FROM Payment
+            WHERE subscription_id = %s
+            ORDER BY payment_date DESC
+        """, (subscription_id,))
+        rows = cursor.fetchall()
+
+        cursor.close()
+        conn.close()
+        return [cls.from_row(row) for row in rows]
+

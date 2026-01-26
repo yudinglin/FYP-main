@@ -1,5 +1,9 @@
 from db import get_connection
 from datetime import datetime, timedelta
+from models.UserAccount import UserAccount
+from models.SubscriptionPlan import SubscriptionPlan
+from utils.email_service import email_service
+from flask_jwt_extended import get_jwt_identity 
 
 
 class Subscription:
@@ -95,4 +99,75 @@ class Subscription:
         cursor.close()
         conn.close()
         return cls.from_row(row)
+
+    @classmethod
+    def update_plan(cls, subscription_id, new_plan_id):
+        """Update subscription to a new plan"""
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        # Get current subscription
+        current_sub = cls.find_by_id(subscription_id)
+        if not current_sub or current_sub.status != 'ACTIVE':
+            cursor.close()
+            conn.close()
+            return None
+
+        # Update the plan_id
+        cursor.execute("""
+            UPDATE Subscription
+            SET plan_id = %s
+            WHERE subscription_id = %s AND status = 'ACTIVE'
+        """, (new_plan_id, subscription_id))
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+        return cls.find_by_id(subscription_id)
+
+    @classmethod
+    def cancel_subscription(cls, subscription_id):
+        """Cancel a subscription and delete the user from all tables"""
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        try:
+            # Get the subscription FIRST
+            subscription = cls.find_by_id(subscription_id)
+            if not subscription or subscription.status != 'ACTIVE':
+                cursor.close()
+                conn.close()
+                return None
+
+            cancelled_at = datetime.utcnow()
+
+            # Update subscription status to CANCELLED
+            cursor.execute("""
+                UPDATE Subscription
+                SET status = 'CANCELLED', cancelled_at = %s
+                WHERE subscription_id = %s
+            """, (cancelled_at, subscription_id))
+            conn.commit()
+
+            # Fetch and store the cancelled subscription data BEFORE user deletion
+            cancelled_subscription = cls.find_by_id(subscription_id)
+            
+            cursor.close()
+            conn.close()
+            
+            # Delete the user and all associated data (cascades through foreign keys)
+            deleted = UserAccount.delete_by_id(subscription.user_id)
+            if not deleted:
+                print(f"Warning: Failed to delete user {subscription.user_id}")
+                return None
+            
+            # Return the stored subscription data
+            return cancelled_subscription
+            
+        except Exception as e:
+            cursor.close()
+            conn.close()
+            print(f"Error cancelling subscription: {e}")
+            return None
+
 

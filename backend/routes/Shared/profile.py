@@ -1,9 +1,16 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from models.UserAccount import UserAccount
+from controllers.Shared.profile_controller import (
+    get_profile,
+    update_profile,
+    get_subscription_info,
+    update_subscription,
+    cancel_subscription
+)
+
 
 profile_bp = Blueprint("profile", __name__, url_prefix="/api")
-
 
 # -------------------------------------------------------------------------
 # GET PROFILE
@@ -104,3 +111,39 @@ def save_youtube_channels_route():
     # Reload fresh user data
     fresh_user = UserAccount.find_by_email(email)
     return jsonify({"user": fresh_user.to_dict()}), 200
+
+
+# -------------------------------------------------------------------------
+# GET SUBSCRIPTION INFO
+# -------------------------------------------------------------------------
+@profile_bp.get("/profile/subscription")
+@jwt_required()
+def get_subscription_route():
+    response, status = get_subscription_info()
+    return jsonify(response), status
+
+
+# -------------------------------------------------------------------------
+# UPDATE SUBSCRIPTION PLAN
+# -------------------------------------------------------------------------
+@profile_bp.put("/profile/subscription")
+@jwt_required()
+def update_subscription_route():
+    data = request.get_json() or {}
+    plan_name = data.get("plan_name")
+
+    if not plan_name:
+        return jsonify({"message": "plan_name is required"}), 400
+
+    response, status = update_subscription(plan_name)
+    return jsonify(response), status
+
+
+# -------------------------------------------------------------------------
+# CANCEL SUBSCRIPTION
+# -------------------------------------------------------------------------
+@profile_bp.delete("/profile/subscription")
+@jwt_required()
+def cancel_subscription_route():
+    response, status = cancel_subscription()
+    return jsonify(response), status

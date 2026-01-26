@@ -267,6 +267,396 @@ This is an automated email. Please do not reply to this message.
 
         return self.send_email(user_email, subject, html_body, text_body)
 
+    def send_subscription_update(self, user_email, user_name, old_plan_name, new_plan_name, new_plan_price, payment_id, subscription_id):
+        """
+        Send subscription plan change confirmation email
+        """
+        subject = f"YouAnalyze - Subscription Plan Updated"
+
+        formatted_price = f"${new_plan_price:.2f}"
+        update_date = datetime.now().strftime("%B %d, %Y")
+
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    padding: 20px;
+                    background-color: #f4f4f4;
+                }}
+                .container {{
+                    background-color: white;
+                    padding: 30px;
+                    border-radius: 10px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }}
+                .header {{
+                    text-align: center;
+                    border-bottom: 3px solid #dc2626;
+                    padding-bottom: 20px;
+                    margin-bottom: 30px;
+                }}
+                .header h1 {{
+                    color: #dc2626;
+                    margin: 0;
+                    font-size: 28px;
+                }}
+                .update-badge {{
+                    background-color: #3b82f6;
+                    color: white;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    display: inline-block;
+                    margin-bottom: 20px;
+                    font-weight: bold;
+                }}
+                .plan-change {{
+                    background-color: #f9fafb;
+                    padding: 20px;
+                    border-radius: 5px;
+                    margin: 20px 0;
+                    border-left: 4px solid #3b82f6;
+                }}
+                .plan-row {{
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 10px 0;
+                    border-bottom: 1px solid #e5e7eb;
+                }}
+                .plan-row:last-child {{
+                    border-bottom: none;
+                }}
+                .invoice-details {{
+                    background-color: #f9fafb;
+                    padding: 20px;
+                    border-radius: 5px;
+                    margin: 20px 0;
+                }}
+                .invoice-row {{
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 10px 0;
+                    border-bottom: 1px solid #e5e7eb;
+                }}
+                .invoice-row:last-child {{
+                    border-bottom: none;
+                    font-weight: bold;
+                    font-size: 18px;
+                    color: #dc2626;
+                    margin-top: 10px;
+                    padding-top: 15px;
+                }}
+                .footer {{
+                    margin-top: 30px;
+                    padding-top: 20px;
+                    border-top: 1px solid #e5e7eb;
+                    text-align: center;
+                    color: #6b7280;
+                    font-size: 12px;
+                }}
+                .button {{
+                    display: inline-block;
+                    background-color: #dc2626;
+                    color: white;
+                    padding: 12px 30px;
+                    text-decoration: none;
+                    border-radius: 5px;
+                    margin-top: 20px;
+                    font-weight: bold;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>📊 YouAnalyze</h1>
+                </div>
+
+                <div class="update-badge">✓ Subscription Updated!</div>
+
+                <p>Dear {user_name},</p>
+
+                <p>Your subscription plan has been successfully updated.</p>
+
+                <div class="plan-change">
+                    <h2 style="margin-top: 0; color: #3b82f6;">Plan Change Details</h2>
+                    <div class="plan-row">
+                        <span><strong>Previous Plan:</strong></span>
+                        <span>{old_plan_name}</span>
+                    </div>
+                    <div class="plan-row">
+                        <span><strong>New Plan:</strong></span>
+                        <span style="color: #10b981; font-weight: bold;">{new_plan_name}</span>
+                    </div>
+                    <div class="plan-row">
+                        <span><strong>Update Date:</strong></span>
+                        <span>{update_date}</span>
+                    </div>
+                </div>
+
+                <div class="invoice-details">
+                    <h2 style="margin-top: 0; color: #dc2626;">Payment Details</h2>
+                    <div class="invoice-row">
+                        <span><strong>New Plan Price:</strong></span>
+                        <span>{formatted_price}</span>
+                    </div>
+                    <div class="invoice-row">
+                        <span><strong>Payment ID:</strong></span>
+                        <span>#{payment_id}</span>
+                    </div>
+                    <div class="invoice-row">
+                        <span><strong>Subscription ID:</strong></span>
+                        <span>#{subscription_id}</span>
+                    </div>
+                    <div class="invoice-row">
+                        <span><strong>Payment Status:</strong></span>
+                        <span>✅ Paid</span>
+                    </div>
+                </div>
+
+                <p style="margin-top: 30px;">
+                    Your new plan is now active. You can access all features available in the <strong>{new_plan_name}</strong> plan.
+                </p>
+
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="http://localhost:5174/profile" class="button">View Your Profile</a>
+                </div>
+
+                <p>If you have any questions or need assistance, please don't hesitate to contact our support team.</p>
+
+                <p>Best regards,<br>
+                <strong>The YouAnalyze Team</strong></p>
+
+                <div class="footer">
+                    <p>This is an automated email. Please do not reply to this message.</p>
+                    <p>&copy; {datetime.now().year} YouAnalyze. All rights reserved.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        text_body = f"""
+YouAnalyze - Subscription Plan Updated
+
+Dear {user_name},
+
+Your subscription plan has been successfully updated.
+
+Plan Change Details:
+- Previous Plan: {old_plan_name}
+- New Plan: {new_plan_name}
+- Update Date: {update_date}
+
+Payment Details:
+- New Plan Price: {formatted_price}
+- Payment ID: #{payment_id}
+- Subscription ID: #{subscription_id}
+- Payment Status: Paid
+
+Your new plan is now active. You can access all features available in the {new_plan_name} plan.
+
+View your profile: http://localhost:5174/profile
+
+If you have any questions or need assistance, please don't hesitate to contact our support team.
+
+Best regards,
+The YouAnalyze Team
+
+---
+This is an automated email. Please do not reply to this message.
+© {datetime.now().year} YouAnalyze. All rights reserved.
+        """
+
+        return self.send_email(user_email, subject, html_body, text_body)
+
+    def send_subscription_cancellation(self, user_email, user_name, plan_name, subscription_id, cancelled_at):
+        """
+        Send subscription cancellation confirmation email
+        """
+        subject = f"YouAnalyze - Subscription Cancelled"
+
+        cancellation_date = cancelled_at.strftime("%B %d, %Y") if isinstance(cancelled_at, datetime) else str(cancelled_at)
+
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    padding: 20px;
+                    background-color: #f4f4f4;
+                }}
+                .container {{
+                    background-color: white;
+                    padding: 30px;
+                    border-radius: 10px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }}
+                .header {{
+                    text-align: center;
+                    border-bottom: 3px solid #dc2626;
+                    padding-bottom: 20px;
+                    margin-bottom: 30px;
+                }}
+                .header h1 {{
+                    color: #dc2626;
+                    margin: 0;
+                    font-size: 28px;
+                }}
+                .cancellation-badge {{
+                    background-color: #ef4444;
+                    color: white;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    display: inline-block;
+                    margin-bottom: 20px;
+                    font-weight: bold;
+                }}
+                .cancellation-details {{
+                    background-color: #fef2f2;
+                    padding: 20px;
+                    border-radius: 5px;
+                    margin: 20px 0;
+                    border-left: 4px solid #ef4444;
+                }}
+                .detail-row {{
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 10px 0;
+                    border-bottom: 1px solid #fee2e2;
+                }}
+                .detail-row:last-child {{
+                    border-bottom: none;
+                }}
+                .footer {{
+                    margin-top: 30px;
+                    padding-top: 20px;
+                    border-top: 1px solid #e5e7eb;
+                    text-align: center;
+                    color: #6b7280;
+                    font-size: 12px;
+                }}
+                .button {{
+                    display: inline-block;
+                    background-color: #dc2626;
+                    color: white;
+                    padding: 12px 30px;
+                    text-decoration: none;
+                    border-radius: 5px;
+                    margin-top: 20px;
+                    font-weight: bold;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>📊 YouAnalyze</h1>
+                </div>
+
+                <div class="cancellation-badge">Subscription Cancelled</div>
+
+                <p>Dear {user_name},</p>
+
+                <p>We're sorry to see you go. Your subscription has been cancelled as requested.</p>
+
+                <div class="cancellation-details">
+                    <h2 style="margin-top: 0; color: #dc2626;">Cancellation Details</h2>
+                    <div class="detail-row">
+                        <span><strong>Plan:</strong></span>
+                        <span>{plan_name}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span><strong>Subscription ID:</strong></span>
+                        <span>#{subscription_id}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span><strong>Cancellation Date:</strong></span>
+                        <span>{cancellation_date}</span>
+                    </div>
+                    <div class="detail-row">
+                        <span><strong>Status:</strong></span>
+                        <span>CANCELLED</span>
+                    </div>
+                </div>
+
+                <p style="margin-top: 30px;">
+                    Your subscription access will remain active until the end of your current billing period. 
+                    After that, you will no longer have access to premium features.
+                </p>
+
+                <p>
+                    If you change your mind, you can reactivate your subscription at any time by visiting your profile page.
+                </p>
+
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="http://localhost:5174/profile" class="button">View Your Profile</a>
+                </div>
+
+                <p>We'd love to hear your feedback about why you cancelled. If you have a moment, please let us know how we can improve.</p>
+
+                <p>Thank you for being part of YouAnalyze. We hope to serve you again in the future.</p>
+
+                <p>Best regards,<br>
+                <strong>The YouAnalyze Team</strong></p>
+
+                <div class="footer">
+                    <p>This is an automated email. Please do not reply to this message.</p>
+                    <p>&copy; {datetime.now().year} YouAnalyze. All rights reserved.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        text_body = f"""
+YouAnalyze - Subscription Cancelled
+
+Dear {user_name},
+
+We're sorry to see you go. Your subscription has been cancelled as requested.
+
+Cancellation Details:
+- Plan: {plan_name}
+- Subscription ID: #{subscription_id}
+- Cancellation Date: {cancellation_date}
+- Status: CANCELLED
+
+Your subscription access will remain active until the end of your current billing period. 
+After that, you will no longer have access to premium features.
+
+If you change your mind, you can reactivate your subscription at any time by visiting your profile page.
+
+View your profile: http://localhost:5174/profile
+
+We'd love to hear your feedback about why you cancelled. If you have a moment, please let us know how we can improve.
+
+Thank you for being part of YouAnalyze. We hope to serve you again in the future.
+
+Best regards,
+The YouAnalyze Team
+
+---
+This is an automated email. Please do not reply to this message.
+© {datetime.now().year} YouAnalyze. All rights reserved.
+        """
+
+        return self.send_email(user_email, subject, html_body, text_body)
+
 
 # Global instance
 email_service = EmailService()

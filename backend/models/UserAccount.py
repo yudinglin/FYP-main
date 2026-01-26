@@ -303,3 +303,20 @@ class UserAccount:
 
     def check_password(self, plain_password):
         return check_password_hash(self.password_hash, plain_password)
+    
+    @classmethod
+    def delete_by_id(cls, user_id):
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            DELETE FROM User
+            WHERE user_id = %s
+        """, (user_id,))
+        conn.commit()
+
+        affected = cursor.rowcount
+
+        cursor.close()
+        conn.close()
+        return affected > 0

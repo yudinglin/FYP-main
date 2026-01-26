@@ -1,5 +1,4 @@
-// frontend/src/pages/Business/CentralityMetrics.jsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   Target,
   TrendingUp,
@@ -7,7 +6,6 @@ import {
   MessageSquare,
   ThumbsUp,
   Lightbulb,
-  ArrowRight,
   Play,
   Eye,
   Award,
@@ -15,23 +13,24 @@ import {
   CheckCircle2,
   BarChart3,
   Sparkles,
-  Zap,
+  Flame,
   Clock,
   DollarSign,
-  Flame,
-  Activity,
+  Heart,
+  Share2,
   Calendar,
-  TrendingDown,
+  Star,
+  ArrowRight,
 } from "lucide-react";
 import { useAuth } from "../../core/context/AuthContext";
 
 const API_BASE = "http://localhost:5000";
 
 /**
- * Audience Resonance Analyzer
- * Business-focused: Which content resonates? What should brands sponsor?
+ * Simplified Content Performance Insights
+ * Business-focused: Easy to understand metrics for non-technical users
  */
-export default function CentralityMetrics() {
+export default function ContentPerformanceInsights() {
   const { user } = useAuth();
 
   // Channel selector
@@ -41,7 +40,7 @@ export default function CentralityMetrics() {
     const base = [
       {
         key: "ALL",
-        label: "All channels (combined analysis)",
+        label: "All my channels",
         urls: channels.map((c) => c.url).filter(Boolean),
       },
     ];
@@ -74,7 +73,7 @@ export default function CentralityMetrics() {
 
       if (!res.ok) {
         const text = await res.text();
-        throw new Error(text || `Failed to fetch resonance data for ${label}`);
+        throw new Error(text || `Failed to fetch data for ${label}`);
       }
 
       const data = await res.json();
@@ -106,7 +105,7 @@ export default function CentralityMetrics() {
         setResults(res);
       } catch (e) {
         console.error(e);
-        setError(e?.message || "Failed to load audience resonance data");
+        setError(e?.message || "Failed to load performance data");
       } finally {
         setLoading(false);
       }
@@ -119,7 +118,7 @@ export default function CentralityMetrics() {
     return (
       <div className="min-h-[calc(100vh-72px)] bg-slate-50">
         <div className="max-w-7xl mx-auto px-6 py-8">
-          <p className="text-slate-600">Analyzing audience resonance...</p>
+          <p className="text-slate-600">Analyzing your content performance...</p>
         </div>
       </div>
     );
@@ -143,21 +142,26 @@ export default function CentralityMetrics() {
     );
   }
 
-  const MenuItem = ({ icon: Icon, label, view, badge }) => (
+  const MenuItem = ({ icon: Icon, label, view, badge, description }) => (
     <button
       onClick={() => setActiveView(view)}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+      className={`w-full flex flex-col gap-1 px-4 py-3 rounded-lg transition-all text-left ${
         activeView === view
           ? "bg-violet-50 text-violet-700 font-medium"
           : "text-slate-600 hover:bg-slate-50"
       }`}
     >
-      <Icon size={18} />
-      <span className="flex-1 text-left text-sm">{label}</span>
-      {badge && (
-        <span className="bg-violet-100 text-violet-700 text-xs px-2 py-0.5 rounded-full font-medium">
-          {badge}
-        </span>
+      <div className="flex items-center gap-3">
+        <Icon size={18} />
+        <span className="flex-1 text-sm font-medium">{label}</span>
+        {badge && (
+          <span className="bg-violet-100 text-violet-700 text-xs px-2 py-0.5 rounded-full font-medium">
+            {badge}
+          </span>
+        )}
+      </div>
+      {description && (
+        <span className="text-xs text-slate-500 ml-9">{description}</span>
       )}
     </button>
   );
@@ -168,38 +172,69 @@ export default function CentralityMetrics() {
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
-            <Target className="w-7 h-7 text-violet-600" />
+            <BarChart3 className="w-7 h-7 text-violet-600" />
             <h1 className="text-3xl font-bold text-slate-900">
-              Audience Resonance Analyzer
+              Content Performance Insights
             </h1>
           </div>
-          <p className="text-slate-600">
-            Discover which content truly resonates. Get actionable insights for sponsorships and partnerships.
+          <p className="text-slate-600 text-lg">
+            Understand what your audience loves and what brands should sponsor
           </p>
         </div>
 
         <div className="flex gap-6">
           {/* Sidebar */}
-          <div className="w-64 flex flex-col gap-4">
+          <div className="w-72 flex flex-col gap-4">
             {/* Navigation */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
               <h2 className="text-sm font-semibold text-slate-700 px-4 py-2 mb-2">
-                Views
+                Choose What to View
               </h2>
               <div className="space-y-1">
-                <MenuItem icon={BarChart3} label="Overview" view="overview" badge="Start" />
-                <MenuItem icon={Sparkles} label="Sponsorship Intel" view="sponsorship" />
-                <MenuItem icon={Flame} label="Viral Potential" view="viral" />
-                <MenuItem icon={Activity} label="Retention Analysis" view="retention" />
-                <MenuItem icon={Clock} label="Timing Strategy" view="timing" />
-                <MenuItem icon={DollarSign} label="ROI Calculator" view="roi" />
+                <MenuItem 
+                  icon={BarChart3} 
+                  label="Quick Summary" 
+                  view="overview" 
+                  badge="Start Here"
+                  description="See your best content at a glance"
+                />
+                <MenuItem 
+                  icon={Sparkles} 
+                  label="Brand Partnership Opportunities" 
+                  view="sponsorship"
+                  description="What sponsors should know about you"
+                />
+                <MenuItem 
+                  icon={Flame} 
+                  label="Videos Going Viral" 
+                  view="viral"
+                  description="Your most shareable content"
+                />
+                <MenuItem 
+                  icon={Heart} 
+                  label="Audience Loyalty" 
+                  view="retention"
+                  description="Videos people finish watching"
+                />
+                <MenuItem 
+                  icon={Clock} 
+                  label="Best Time to Post" 
+                  view="timing"
+                  description="When your audience is most active"
+                />
+                <MenuItem 
+                  icon={DollarSign} 
+                  label="Sponsorship Value" 
+                  view="roi"
+                  description="What you're worth to brands"
+                />
               </div>
             </div>
 
             {/* Channel Selector */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
               <h3 className="text-sm font-semibold text-slate-700 mb-3">
-                Channel Selection
+                Select Channel
               </h3>
               <select
                 className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
@@ -217,14 +252,14 @@ export default function CentralityMetrics() {
             {/* Quick Stats */}
             {results.length > 0 && results[0]?.data && (
               <div className="bg-gradient-to-br from-violet-600 to-violet-700 rounded-xl shadow-sm p-4 text-white">
-                <div className="text-sm font-medium mb-3">Quick Stats</div>
+                <div className="text-sm font-medium mb-3">At a Glance</div>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-violet-200 text-sm">Channels</span>
+                    <span className="text-violet-200 text-sm">Channels Analyzed</span>
                     <span className="font-semibold">{results.length}</span>
                   </div>
                   <div className="flex justify-between items-center">
-                    <span className="text-violet-200 text-sm">Total Videos</span>
+                    <span className="text-violet-200 text-sm">Videos Reviewed</span>
                     <span className="font-semibold">
                       {results.reduce((sum, r) => sum + (r.data?.channel?.videos_analyzed || 0), 0)}
                     </span>
@@ -290,8 +325,8 @@ export default function CentralityMetrics() {
   );
 }
 
-// Helper Components (must be defined before use)
-function StatCard({ icon, label, value, color = "slate" }) {
+// Helper Components
+function InfoCard({ icon, label, value, helpText, color = "slate" }) {
   const colorClasses = {
     violet: "bg-violet-50 text-violet-700 border-violet-100",
     indigo: "bg-indigo-50 text-indigo-700 border-indigo-100",
@@ -299,50 +334,64 @@ function StatCard({ icon, label, value, color = "slate" }) {
   };
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-4">
+    <div className="rounded-2xl border border-slate-100 bg-white p-5">
       <div
-        className={`inline-flex items-center gap-2 rounded-lg px-2 py-1 ${colorClasses[color]}`}
+        className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 ${colorClasses[color]}`}
       >
         {icon}
         <span className="text-xs font-semibold">{label}</span>
       </div>
-      <p className="mt-3 text-2xl font-bold text-slate-900">{value}</p>
+      <p className="mt-3 text-3xl font-bold text-slate-900">{value}</p>
+      {helpText && <p className="mt-1 text-xs text-slate-500">{helpText}</p>}
     </div>
   );
 }
 
-function SentimentBadge({ icon, label, value, color }) {
+function AudienceReactionBadge({ icon, label, value, color, helpText }) {
   const colorClasses = {
     emerald: "bg-emerald-100 text-emerald-700 border-emerald-200",
     blue: "bg-blue-100 text-blue-700 border-blue-200",
   };
 
   return (
-    <div className={`rounded-xl border p-3 ${colorClasses[color]}`}>
-      <div className="flex items-center gap-1.5">
+    <div className={`rounded-xl border p-4 ${colorClasses[color]}`}>
+      <div className="flex items-center gap-2 mb-1">
         {icon}
         <span className="text-xs font-semibold">{label}</span>
       </div>
-      <p className="mt-1 text-lg font-bold">{value}</p>
+      <p className="text-2xl font-bold mb-1">{value}</p>
+      {helpText && <p className="text-xs opacity-80">{helpText}</p>}
     </div>
   );
 }
 
-function ThemeRow({ rank, theme, count, engagement }) {
+function ContentTypeRow({ rank, theme, count, popularity }) {
   const medals = ["🥇", "🥈", "🥉"];
+  const themeNames = {
+    tutorial: "How-To & Tutorials",
+    review: "Product Reviews",
+    vlog: "Daily Vlogs",
+    challenge: "Challenges & Competitions",
+    listicle: "Top Lists & Rankings",
+    educational: "Educational Content",
+    entertainment: "Entertainment & Fun",
+    news: "News & Updates",
+  };
 
   return (
-    <div className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200 p-3 hover:bg-slate-100 transition-colors">
+    <div className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200 p-4 hover:bg-slate-100 transition-colors">
       <div className="flex items-center gap-3">
-        <span className="text-xl">{medals[rank - 1] || "📊"}</span>
+        <span className="text-2xl">{medals[rank - 1] || "📊"}</span>
         <div>
-          <p className="text-sm font-semibold text-slate-900 capitalize">{theme}</p>
-          <p className="text-xs text-slate-600">{count} videos</p>
+          <p className="text-sm font-semibold text-slate-900">
+            {themeNames[theme] || theme}
+          </p>
+          <p className="text-xs text-slate-600">{count} videos in this category</p>
         </div>
       </div>
       <div className="text-right">
-        <p className="text-sm font-bold text-emerald-700">{engagement.toFixed(2)}%</p>
-        <p className="text-xs text-slate-500">engagement</p>
+        <p className="text-sm font-bold text-emerald-700">{popularity.toFixed(1)}%</p>
+        <p className="text-xs text-slate-500">audience interaction</p>
       </div>
     </div>
   );
@@ -380,29 +429,29 @@ function VideoCard({ video, rank }) {
       </div>
 
       <div className="p-4">
-        <p className="text-sm font-semibold text-slate-900 line-clamp-2 mb-2">
+        <p className="text-sm font-semibold text-slate-900 line-clamp-2 mb-3">
           {video.title}
         </p>
 
         <div className="flex items-center gap-3 text-xs text-slate-600 mb-3">
           <div className="flex items-center gap-1">
             <Eye className="w-3 h-3" />
-            <span>{(video.views || 0).toLocaleString()}</span>
+            <span>{(video.views || 0).toLocaleString()} views</span>
           </div>
           <div className="flex items-center gap-1">
             <ThumbsUp className="w-3 h-3" />
-            <span>{(video.likes || 0).toLocaleString()}</span>
+            <span>{(video.likes || 0).toLocaleString()} likes</span>
           </div>
           <div className="flex items-center gap-1">
             <MessageSquare className="w-3 h-3" />
-            <span>{(video.comments || 0).toLocaleString()}</span>
+            <span>{(video.comments || 0).toLocaleString()} comments</span>
           </div>
         </div>
 
         <div className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2 py-1">
           <TrendingUp className="w-3 h-3 text-emerald-600" />
           <span className="text-xs font-semibold text-emerald-700">
-            {(video.engagement_rate || 0).toFixed(2)}% engagement
+            {(video.engagement_rate || 0).toFixed(2)}% audience interaction
           </span>
         </div>
       </div>
@@ -428,30 +477,36 @@ function OverviewPanel({ title, data }) {
     <section className="space-y-6">
       {/* Channel Stats */}
       <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-slate-900">{title}</h2>
-          <span className="text-xs text-slate-500">
-            {channel.videos_analyzed || 0} videos analyzed
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
+            <p className="text-sm text-slate-500 mt-1">Quick overview of your performance</p>
+          </div>
+          <span className="text-xs text-slate-500 bg-slate-50 px-3 py-1 rounded-full">
+            Based on {channel.videos_analyzed || 0} recent videos
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatCard
+          <InfoCard
             icon={<Users className="w-4 h-4" />}
-            label="Subscribers"
+            label="Your Audience"
             value={(channel.subscribers || 0).toLocaleString()}
+            helpText="People who subscribed to your channel"
             color="violet"
           />
-          <StatCard
+          <InfoCard
             icon={<Eye className="w-4 h-4" />}
-            label="Total Views"
+            label="Total Reach"
             value={(channel.total_views || 0).toLocaleString()}
+            helpText="All-time video views across your channel"
             color="indigo"
           />
-          <StatCard
+          <InfoCard
             icon={<TrendingUp className="w-4 h-4" />}
-            label="Avg Engagement"
+            label="Audience Interaction"
             value={`${(averages.engagement_rate || 0).toFixed(2)}%`}
+            helpText="How many people like, comment, or share"
             color="emerald"
           />
         </div>
@@ -463,15 +518,18 @@ function OverviewPanel({ title, data }) {
         <div className="rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 p-6">
           <div className="flex items-center gap-2 text-emerald-900 mb-4">
             <MessageSquare className="w-5 h-5" />
-            <h3 className="text-base font-semibold">Audience Sentiment</h3>
+            <h3 className="text-base font-semibold">How Your Audience Feels</h3>
           </div>
+          <p className="text-sm text-emerald-800 mb-4">
+            Based on comments and reactions from your viewers
+          </p>
 
           <div className="space-y-3">
             <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-emerald-100 p-4">
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-slate-700">Sentiment Score</span>
+                <span className="text-sm text-slate-700">Overall Mood</span>
                 <span className="text-xl font-bold text-emerald-700">
-                  {(sentiment.sentiment_score || 0).toFixed(1)}
+                  {(sentiment.sentiment_score || 0) > 0 ? "Positive 😊" : "Neutral 😐"}
                 </span>
               </div>
               <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
@@ -482,20 +540,25 @@ function OverviewPanel({ title, data }) {
                   }}
                 />
               </div>
+              <p className="text-xs text-slate-500 mt-2">
+                The more positive, the better your content resonates
+              </p>
             </div>
 
             <div className="grid grid-cols-2 gap-3">
-              <SentimentBadge
+              <AudienceReactionBadge
                 icon={<ThumbsUp className="w-3 h-3" />}
-                label="Positive"
+                label="Happy Viewers"
                 value={sentiment.positive_count || 0}
                 color="emerald"
+                helpText="Positive comments"
               />
-              <SentimentBadge
+              <AudienceReactionBadge
                 icon={<MessageSquare className="w-3 h-3" />}
-                label="Questions"
+                label="Curious Viewers"
                 value={sentiment.question_count || 0}
                 color="blue"
+                helpText="People asking questions"
               />
             </div>
           </div>
@@ -504,21 +567,24 @@ function OverviewPanel({ title, data }) {
         {/* Top Themes */}
         <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
           <div className="flex items-center gap-2 text-slate-900 mb-4">
-            <BarChart3 className="w-5 h-5" />
-            <h3 className="text-base font-semibold">Top Content Themes</h3>
+            <Star className="w-5 h-5" />
+            <h3 className="text-base font-semibold">Your Most Popular Content Types</h3>
           </div>
+          <p className="text-sm text-slate-600 mb-4">
+            What your audience engages with the most
+          </p>
 
           {topThemes.length === 0 ? (
-            <p className="text-sm text-slate-500">No themes identified</p>
+            <p className="text-sm text-slate-500">Not enough data yet - keep creating!</p>
           ) : (
             <div className="space-y-3">
               {topThemes.map(([theme, data], idx) => (
-                <ThemeRow
+                <ContentTypeRow
                   key={theme}
                   rank={idx + 1}
                   theme={theme}
                   count={data.count}
-                  engagement={data.avg_engagement}
+                  popularity={data.avg_engagement}
                 />
               ))}
             </div>
@@ -530,11 +596,14 @@ function OverviewPanel({ title, data }) {
       <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
         <div className="flex items-center gap-2 text-slate-900 mb-4">
           <Award className="w-5 h-5" />
-          <h3 className="text-base font-semibold">Top Performing Videos</h3>
+          <h3 className="text-base font-semibold">Your Star Performers</h3>
         </div>
+        <p className="text-sm text-slate-600 mb-4">
+          Videos that got the most love from your audience
+        </p>
 
         {topPerformers.length === 0 ? (
-          <p className="text-sm text-slate-500">No data</p>
+          <p className="text-sm text-slate-500">No data available</p>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {topPerformers.slice(0, 6).map((video, idx) => (
@@ -554,13 +623,20 @@ function SponsorshipPanel({ title, data }) {
 
   return (
     <section className="rounded-2xl bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-100 p-6">
-      <div className="flex items-center gap-2 text-violet-900 mb-6">
+      <div className="flex items-center gap-2 text-violet-900 mb-4">
         <Sparkles className="w-6 h-6" />
-        <h2 className="text-xl font-semibold">{title} - Sponsorship Intelligence</h2>
+        <h2 className="text-xl font-semibold">{title} - Why Brands Should Work With You</h2>
       </div>
+      <p className="text-violet-800 mb-6">
+        Key insights that make you attractive to sponsors and advertisers
+      </p>
 
       {insights.length === 0 ? (
-        <p className="text-sm text-violet-700">Analyzing patterns...</p>
+        <div className="rounded-xl bg-white/80 p-6 text-center">
+          <Sparkles className="w-12 h-12 mx-auto text-violet-300 mb-3" />
+          <p className="text-sm text-violet-700">Building your sponsorship profile...</p>
+          <p className="text-xs text-violet-600 mt-1">Keep creating great content!</p>
+        </div>
       ) : (
         <>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -571,13 +647,13 @@ function SponsorshipPanel({ title, data }) {
               >
                 <div className="flex items-start justify-between gap-3 mb-3">
                   <div className="flex-1">
-                    <p className="text-sm font-semibold text-slate-900 mb-1">
+                    <p className="text-sm font-semibold text-slate-900 mb-2">
                       {insight.title}
                     </p>
-                    <p className="text-xs text-slate-600">{insight.description}</p>
+                    <p className="text-xs text-slate-600 leading-relaxed">{insight.description}</p>
                   </div>
                   <div className="text-right flex-shrink-0">
-                    <p className="text-lg font-bold text-violet-700">{insight.value}</p>
+                    <p className="text-2xl font-bold text-violet-700">{insight.value}</p>
                     <p className="text-xs text-violet-600">{insight.metric}</p>
                   </div>
                 </div>
@@ -588,9 +664,9 @@ function SponsorshipPanel({ title, data }) {
           <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-violet-100 p-5">
             <div className="flex items-center gap-2 mb-4">
               <Lightbulb className="w-5 h-5 text-violet-600" />
-              <h3 className="text-sm font-semibold text-slate-900">Recommendations</h3>
+              <h3 className="text-sm font-semibold text-slate-900">What This Means for Sponsors</h3>
             </div>
-            <ul className="space-y-2">
+            <ul className="space-y-3">
               {recommendations.map((rec, idx) => (
                 <li key={idx} className="flex items-start gap-3">
                   <CheckCircle2 className="w-4 h-4 text-violet-600 mt-0.5 flex-shrink-0" />
@@ -611,17 +687,20 @@ function ViralPanel({ title, data }) {
 
   return (
     <section className="rounded-2xl bg-gradient-to-br from-orange-50 to-red-50 border border-orange-100 p-6">
-      <div className="flex items-center gap-2 text-orange-900 mb-6">
+      <div className="flex items-center gap-2 text-orange-900 mb-4">
         <Flame className="w-6 h-6" />
-        <h2 className="text-xl font-semibold">{title} - Viral Potential Analysis</h2>
+        <h2 className="text-xl font-semibold">{title} - Videos That Could Go Viral</h2>
       </div>
+      <p className="text-orange-800 mb-6">
+        Content with high sharing potential and explosive growth patterns
+      </p>
 
       {viralCandidates.length === 0 ? (
         <div className="rounded-xl bg-white/80 p-6 text-center">
           <Flame className="w-12 h-12 mx-auto text-orange-300 mb-3" />
-          <p className="text-sm text-slate-600">No viral candidates identified yet</p>
+          <p className="text-sm text-slate-600">No viral patterns detected yet</p>
           <p className="text-xs text-slate-500 mt-1">
-            Keep creating engaging content to unlock viral potential
+            Keep creating engaging content - viral moments can happen anytime!
           </p>
         </div>
       ) : (
@@ -630,17 +709,17 @@ function ViralPanel({ title, data }) {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-slate-900">
-                  Videos with Viral Characteristics
+                  Videos Showing Viral Characteristics
                 </p>
                 <p className="text-xs text-slate-600 mt-1">
-                  High engagement ratios and exponential growth patterns
+                  High sharing rate and exceptional audience response
                 </p>
               </div>
               <div className="text-right">
                 <p className="text-3xl font-bold text-orange-600">
                   {viralCandidates.length}
                 </p>
-                <p className="text-xs text-slate-500">candidates</p>
+                <p className="text-xs text-slate-500">hot videos</p>
               </div>
             </div>
           </div>
@@ -663,7 +742,7 @@ function ViralPanel({ title, data }) {
                       {video.title}
                     </p>
 
-                    <div className="grid grid-cols-3 gap-2 text-xs mb-2">
+                    <div className="grid grid-cols-3 gap-2 text-xs mb-3">
                       <div>
                         <p className="text-slate-500">Views</p>
                         <p className="font-semibold text-slate-900">
@@ -677,7 +756,7 @@ function ViralPanel({ title, data }) {
                         </p>
                       </div>
                       <div>
-                        <p className="text-slate-500">Comment Rate</p>
+                        <p className="text-slate-500">Comments</p>
                         <p className="font-semibold text-blue-600">
                           {video.comment_ratio.toFixed(2)}%
                         </p>
@@ -685,9 +764,9 @@ function ViralPanel({ title, data }) {
                     </div>
 
                     <div className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-orange-100 to-red-100 px-2 py-1">
-                      <Zap className="w-3 h-3 text-orange-600" />
+                      <Share2 className="w-3 h-3 text-orange-600" />
                       <span className="text-xs font-semibold text-orange-700">
-                        Viral Score: {video.viral_score.toFixed(1)}
+                        Viral Score: {video.viral_score.toFixed(1)}/10
                       </span>
                     </div>
                   </div>
@@ -708,38 +787,47 @@ function RetentionPanel({ title, data }) {
 
   return (
     <section className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-6">
-      <div className="flex items-center gap-2 text-blue-900 mb-6">
-        <Activity className="w-6 h-6" />
-        <h2 className="text-xl font-semibold">{title} - Retention Analysis</h2>
+      <div className="flex items-center gap-2 text-blue-900 mb-4">
+        <Heart className="w-6 h-6" />
+        <h2 className="text-xl font-semibold">{title} - Audience Loyalty</h2>
       </div>
+      <p className="text-blue-800 mb-6">
+        Videos that keep people watching and engaging throughout
+      </p>
 
       <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-blue-100 p-5 mb-6">
         <div className="flex items-center justify-between">
           <div>
             <p className="text-sm font-semibold text-slate-900">
-              Average Retention Score
+              Average Loyalty Score
             </p>
             <p className="text-xs text-slate-600 mt-1">
-              Based on engagement depth (likes + comments weighted)
+              How well your videos hold people's attention (higher is better)
             </p>
           </div>
           <div className="text-right">
             <p className="text-3xl font-bold text-blue-600">{avgScore.toFixed(2)}%</p>
-            <p className="text-xs text-slate-500">retention proxy</p>
+            <p className="text-xs text-slate-500">viewer loyalty</p>
           </div>
         </div>
       </div>
 
       {highRetention.length === 0 ? (
         <div className="rounded-xl bg-white/80 p-6 text-center">
-          <Activity className="w-12 h-12 mx-auto text-blue-300 mb-3" />
-          <p className="text-sm text-slate-600">No high-retention videos identified</p>
+          <Heart className="w-12 h-12 mx-auto text-blue-300 mb-3" />
+          <p className="text-sm text-slate-600">No standout loyalty videos yet</p>
+          <p className="text-xs text-slate-500 mt-1">
+            Keep creating content that keeps people engaged!
+          </p>
         </div>
       ) : (
         <div className="space-y-3">
           <h3 className="text-sm font-semibold text-slate-900">
-            High Retention Videos ({highRetention.length})
+            Videos People Love to Watch ({highRetention.length})
           </h3>
+          <p className="text-xs text-slate-600 mb-3">
+            These videos kept viewers engaged from start to finish
+          </p>
           {highRetention.map((video, idx) => (
             <div
               key={video.id}
@@ -758,15 +846,15 @@ function RetentionPanel({ title, data }) {
                   </p>
 
                   <div className="flex items-center gap-4 text-xs text-slate-600 mb-2">
-                    <span>Views: {video.views.toLocaleString()}</span>
-                    <span>Likes: {video.likes.toLocaleString()}</span>
-                    <span>Comments: {video.comments.toLocaleString()}</span>
+                    <span>{video.views.toLocaleString()} views</span>
+                    <span>{video.likes.toLocaleString()} likes</span>
+                    <span>{video.comments.toLocaleString()} comments</span>
                   </div>
 
                   <div className="inline-flex items-center gap-1.5 rounded-lg bg-blue-100 px-2 py-1">
-                    <Activity className="w-3 h-3 text-blue-600" />
+                    <Heart className="w-3 h-3 text-blue-600" />
                     <span className="text-xs font-semibold text-blue-700">
-                      Retention: {video.retention_score.toFixed(2)}%
+                      Loyalty: {video.retention_score.toFixed(2)}%
                     </span>
                   </div>
                 </div>
@@ -796,15 +884,21 @@ function TimingPanel({ title, data }) {
 
   return (
     <section className="rounded-2xl bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-100 p-6">
-      <div className="flex items-center gap-2 text-amber-900 mb-6">
+      <div className="flex items-center gap-2 text-amber-900 mb-4">
         <Clock className="w-6 h-6" />
-        <h2 className="text-xl font-semibold">{title} - Timing Strategy</h2>
+        <h2 className="text-xl font-semibold">{title} - Best Time to Post</h2>
       </div>
+      <p className="text-amber-800 mb-6">
+        When your audience is most active and engaged with your content
+      </p>
 
       {chartData.length === 0 ? (
         <div className="rounded-xl bg-white/80 p-6 text-center">
           <Calendar className="w-12 h-12 mx-auto text-amber-300 mb-3" />
-          <p className="text-sm text-slate-600">Not enough data to analyze timing</p>
+          <p className="text-sm text-slate-600">Not enough data to find patterns yet</p>
+          <p className="text-xs text-slate-500 mt-1">
+            Post consistently and we'll find your best posting times!
+          </p>
         </div>
       ) : (
         <>
@@ -812,12 +906,12 @@ function TimingPanel({ title, data }) {
             <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-amber-100 p-5 mb-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">Best Day to Post</p>
+                  <p className="text-sm font-semibold text-slate-900">Your Best Day to Upload</p>
                   <p className="text-xs text-slate-600 mt-1">{timing.recommendation}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-3xl font-bold text-amber-600">{bestDay}</p>
-                  <p className="text-xs text-slate-500">highest performance</p>
+                  <p className="text-xs text-slate-500">most engagement</p>
                 </div>
               </div>
             </div>
@@ -827,6 +921,9 @@ function TimingPanel({ title, data }) {
             <h3 className="text-sm font-semibold text-slate-900 mb-4">
               Performance by Day of Week
             </h3>
+            <p className="text-xs text-slate-600 mb-4">
+              Days ranked by how much your audience interacts with your videos
+            </p>
             <div className="space-y-3">
               {chartData
                 .sort((a, b) => b.engagement - a.engagement)
@@ -835,7 +932,7 @@ function TimingPanel({ title, data }) {
                     <div className="flex items-center justify-between mb-1">
                       <span className="text-sm font-medium text-slate-900">{item.day}</span>
                       <span className="text-xs text-slate-600">
-                        {item.engagement.toFixed(2)}% engagement · {item.count} videos
+                        {item.engagement.toFixed(2)}% interaction · {item.count} videos posted
                       </span>
                     </div>
                     <div className="h-2 bg-amber-100 rounded-full overflow-hidden">
@@ -863,40 +960,51 @@ function ROIPanel({ title, data }) {
 
   return (
     <section className="rounded-2xl bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-100 p-6">
-      <div className="flex items-center gap-2 text-emerald-900 mb-6">
+      <div className="flex items-center gap-2 text-emerald-900 mb-4">
         <DollarSign className="w-6 h-6" />
-        <h2 className="text-xl font-semibold">{title} - ROI Calculator</h2>
+        <h2 className="text-xl font-semibold">{title} - Your Value to Sponsors</h2>
       </div>
+      <p className="text-emerald-800 mb-6">
+        What your channel is worth to brands and advertisers
+      </p>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
         <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-emerald-100 p-5">
-          <p className="text-sm font-semibold text-slate-900 mb-2">CPE (Cost Per Engagement)</p>
+          <p className="text-sm font-semibold text-slate-900 mb-2">Cost Per Interaction</p>
           <p className="text-2xl font-bold text-emerald-700">
             ${metrics.cpe ? metrics.cpe.toFixed(2) : "N/A"}
           </p>
-          <p className="text-xs text-slate-500 mt-1">Lower is better</p>
+          <p className="text-xs text-slate-500 mt-1">
+            How much sponsors pay for each like/comment (lower = better value)
+          </p>
         </div>
 
         <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-emerald-100 p-5">
-          <p className="text-sm font-semibold text-slate-900 mb-2">Potential ROI</p>
+          <p className="text-sm font-semibold text-slate-900 mb-2">Sponsor Return Multiplier</p>
           <p className="text-2xl font-bold text-emerald-700">
             {metrics.roi_potential ? `${metrics.roi_potential.toFixed(1)}x` : "N/A"}
           </p>
-          <p className="text-xs text-slate-500 mt-1">Estimated return</p>
+          <p className="text-xs text-slate-500 mt-1">
+            For every $1 invested, sponsors could get back this much
+          </p>
         </div>
 
         <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-emerald-100 p-5">
-          <p className="text-sm font-semibold text-slate-900 mb-2">Value Score</p>
+          <p className="text-sm font-semibold text-slate-900 mb-2">Overall Value Rating</p>
           <p className="text-2xl font-bold text-emerald-700">
             {metrics.value_score ? metrics.value_score.toFixed(1) : "N/A"}/10
           </p>
-          <p className="text-xs text-slate-500 mt-1">Overall value rating</p>
+          <p className="text-xs text-slate-500 mt-1">
+            How attractive you are to potential sponsors
+          </p>
         </div>
       </div>
 
       {recommendations.length > 0 && (
         <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-emerald-100 p-5">
-          <h3 className="text-sm font-semibold text-slate-900 mb-4">Investment Recommendations</h3>
+          <h3 className="text-sm font-semibold text-slate-900 mb-4">
+            Why Brands Should Invest in You
+          </h3>
           <ul className="space-y-2">
             {recommendations.map((rec, idx) => (
               <li key={idx} className="flex items-start gap-3">
