@@ -339,9 +339,13 @@ export default function BusinessDashboard() {
 
             <div className="flex items-center gap-3">
               {options.length === 0 ? (
-                <Link to="/business/profile" className="text-sm font-semibold text-blue-600 hover:underline">
-                  Go link channels
-                </Link>
+                <Link
+                to="/businessprofile"
+                state={{ section: "linkChannel" }}
+                className="text-sm font-semibold text-blue-600 hover:underline"
+              >
+                Go link channels
+              </Link>
               ) : (
                 <select
                   className="rounded-lg border border-slate-200 px-3 py-2 text-sm"
@@ -421,7 +425,7 @@ export default function BusinessDashboard() {
               <Panel title="Quick Actions">
                 <div className="space-y-2">
                   <Link
-                    to="/business/profile"
+                    to="/businessprofile"
                     className="block rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-900 hover:bg-slate-50"
                   >
                     Manage linked channels
