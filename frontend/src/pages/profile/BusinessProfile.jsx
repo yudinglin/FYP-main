@@ -769,14 +769,14 @@ function SubscriptionSection({
                 ${plan.price_monthly.toFixed(2)}
               </span>
             </div>
-            <div className="flex justify-between items-center py-2 border-b border-slate-100">
+            {/* <div className="flex justify-between items-center py-2 border-b border-slate-100">
               <span className="text-sm text-slate-600">Max Channels:</span>
               <span className="text-sm font-semibold text-slate-900">{plan.max_channels}</span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-slate-100">
               <span className="text-sm text-slate-600">Max Saved Graphs:</span>
               <span className="text-sm font-semibold text-slate-900">{plan.max_saved_graphs}</span>
-            </div>
+            </div> */}
             <div className="flex justify-between items-center py-2">
               <span className="text-sm text-slate-600">Start Date:</span>
               <span className="text-sm font-semibold text-slate-900">
@@ -853,7 +853,7 @@ function SubscriptionSection({
         <section className="rounded-2xl bg-white shadow-sm border border-red-200 p-6 space-y-4 mb-6">
           <h2 className="text-lg font-semibold text-red-700">Cancel Subscription</h2>
           <p className="text-sm text-slate-600">
-            Cancelling your subscription will end your access to premium features. You will be logged out and become an unregistered user.
+            Cancelling your subscription will end your access to premium features. You will be logged out.
           </p>
 
           {!showCancelConfirm ? (
@@ -900,10 +900,10 @@ function SubscriptionSection({
                 className="flex justify-between items-center py-3 border-b border-slate-100 last:border-0"
               >
                 <div>
-                  <p className="text-sm font-semibold text-slate-900">
+                  {/* <p className="text-sm font-semibold text-slate-900">
                     Payment #{payment.payment_id}
-                  </p>
-                  <p className="text-xs text-slate-500">
+                  </p> */}
+                  <p className="text-sm text-slate-900">
                     {new Date(payment.payment_date).toLocaleDateString()}
                   </p>
                 </div>
