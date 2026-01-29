@@ -219,6 +219,39 @@ export default function PaymentPage() {
               <span className="text-lg font-normal text-gray-600">/mo</span>
             </div>
 
+          {/* Free Trial Notice - Neutral Theme */}
+          <div className="flex items-start bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-2xl p-5 mb-6 shadow-sm">
+            {/* Icon */}
+            <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-gray-200 rounded-full mr-4">
+              <svg
+                className="w-6 h-6 text-gray-700"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
+            </div>
+
+            {/* Text Content */}
+            <div>
+              <p className="text-lg font-semibold text-gray-900 mb-1">
+                Free Trial Offer
+              </p>
+              <p className="text-sm text-gray-700">
+                Enjoy your first <span className="font-medium">30 days completely free</span>. 
+                Billing starts on day 31. Cancel anytime before then with no charges.
+              </p>
+            </div>
+          </div>
+
+
             <h4 className="font-semibold mb-3">Features:</h4>
             <ul className="space-y-2">
               {selectedPlan.features.map((feature, index) => (
