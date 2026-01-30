@@ -88,3 +88,99 @@ def video_correlation_network():
         ].to_dict(orient="records")
 
     }), 200
+
+@video_corr_bp.route("/videos.similarityNetwork", methods=["GET"])
+def video_similarity_network():
+    """Build a *star* network: one center video + top-K similar videos."""
+    url_or_id = request.args.get("url")
+    center_video_id = request.args.get("videoId")
+
+    if not url_or_id:
+        return jsonify({"error": "Missing url"}), 400
+    if not center_video_id:
+        return jsonify({"error": "Missing videoId"}), 400
+
+    channel_id = extract_channel_id(url_or_id)
+    if not channel_id:
+        return jsonify({"error": "Invalid channel URL or ID"}), 400
+
+    try:
+        top_k = int(request.args.get("topK", "25"))
+    except ValueError:
+        top_k = 25
+    top_k = max(1, min(top_k, 500))
+
+    try:
+        pool_max = int(request.args.get("poolMax", "500"))
+    except ValueError:
+        pool_max = 500
+    pool_max = max(2, min(pool_max, 2000))
+
+    # Optional threshold
+    try:
+        threshold = float(request.args.get("threshold", "-1"))
+    except ValueError:
+        threshold = -1
+
+    basic = fetch_basic_channel_stats(channel_id)
+    if not basic:
+        return jsonify({"error": "Channel not found"}), 404
+
+    playlist_id = basic["uploadsPlaylistId"]
+    video_ids = fetch_video_ids(playlist_id, pool_max)
+    if not video_ids:
+        return jsonify({"nodes": [], "edges": [], "rawMetrics": []}), 200
+
+    if center_video_id not in video_ids:
+        video_ids = [center_video_id] + video_ids
+
+    videos = fetch_video_stats(video_ids, with_snippet=True)
+    df = pd.DataFrame(videos)
+    if df.empty:
+        return jsonify({"nodes": [], "edges": [], "rawMetrics": []}), 200
+
+    metric_cols = ["views", "likes", "comments"]
+    df[metric_cols] = df[metric_cols].astype(float)
+
+    center_rows = df[df["id"] == center_video_id]
+    if center_rows.empty:
+        return jsonify({"error": "Center video not found in fetched data"}), 404
+
+    center_vec = center_rows.iloc[0][metric_cols]
+
+    similarities = []
+    for _, row in df.iterrows():
+        vid = row.get("id")
+        if not vid or vid == center_video_id:
+            continue
+        r = pd.Series(row[metric_cols]).corr(pd.Series(center_vec), method="pearson")
+        if pd.isna(r):
+            continue
+        r = float(r)
+        if threshold >= 0 and r < threshold:
+            continue
+        similarities.append((vid, r))
+
+    similarities.sort(key=lambda x: x[1], reverse=True)
+    top = similarities[:top_k]
+
+    top_ids = [center_video_id] + [vid for vid, _ in top]
+    df_sub = df[df["id"].isin(top_ids)].copy()
+    df_sub["isCenter"] = df_sub["id"] == center_video_id
+
+    edges = [
+        {"source": center_video_id, "target": vid, "weight": round(weight, 3)}
+        for vid, weight in top
+    ]
+
+    nodes = df_sub[
+        ["id", "title", "publishedAt", "views", "likes", "comments", "thumbnail", "isCenter"]
+    ].to_dict(orient="records")
+
+    return jsonify({
+        "nodes": nodes,
+        "edges": edges,
+        "rawMetrics": df_sub[
+            ["id", "title", "views", "likes", "comments", "publishedAt", "thumbnail", "isCenter"]
+        ].to_dict(orient="records"),
+    }), 200

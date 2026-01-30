@@ -71,17 +71,48 @@ def fetch_basic_channel_stats(channel_id: str):
 # tablee video ID from uploads playlist
 
 def fetch_video_ids(playlist_id: str, max_videos: int = 50):
-    params = {
-        "part": "contentDetails",
-        "playlistId": playlist_id,
-        "maxResults": max_videos,
-    }
+    """Fetch up to max_videos videoIds from a channel uploads playlist.
 
-    pl_data = youtube_get("playlistItems", params)
-    return [
-        item["contentDetails"]["videoId"]
-        for item in pl_data.get("items", [])
-    ]
+    NOTE: YouTube Data API playlistItems maxResults is 50, so we must paginate.
+    """
+    if not playlist_id:
+        return []
+
+    try:
+        max_videos = int(max_videos)
+    except Exception:
+        max_videos = 50
+
+    if max_videos <= 0:
+        return []
+
+    video_ids = []
+    page_token = None
+
+    while len(video_ids) < max_videos:
+        remaining = max_videos - len(video_ids)
+        params = {
+            "part": "contentDetails",
+            "playlistId": playlist_id,
+            "maxResults": min(50, remaining),
+        }
+        if page_token:
+            params["pageToken"] = page_token
+
+        pl_data = youtube_get("playlistItems", params)
+
+        for item in pl_data.get("items", []):
+            vid = item.get("contentDetails", {}).get("videoId")
+            if vid:
+                video_ids.append(vid)
+            if len(video_ids) >= max_videos:
+                break
+
+        page_token = pl_data.get("nextPageToken")
+        if not page_token:
+            break
+
+    return video_ids
 
 
 # Retrieve statistical information based on videoIds (shared with videos.list and similarity analysis)

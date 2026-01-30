@@ -11,7 +11,6 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
-  LabelList,
 } from "recharts";
 import { useAuth } from "../../core/context/AuthContext";
 import { 
@@ -97,6 +96,11 @@ export default function NetworkGraphBusiness() {
   const fgRef = useRef();
   const containerRef = useRef();
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+
+  // Center video (Graph tab only)
+  const [centerInput, setCenterInput] = useState("");
+  const [centerVideoId, setCenterVideoId] = useState("");
+
 
   // --------- resize graph container ---------
   useEffect(() => {
@@ -329,9 +333,23 @@ export default function NetworkGraphBusiness() {
   };
 
   const getNodeSize = (views) => {
-    if (!views) return 4;
-    return 4 + Math.log10(views + 1) * 1.4;
+    const v = Number(views) || 0;
+    return Math.min(10, 2.6 + Math.log10(v + 1) * 1.05);
   };
+
+
+  const resolveCenterVideoId = (value) => {
+    if (!value) return "";
+    // try match "... — <id>" or last 11-char youtube id or prefixed "<idx>:<id>"
+    const m = String(value).match(/([0-9]+:[A-Za-z0-9_-]{11}|[A-Za-z0-9_-]{11})\s*$/);
+    return m ? m[1] : "";
+  };
+
+  const getChannelLabelByUrl = (url) => {
+    const c = channels.find((x) => x.url === url);
+    return c?.name || "Channel";
+  };
+
 
   const nodeTooltip = (node) => {
     const title = node.title || node.name || node.id;
@@ -372,6 +390,74 @@ export default function NetworkGraphBusiness() {
     const sorted = [...scatterData].sort((a, b) => (b[barMetric] || 0) - (a[barMetric] || 0));
     return sorted.slice(0, 10);
   }, [scatterData, barMetric]);
+
+  const displayGraphData = useMemo(() => {
+  // Only rewrite graph when in "graph" view
+  if (activeView !== "graph") return { nodes: graphData.nodes, links: graphData.links };
+
+  const metrics = graphData.rawMetrics || [];
+  if (metrics.length === 0) return { nodes: [], links: [] };
+
+  // pick center
+  const centerId = centerVideoId || resolveCenterVideoId(centerInput) || metrics[0]?.id;
+  const center = metrics.find((m) => m.id === centerId) || metrics[0];
+  if (!center) return { nodes: [], links: [] };
+
+  const vec = (m) => {
+    const v = Math.log1p(Number(m.views) || 0);
+    const l = Math.log1p(Number(m.likes) || 0);
+    const c = Math.log1p(Number(m.comments) || 0);
+    const norm = Math.sqrt(v * v + l * l + c * c) || 1;
+    return [v / norm, l / norm, c / norm];
+  };
+
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+
+  const centerVec = vec(center);
+
+  // score all candidates (exclude center)
+  const scored = metrics
+    .filter((m) => m.id !== center.id)
+    .map((m) => ({ m, sim: dot(centerVec, vec(m)) }))
+    .sort((a, b) => b.sim - a.sim);
+
+  const k = Math.max(1, Math.min(500, Number(maxVideos) || 25)); // you already clamp input elsewhere
+  const top = scored.slice(0, k);
+
+  // nodes for ForceGraph2D should include views/likes/comments/title/engagementRate etc.
+  const toNode = (m, isCenter = false) => ({
+    id: m.id,
+    _rawId: m._rawId ?? m.id,
+    _channelUrl: m._channelUrl,
+    title: m.title || m._rawId || m.id,
+    name: m.title || m._rawId || m.id,
+    thumbnail: m.thumbnail,
+    views: Number(m.views) || 0,
+    likes: Number(m.likes) || 0,
+    comments: Number(m.comments) || 0,
+    engagementRate:
+      (Number(m.views) || 0) > 0
+        ? (Number(m.likes) + Number(m.comments)) / Number(m.views)
+        : 0,
+    isCenter,
+  });
+
+  const nodes = [toNode(center, true), ...top.map((x) => toNode(x.m, false))];
+
+  const links = top.map((x) => ({
+    source: center.id,
+    target: x.m.id,
+    weight: x.sim,
+  }));
+
+  // keep center input synced (optional but makes UI feel “selected”)
+  if (!centerVideoId) {
+    // don't set state here (avoid setState in memo). you can sync in useEffect if you want.
+  }
+
+  return { nodes, links };
+}, [activeView, graphData, centerVideoId, centerInput, maxVideos]);
+
 
   // --------- render ---------
   return (
@@ -427,6 +513,49 @@ export default function NetworkGraphBusiness() {
                     ))}
                   </select>
                 </div>
+
+                {/* Center Video (only for Network Graph) */}
+                <div className={`${activeView !== "graph" ? "opacity-50" : ""}`}>
+                  <label className="text-sm text-slate-600 block mb-2">Center Video</label>
+
+                  <input
+                    type="text"
+                    list="business-center-video-list"
+                    value={centerInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCenterInput(val);
+                      const id = resolveCenterVideoId(val);
+                      if (id) setCenterVideoId(id);
+                    }}
+                    onBlur={() => {
+                      const id = resolveCenterVideoId(centerInput);
+                      if (id) setCenterVideoId(id);
+                    }}
+                    disabled={activeView !== "graph" || graphData.rawMetrics.length === 0}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
+                    placeholder={
+                      graphData.rawMetrics.length === 0
+                        ? "Run Analyze Videos first"
+                        : "Search video title..."
+                    }
+                  />
+
+                  <datalist id="business-center-video-list">
+                    {(graphData.rawMetrics || []).map((v) => {
+                      const ch = v._channelUrl ? getChannelLabelByUrl(v._channelUrl) : "";
+                      const label = ch ? `[${ch}] ${v.title || v._rawId || v.id}` : (v.title || v._rawId || v.id);
+                      return <option key={v.id} value={`${label} — ${v.id}`} />;
+                    })}
+                  </datalist>
+
+                  <p className="text-xs text-slate-500 mt-1">
+                    {activeView !== "graph"
+                      ? "Center video is only required for Network Graph."
+                      : "Pick a video; it will be the center node (ALL channels supported)."}
+                  </p>
+                </div>
+
 
                 {/* Video Count Input */}
                 <div>
@@ -517,7 +646,7 @@ export default function NetworkGraphBusiness() {
         {/* Summary */}
         {activeView === "summary" && (
           <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-            {graphData.nodes.length === 0 ? (
+            {displayGraphData.nodes.length === 0 ? (
               <div className="flex items-center justify-center h-72">
                 <div className="text-center text-slate-600">
                   <Network className="mx-auto text-slate-300 mb-4" size={64} />
@@ -569,7 +698,7 @@ export default function NetworkGraphBusiness() {
                           <div className="text-sm text-slate-500">Click "Analyze Videos" to generate the network</div>
                         </div>
                       </div>
-                    ) : graphData.nodes.length > 0 && graphData.links.length === 0 ? (
+                    ) : graphData.nodes.length > 0 && displayGraphData.links.length === 0 ? (
                       <div className="h-full flex items-center justify-center bg-amber-50 rounded-lg border border-amber-200">
                         <div className="text-center max-w-md p-6">
                           <AlertCircle className="mx-auto text-amber-600 mb-4" size={48} />
@@ -609,7 +738,7 @@ export default function NetworkGraphBusiness() {
 
                         <ForceGraph2D
                           ref={fgRef}
-                          graphData={{ nodes: graphData.nodes, links: graphData.links }}
+                          graphData={displayGraphData}
                           width={containerSize.width}
                           height={containerSize.height}
                           nodeLabel={nodeTooltip}
@@ -792,21 +921,20 @@ export default function NetworkGraphBusiness() {
 
                               <div className="h-[420px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                  <BarChart data={channelBarData} margin={{ top: 10, right: 20, bottom: 20, left: 10 }}>
+                                  <BarChart data={channelBarData} margin={{ top: 10, right: 20, bottom: 120, left: 10 }}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis
                                       dataKey="title"
-                                      tick={{ fontSize: 11 }}
+                                      tick={{ fontSize: 10 }}
                                       interval={0}
-                                      angle={-15}
+                                      angle={-45}
                                       textAnchor="end"
-                                      height={80}
+                                      height={100}
+                                      tickFormatter={(value) => truncate(value, 16)}
                                     />
                                     <YAxis tick={{ fontSize: 12 }} />
                                     <Tooltip formatter={(value) => formatNum(value)} labelFormatter={(label) => label} />
-                                    <Bar dataKey={barMetric} fill={isPrimary ? "#4f46e5" : "#10b981"} radius={[8, 8, 0, 0]}>
-                                      <LabelList dataKey={barMetric} position="top" formatter={(v) => formatNum(v)} />
-                                    </Bar>
+                                    <Bar dataKey={barMetric} fill={isPrimary ? "#4f46e5" : "#10b981"} radius={[8, 8, 0, 0]} />
                                   </BarChart>
                                 </ResponsiveContainer>
                               </div>
@@ -868,21 +996,20 @@ export default function NetworkGraphBusiness() {
 
                       <div className="h-[420px] mt-4">
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={barData} margin={{ top: 10, right: 20, bottom: 20, left: 10 }}>
+                          <BarChart data={barData} margin={{ top: 10, right: 20, bottom: 120, left: 10 }}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
                               dataKey="title"
-                              tick={{ fontSize: 11 }}
+                              tick={{ fontSize: 10 }}
                               interval={0}
-                              angle={-15}
+                              angle={-45}
                               textAnchor="end"
-                              height={80}
+                              height={100}
+                              tickFormatter={(value) => truncate(value, 16)}
                             />
                             <YAxis tick={{ fontSize: 12 }} />
                             <Tooltip formatter={(value) => formatNum(value)} labelFormatter={(label) => label} />
-                            <Bar dataKey={barMetric} fill="#10b981" radius={[8, 8, 0, 0]}>
-                              <LabelList dataKey={barMetric} position="top" formatter={(v) => formatNum(v)} />
-                            </Bar>
+                            <Bar dataKey={barMetric} fill="#10b981" radius={[8, 8, 0, 0]} />
                           </BarChart>
                         </ResponsiveContainer>
                       </div>

@@ -19,6 +19,7 @@ import { Lightbulb, TrendingUp, MessageSquare, BarChart3, Network, AlertCircle }
 const API_BASE = "http://127.0.0.1:5000";
 
 export default function NetworkGraph() {
+  // In "focus" mode, maxVideos = number of similar nodes (excluding the center video)
   const [maxVideos, setMaxVideos] = useState(25);
   const [graphData, setGraphData] = useState({ nodes: [], links: [], rawMetrics: [] });
   const [loading, setLoading] = useState(false);
@@ -30,6 +31,16 @@ export default function NetworkGraph() {
   const [activeView, setActiveView] = useState("summary");
   const [videoInput, setVideoInput] = useState("25");
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+
+  // --- Focus mode (pick 1 video as center) ---
+  // Video catalog for search/select center node
+  const [videoCatalog, setVideoCatalog] = useState([]); // [{id,title,thumbnail,publishedAt}]
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState("");
+
+  // user input (title or id) + resolved id
+  const [centerInput, setCenterInput] = useState("");
+  const [centerVideoId, setCenterVideoId] = useState("");
 
   const handleFetchGraph = async () => {
     setLoading(true);
@@ -43,11 +54,16 @@ export default function NetworkGraph() {
         return;
       }
 
-      // Use a fixed reasonable threshold
-      const threshold = 0.70;
+      if (!centerVideoId) {
+        setError("Please select a center video first.");
+        setLoading(false);
+        return;
+      }
+
       const q = encodeURIComponent(channelUrl);
+      const vid = encodeURIComponent(centerVideoId);
       const res = await fetch(
-        `${API_BASE}/api/youtube/videos.correlationNetwork?url=${q}&threshold=${threshold.toFixed(2)}&maxVideos=${maxVideos}`
+        `${API_BASE}/api/youtube/videos.similarityNetwork?url=${q}&videoId=${vid}&topK=${maxVideos}&poolMax=2000`
       );
 
       if (!res.ok) {
@@ -62,6 +78,8 @@ export default function NetworkGraph() {
         name: n.title || n.id,
         engagementRate:
           n.views > 0 ? ((n.likes || 0) + (n.comments || 0)) / n.views : 0,
+        // Mark center node (backend provides isCenter)
+        isCenter: Boolean(n.isCenter),
       }));
 
       const links = (data.edges || []).map((e) => ({ ...e }));
@@ -86,6 +104,40 @@ export default function NetworkGraph() {
     }
   };
 
+  const fetchVideoCatalog = async () => {
+    setCatalogLoading(true);
+    setCatalogError("");
+
+    try {
+      const channelUrl = user?.youtube_channel;
+      if (!channelUrl) {
+        setCatalogError("No channel URL found. Please add your YouTube channel in settings.");
+        return;
+      }
+
+      const q = encodeURIComponent(channelUrl);
+      const res = await fetch(`${API_BASE}/api/youtube/videos.catalog?url=${q}&maxResults=2000`);
+      if (!res.ok) {
+        const text = await res.text();
+        throw new Error(text || "Failed to fetch video catalog");
+      }
+      const data = await res.json();
+      const vids = Array.isArray(data.videos) ? data.videos : [];
+      setVideoCatalog(vids);
+
+      // If user hasn't selected a center yet, preselect the newest video
+      if (!centerVideoId && vids.length > 0) {
+        setCenterVideoId(vids[0].id);
+        setCenterInput(`${vids[0].title} — ${vids[0].id}`);
+      }
+    } catch (e) {
+      console.error(e);
+      setCatalogError(e.message || "Failed to fetch video catalog");
+    } finally {
+      setCatalogLoading(false);
+    }
+  };
+
   // Update container size on mount and resize
   useEffect(() => {
     const updateSize = () => {
@@ -101,17 +153,60 @@ export default function NetworkGraph() {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
+  // Fetch catalog when opening the Network view (so the dropdown is ready)
+  useEffect(() => {
+    if (activeView !== "network") return;
+    if (videoCatalog.length > 0 || catalogLoading) return;
+    fetchVideoCatalog();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView]);
+
+  // Auto-run analysis when entering Insights view
+  useEffect(() => {
+    if (activeView !== "summary") return;
+
+    // already have insights data
+    if (graphData.rawMetrics && graphData.rawMetrics.length > 0) return;
+
+    let cancelled = false;
+
+    const run = async () => {
+      try {
+        // if no center video yet, fetch catalog (it auto-selects first)
+        if (!centerVideoId) {
+          await fetchVideoCatalog();
+          // give React one tick to apply setCenterVideoId
+          await new Promise((r) => setTimeout(r, 0));
+        }
+
+        if (cancelled) return;
+
+        await handleFetchGraph();
+      } catch (e) {
+        // handleFetchGraph already sets error
+      }
+    };
+
+    run();
+
+    return () => {
+      cancelled = true;
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView, centerVideoId]);
+
+
   // Enhanced Force layout tuning for better spacing
   useEffect(() => {
     if (!fgRef.current) return;
     const fg = fgRef.current;
 
     // Stronger repulsion between nodes
-    fg.d3Force("charge").strength(-550);
+    fg.d3Force("charge").strength(-1200);
     
     // Longer links based on weight
     fg.d3Force("link").distance((link) => {
-      const baseDistance = 250;
+      const baseDistance = 450;
       const weight = link.weight || 0;
       // Higher correlation = shorter distance, but still keep them apart
       return baseDistance - (weight * 80);
@@ -136,6 +231,12 @@ export default function NetworkGraph() {
 
     // Warm up the simulation
     if (graphData.nodes.length > 0) {
+      // Fix the center node to the middle of the canvas
+      const center = graphData.nodes.find((n) => n.isCenter);
+      if (center) {
+        center.fx = containerSize.width / 2;
+        center.fy = containerSize.height / 2;
+      }
       fg.d3ReheatSimulation();
     }
   }, [graphData, containerSize]);
@@ -147,9 +248,9 @@ export default function NetworkGraph() {
   };
 
   const getNodeSize = (views) => {
-    if (!views) return 4;
+    if (!views) return 3;
     // Slightly larger base size for better visibility
-    return 4 + Math.log10(views + 1) * 1.4;
+    return 4 + Math.log10(views + 1) * 0.7;
   };
 
   const nodeTooltip = (node) => {
@@ -168,6 +269,13 @@ export default function NetworkGraph() {
   };
 
   const truncate = (str, n = 30) => str?.length > n ? str.substr(0, n) + "..." : str;
+
+  const resolveCenterVideoId = (value) => {
+    if (!value) return "";
+    // If user typed something like "title — VIDEO_ID", take the last token
+    const m = String(value).match(/([A-Za-z0-9_-]{11})\s*$/);
+    return m ? m[1] : "";
+  };
 
   const MenuItem = ({ icon: Icon, label, view, badge }) => (
     <button
@@ -484,10 +592,60 @@ export default function NetworkGraph() {
               </h3>
               
               <div className="space-y-4">
-                {/* Video Count Input */}
+                {/* Center Video Selection */}
                 <div>
                   <label className="text-sm text-slate-600 block mb-2">
-                    Number of Videos to Analyze
+                    Center Video
+                  </label>
+
+                  <input
+                    type="text"
+                    list="creator-video-catalog"
+                    value={centerInput}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setCenterInput(val);
+                      const vid = resolveCenterVideoId(val);
+                      if (vid) setCenterVideoId(vid);
+                    }}
+                    onBlur={() => {
+                      const vid = resolveCenterVideoId(centerInput);
+                      if (vid) setCenterVideoId(vid);
+                    }}
+                    className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                    placeholder={catalogLoading ? "Loading videos..." : "Search by title..."}
+                    disabled={catalogLoading}
+                  />
+
+                  <datalist id="creator-video-catalog">
+                    {videoCatalog.map((v) => (
+                      <option key={v.id} value={`${v.title} — ${v.id}`} />
+                    ))}
+                  </datalist>
+
+                  <div className="flex items-center justify-between mt-1">
+                    <p className="text-xs text-slate-500">
+                      Pick one video; it will be the center node.
+                    </p>
+                    <button
+                      type="button"
+                      onClick={fetchVideoCatalog}
+                      className="text-xs text-indigo-600 hover:text-indigo-700"
+                      disabled={catalogLoading}
+                    >
+                      {catalogLoading ? "Refreshing..." : "Refresh"}
+                    </button>
+                  </div>
+
+                  {catalogError && (
+                    <p className="text-xs text-red-600 mt-1">{catalogError}</p>
+                  )}
+                </div>
+
+                {/* Similar Node Count Input */}
+                <div>
+                  <label className="text-sm text-slate-600 block mb-2">
+                    Number of Similar Videos to Show
                   </label>
                   <input
                     type="number"
@@ -516,7 +674,7 @@ export default function NetworkGraph() {
                     placeholder="Enter 1-500"
                   />
                   <p className="text-xs text-slate-500 mt-1">
-                    Analyze between 1-500 of your most recent videos
+                    Shows this many similar videos around the center node (1-500)
                   </p>
                 </div>
 
@@ -565,8 +723,8 @@ export default function NetworkGraph() {
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                   <h2 className="text-xl font-semibold text-slate-900 mb-2">Video Network Graph</h2>
                   <p className="text-sm text-slate-500 mb-4">
-                    Explore which videos behave similarly based on views, likes, and comments.
-                    Node size = views, color = engagement rate. Click a node to open the video.
+                    This graph is centered on the video you selected. Other nodes are the most similar videos
+                    based on views, likes, and comments. Node size = views, color = engagement rate. Click a node to open the video.
                     {graphData.nodes.length > 50 && " Drag to pan, scroll to zoom."}
                   </p>
 
@@ -631,8 +789,9 @@ export default function NetworkGraph() {
                             ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
                             ctx.fillStyle = getNodeColor(node.engagementRate);
                             ctx.fill();
-                            ctx.strokeStyle = "#fff";
-                            ctx.lineWidth = 1.5;
+                            // Emphasize the selected center video
+                            ctx.strokeStyle = node.isCenter ? "#0f172a" : "#fff";
+                            ctx.lineWidth = node.isCenter ? 3 : 1.5;
                             ctx.stroke();
 
                             // Only show labels when zoomed in enough or for large nodes
