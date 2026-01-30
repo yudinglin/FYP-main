@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Download, FileChartLine, FileText, SlidersHorizontal, X } from "lucide-react";
+import { Download, FileChartLine, FileText, SlidersHorizontal, X, TrendingUp, ExternalLink } from "lucide-react";
 import ReviewBubble from "../../pages/misc/ReviewBubble.jsx";
 import { useAuth } from "../../core/context/AuthContext";
 
@@ -126,6 +126,7 @@ export default function BusinessDashboard() {
             return {
               videoId: v.id || v.videoId || "",
               title: v.title || "Untitled",
+              thumbnail: v.thumbnail || "",
               views,
               likes,
               comments,
@@ -275,12 +276,87 @@ export default function BusinessDashboard() {
     setExportMessage("Report downloaded as CSV (openable in Excel).");
   };
 
+  // Calculate engagement rate for display
+  const engagementRate = useMemo(() => {
+    if (!viewCount || viewCount === 0) return 0;
+    return ((Number(totalLikes || 0) + Number(totalComments || 0)) / Number(viewCount)) * 100;
+  }, [viewCount, totalLikes, totalComments]);
+
+  // Get engagement rate description
+  const getEngagementDescription = (rate) => {
+    if (rate >= 10) {
+      return {
+        label: "Exceptional",
+        description: "Your audience is highly engaged! Keep up the great work.",
+        color: "text-emerald-600",
+        icon: "🌟"
+      };
+    } else if (rate >= 5) {
+      return {
+        label: "Excellent",
+        description: "Strong engagement! Your content resonates well with viewers.",
+        color: "text-green-600",
+        icon: "🎯"
+      };
+    } else if (rate >= 3) {
+      return {
+        label: "Very Good",
+        description: "Good engagement rate. Your audience is interested in your content.",
+        color: "text-blue-600",
+        icon: "👍"
+      };
+    } else if (rate >= 1) {
+      return {
+        label: "Good",
+        description: "Decent engagement. Consider experimenting with different content styles.",
+        color: "text-indigo-600",
+        icon: "📊"
+      };
+    } else if (rate >= 0.1) {
+      return {
+        label: "Moderate",
+        description: "There's room for improvement. Focus on creating compelling calls-to-action.",
+        color: "text-orange-600",
+        icon: "💡"
+      };
+    } else {
+      return {
+        label: "Needs Improvement",
+        description: "Low engagement detected. Try creating more interactive content to boost viewer participation.",
+        color: "text-red-600",
+        icon: ""
+      };
+    }
+  };
+
+  const engagementInfo = useMemo(() => getEngagementDescription(engagementRate), [engagementRate]);
+
   return (
     <div className="min-h-[calc(100vh-72px)] bg-slate-50">
+      <style>{`
+        .video-card {
+          transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .video-card:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 12px 20px -5px rgba(0, 0, 0, 0.1);
+        }
+        
+        .video-card:hover .thumbnail-overlay {
+          opacity: 1;
+        }
+        
+        .thumbnail-overlay {
+          opacity: 0;
+          transition: opacity 0.3s ease;
+        }
+      `}</style>
+      
       <div className="max-w-7xl mx-auto px-6 py-6">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <h1 className="text-2xl font-semibold text-slate-900">Welcome back  {user?.first_name || "Business"}</h1>
+            <h1 className="text-2xl font-semibold text-slate-900">Welcome back, {user?.first_name || "Business"}</h1>
             <p className="mt-1 text-sm text-slate-500 max-w-2xl">
               {primaryChannel ? `Currently viewing: ${primaryChannel.name || primaryChannel.url} (Primary channel)` : "No channels linked"}
             </p>
@@ -312,7 +388,7 @@ export default function BusinessDashboard() {
                 onClick={() => navigate("/dashboard/business/network")}
               />
               <SidebarItem
-                label="Brand & Creator Centrality"
+                label="Brand Content Performance"
                 onClick={() => navigate("/dashboard/business/centrality")}
               />
               <SidebarItem
@@ -376,6 +452,32 @@ export default function BusinessDashboard() {
             <StatCard label="Total comments" value={loading ? "Loading..." : formatNum(totalComments)} />
           </section>
 
+          {/* Engagement Rate Card */}
+          {!loading && viewCount > 0 && (
+            <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 mb-2">
+                    <p className="text-xs font-medium text-slate-500">Overall Engagement</p>
+                    <span className="text-lg">{engagementInfo.icon}</span>
+                  </div>
+                  <p className={`text-2xl font-semibold ${engagementInfo.color}`}>
+                    {engagementInfo.label}
+                  </p>
+                  <p className="mt-2 text-sm text-slate-600">
+                    {engagementInfo.description}
+                  </p>
+                  <p className="mt-2 text-xs text-slate-400">
+                   Based on channels likes + comments vs total views
+                  </p>
+                </div>
+                <div className={`flex items-center gap-2 ${engagementInfo.color}`}>
+                  <TrendingUp size={24} />
+                </div>
+              </div>
+            </section>
+          )}
+
           {/* Right side blocks */}
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 space-y-4">
@@ -383,21 +485,9 @@ export default function BusinessDashboard() {
                 {topVideos.length === 0 ? (
                   <p className="text-sm text-slate-500">No engagement data available</p>
                 ) : (
-                  <ul className="space-y-2">
-                    {topVideos.map((v) => (
-                      <li key={v.videoId} className="rounded-lg bg-slate-50 px-3 py-2">
-                        <div className="flex items-start justify-between gap-4">
-                          <div>
-                            <p className="text-sm font-medium text-slate-900">{v.title}</p>
-                            <p className="text-xs text-slate-500">
-                              Views: {formatNum(v.views)} · Likes: {formatNum(v.likes)} · Comments: {formatNum(v.comments)}
-                            </p>
-                          </div>
-                          <p className="text-xs font-semibold text-emerald-700">
-                            {(v.engagementScore * 100).toFixed(2)}%
-                          </p>
-                        </div>
-                      </li>
+                  <ul className="space-y-3">
+                    {topVideos.map((v, idx) => (
+                      <VideoCard key={v.videoId} video={v} rank={idx + 1} />
                     ))}
                   </ul>
                 )}
@@ -411,12 +501,7 @@ export default function BusinessDashboard() {
                 ) : (
                   <ul className="space-y-2 text-sm">
                     {latestComments.map((c, idx) => (
-                      <li key={idx} className="rounded-lg bg-slate-50 px-3 py-2">
-                        <p className="text-slate-900">{c.text || c.comment || "—"}</p>
-                        <p className="text-xs text-slate-500 mt-1">
-                          {c.author ? `By ${c.author}` : ""} {c.publishedAt ? `· ${c.publishedAt}` : ""}
-                        </p>
-                      </li>
+                      <CommentCard key={idx} comment={c} />
                     ))}
                   </ul>
                 )}
@@ -482,7 +567,6 @@ function SidebarItem({ label, active = false, onClick }) {
   );
 }
 
-
 function StatCard({ label, value }) {
   return (
     <div className="rounded-2xl bg-white px-4 py-4 shadow-sm border border-slate-100 flex flex-col justify-between">
@@ -491,6 +575,75 @@ function StatCard({ label, value }) {
         <p className="mt-2 text-2xl font-semibold text-slate-900">{value ?? "--"}</p>
       </div>
     </div>
+  );
+}
+
+function VideoCard({ video, rank }) {
+  const handleClick = () => {
+    window.open(`https://www.youtube.com/watch?v=${video.videoId}`, '_blank');
+  };
+
+  // Get engagement description for individual videos
+  const getVideoEngagementLabel = (score) => {
+    const percentage = score * 100;
+    if (percentage >= 10) return { label: "Exceptional", color: "text-emerald-700", bg: "bg-emerald-50" };
+    if (percentage >= 5) return { label: "Excellent", color: "text-green-700", bg: "bg-green-50" };
+    if (percentage >= 3) return { label: "Very Good", color: "text-blue-700", bg: "bg-blue-50" };
+    if (percentage >= 1) return { label: "Good", color: "text-indigo-700", bg: "bg-indigo-50" };
+    if (percentage >= 0.1) return { label: "Moderate", color: "text-orange-700", bg: "bg-orange-50" };
+    return { label: "Low", color: "text-slate-700", bg: "bg-slate-50" };
+  };
+
+  const engagementLabel = getVideoEngagementLabel(video.engagementScore);
+
+  return (
+    <li 
+      onClick={handleClick}
+      className="video-card rounded-lg bg-slate-50 overflow-hidden cursor-pointer"
+    >
+      <div className="flex gap-3 p-3">
+        {video.thumbnail && (
+          <div className="relative flex-shrink-0">
+            <div className="w-28 h-16 rounded-md overflow-hidden bg-slate-200">
+              <img 
+                src={video.thumbnail} 
+                alt={video.title}
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="thumbnail-overlay absolute inset-0 bg-black/40 rounded-md flex items-center justify-center">
+              <ExternalLink size={18} className="text-white" />
+            </div>
+            <div className="absolute -top-2 -left-2 w-5 h-5 bg-slate-900 text-white rounded-full flex items-center justify-center text-xs font-bold">
+              {rank}
+            </div>
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-medium text-slate-900 line-clamp-2">{video.title}</p>
+          <p className="text-xs text-slate-500 mt-1">
+            {formatNum(video.views)} views · {formatNum(video.likes)} likes · {formatNum(video.comments)} comments
+          </p>
+          <div className="mt-1.5 flex items-center gap-2">
+            <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-semibold ${engagementLabel.bg} ${engagementLabel.color}`}>
+              {engagementLabel.label}
+            </span>
+            <span className="text-xs text-slate-400">engagement</span>
+          </div>
+        </div>
+      </div>
+    </li>
+  );
+}
+
+function CommentCard({ comment }) {
+  return (
+    <li className="rounded-lg bg-slate-50 px-3 py-2">
+      <p className="text-slate-900">{comment.text || comment.comment || "—"}</p>
+      <p className="text-xs text-slate-500 mt-1">
+        {comment.author ? `By ${comment.author}` : ""} {comment.publishedAt ? `· ${comment.publishedAt}` : ""}
+      </p>
+    </li>
   );
 }
 
