@@ -147,10 +147,10 @@ def extract_content_themes(videos):
     }
 
 
-def analyze_comment_sentiment(comments):
+def analyze_comment_sentiment(comments, videos):
     """
     Simple sentiment analysis based on keyword matching.
-    Returns positive/negative indicators and common phrases.
+    Returns positive/negative indicators, common phrases, and sentiment timeline.
     """
     if not comments:
         return {}
@@ -171,6 +171,9 @@ def analyze_comment_sentiment(comments):
     question_count = 0
     
     common_phrases = Counter()
+    
+    # Track sentiment by year
+    sentiment_timeline = defaultdict(lambda: {"positive": 0, "negative": 0, "neutral": 0, "total": 0})
 
     for comment in comments:
         text = comment.get("text", "").lower()
@@ -179,14 +182,30 @@ def analyze_comment_sentiment(comments):
         has_negative = any(kw in text for kw in negative_keywords)
         has_question = any(kw in text for kw in question_keywords)
 
+        # Determine sentiment type
         if has_question:
             question_count += 1
+            sentiment_type = "neutral"
         elif has_positive and not has_negative:
             positive_count += 1
+            sentiment_type = "positive"
         elif has_negative and not has_positive:
             negative_count += 1
+            sentiment_type = "negative"
         else:
             neutral_count += 1
+            sentiment_type = "neutral"
+
+        # Track by year using comment's publishedAt
+        comment_date = comment.get("publishedAt", "")
+        if comment_date:
+            try:
+                dt = datetime.fromisoformat(comment_date.replace('Z', '+00:00'))
+                year = dt.year
+                sentiment_timeline[year][sentiment_type] += 1
+                sentiment_timeline[year]["total"] += 1
+            except:
+                pass
 
         # Extract common phrases (3-4 word sequences)
         words = re.findall(r'\b[a-z]+\b', text)
@@ -198,6 +217,22 @@ def analyze_comment_sentiment(comments):
     total = len(comments)
     sentiment_score = ((positive_count - negative_count) / max(total, 1)) * 100
 
+    # Convert timeline to sorted list
+    timeline_data = []
+    for year in sorted(sentiment_timeline.keys()):
+        data = sentiment_timeline[year]
+        total_year = data["total"]
+        timeline_data.append({
+            "year": year,
+            "positive": data["positive"],
+            "negative": data["negative"],
+            "neutral": data["neutral"],
+            "total": total_year,
+            "positive_percentage": (data["positive"] / total_year * 100) if total_year > 0 else 0,
+            "negative_percentage": (data["negative"] / total_year * 100) if total_year > 0 else 0,
+            "sentiment_score": ((data["positive"] - data["negative"]) / total_year * 100) if total_year > 0 else 0,
+        })
+
     return {
         "total_comments": total,
         "positive_count": positive_count,
@@ -207,6 +242,7 @@ def analyze_comment_sentiment(comments):
         "sentiment_score": sentiment_score,
         "positive_ratio": (positive_count / max(total, 1)) * 100,
         "common_phrases": dict(common_phrases.most_common(10)),
+        "timeline": timeline_data,
     }
 
 
@@ -512,14 +548,25 @@ def audience_resonance():
         timing_analysis = analyze_content_timing(videos)
         roi_potential = calculate_sponsor_roi_potential(videos, channel_stats)
         
-        # Fetch comments from top performers for sentiment analysis
-        top_video_ids = [v["id"] for v in engagement_analysis["top_performers"][:5]]
+        # Fetch comments from MORE videos for better sentiment timeline
+        # Get comments from top 10 videos + random sample of others for diversity
+        top_video_ids = [v["id"] for v in engagement_analysis["top_performers"][:10]]
+        
+        # Add some random videos from the rest for broader coverage
+        other_videos = [v for v in videos if v.get("id") not in top_video_ids]
+        if other_videos:
+            import random
+            sample_size = min(10, len(other_videos))
+            random_sample = random.sample(other_videos, sample_size)
+            top_video_ids.extend([v["id"] for v in random_sample])
+        
         all_comments = []
         for vid in top_video_ids:
-            comments = fetch_video_comments(vid, max_comments=30)
+            # Fetch more comments per video (50 instead of 30)
+            comments = fetch_video_comments(vid, max_comments=50)
             all_comments.extend(comments)
         
-        sentiment_analysis = analyze_comment_sentiment(all_comments)
+        sentiment_analysis = analyze_comment_sentiment(all_comments, videos)
         
         # Generate sponsorship insights
         sponsorship_data = generate_sponsorship_insights(

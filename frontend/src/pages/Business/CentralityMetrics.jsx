@@ -488,7 +488,7 @@ function OverviewPanel({ title, data }) {
             <h3 className="text-base font-semibold">How Your Audience Feels</h3>
           </div>
           <p className="text-sm text-slate-600 mb-4">
-            Based on comments and reactions from viewers
+            Based on comments and reactions from viewers over time
           </p>
 
           <div className={`rounded-xl border-2 ${sentimentStatus.bg} p-5 mb-4`}>
@@ -500,6 +500,116 @@ function OverviewPanel({ title, data }) {
               </div>
             </div>
           </div>
+
+          {/* Sentiment Timeline - Simple Line Graph */}
+          {sentiment.timeline && sentiment.timeline.length > 1 && (
+            <div className="mb-4">
+              <h4 className="text-sm font-semibold text-slate-900 mb-2">Audience Sentiment Trend</h4>
+              
+              {/* Simple Line Graph */}
+              <div className="bg-slate-50 rounded-lg p-4 mb-3">
+                <div className="h-32 flex items-end justify-between gap-2">
+                  {sentiment.timeline.map((yearData, idx) => {
+                    const maxScore = Math.max(...sentiment.timeline.map(d => Math.abs(d.sentiment_score)));
+                    const height = ((yearData.sentiment_score + 100) / 200) * 100; // Normalize to 0-100%
+                    
+                    const getBarColor = (score) => {
+                      if (score > 50) return "bg-emerald-500";
+                      if (score > 20) return "bg-green-500";
+                      if (score > -20) return "bg-slate-400";
+                      return "bg-orange-500";
+                    };
+
+                    return (
+                      <div key={yearData.year} className="flex-1 flex flex-col items-center justify-end h-full">
+                        <div className="w-full flex flex-col items-center justify-end h-full pb-2">
+                          <div 
+                            className={`w-full rounded-t transition-all ${getBarColor(yearData.sentiment_score)}`}
+                            style={{ height: `${height}%`, minHeight: '4px' }}
+                          />
+                        </div>
+                        <div className="text-xs font-medium text-slate-700 mt-1">{yearData.year}</div>
+                        <div className="text-xs text-slate-500">{yearData.total}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                {/* Legend */}
+                <div className="flex items-center justify-center gap-4 mt-3 pt-3 border-t border-slate-200">
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 bg-emerald-500 rounded"></div>
+                    <span className="text-xs text-slate-600">Very Positive</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 bg-green-500 rounded"></div>
+                    <span className="text-xs text-slate-600">Positive</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 bg-slate-400 rounded"></div>
+                    <span className="text-xs text-slate-600">Neutral</span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <div className="w-3 h-3 bg-orange-500 rounded"></div>
+                    <span className="text-xs text-slate-600">Negative</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Insights */}
+              <div className="space-y-2">
+                {(() => {
+                  const insights = [];
+                  const timeline = sentiment.timeline;
+                  
+                  // Check if sentiment is improving
+                  if (timeline.length >= 2) {
+                    const recent = timeline[timeline.length - 1];
+                    const previous = timeline[timeline.length - 2];
+                    
+                    if (recent.sentiment_score > previous.sentiment_score + 10) {
+                      insights.push({
+                        icon: <TrendingUp className="w-4 h-4 text-emerald-600" />,
+                        text: `Your content is getting more positive reactions! Sentiment improved from ${previous.year} to ${recent.year}.`,
+                        color: "bg-emerald-50 border-emerald-200 text-emerald-700"
+                      });
+                    } else if (recent.sentiment_score < previous.sentiment_score - 10) {
+                      insights.push({
+                        icon: <AlertCircle className="w-4 h-4 text-orange-600" />,
+                        text: `Audience sentiment has declined recently. Consider reviewing what changed between ${previous.year} and ${recent.year}.`,
+                        color: "bg-orange-50 border-orange-200 text-orange-700"
+                      });
+                    } else {
+                      insights.push({
+                        icon: <CheckCircle2 className="w-4 h-4 text-blue-600" />,
+                        text: `Your audience sentiment has remained consistent from ${previous.year} to ${recent.year}.`,
+                        color: "bg-blue-50 border-blue-200 text-blue-700"
+                      });
+                    }
+                  }
+                  
+                  // Check for most positive year
+                  const mostPositive = timeline.reduce((max, curr) => 
+                    curr.sentiment_score > max.sentiment_score ? curr : max
+                  );
+                  if (mostPositive.sentiment_score > 30) {
+                    insights.push({
+                      icon: <Star className="w-4 h-4 text-amber-600" />,
+                      text: `${mostPositive.year} was your best year with ${mostPositive.positive} positive comments! Try to replicate what worked then.`,
+                      color: "bg-amber-50 border-amber-200 text-amber-700"
+                    });
+                  }
+                  
+                  return insights.map((insight, idx) => (
+                    <div key={idx} className={`flex items-start gap-2 p-3 rounded-lg border ${insight.color}`}>
+                      {insight.icon}
+                      <p className="text-xs font-medium flex-1">{insight.text}</p>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </div>
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4">
