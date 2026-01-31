@@ -1,11 +1,9 @@
 import React, { useEffect, useMemo, useState } from "react";
 import {
-  Target,
   TrendingUp,
   Users,
   MessageSquare,
   ThumbsUp,
-  Lightbulb,
   Play,
   Eye,
   Award,
@@ -13,14 +11,12 @@ import {
   CheckCircle2,
   BarChart3,
   Sparkles,
-  Flame,
-  Clock,
-  DollarSign,
   Heart,
-  Share2,
-  Calendar,
   Star,
-  ArrowRight,
+  Smile,
+  Frown,
+  Meh,
+  ExternalLink,
 } from "lucide-react";
 import { useAuth } from "../../core/context/AuthContext";
 
@@ -118,7 +114,10 @@ export default function ContentPerformanceInsights() {
     return (
       <div className="min-h-[calc(100vh-72px)] bg-slate-50">
         <div className="max-w-7xl mx-auto px-6 py-8">
-          <p className="text-slate-600">Analyzing your content performance...</p>
+          <div className="flex items-center gap-3">
+            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
+            <p className="text-slate-600">Analyzing your content performance...</p>
+          </div>
         </div>
       </div>
     );
@@ -142,23 +141,18 @@ export default function ContentPerformanceInsights() {
     );
   }
 
-  const MenuItem = ({ icon: Icon, label, view, badge, description }) => (
+  const MenuItem = ({ icon: Icon, label, view, description }) => (
     <button
       onClick={() => setActiveView(view)}
       className={`w-full flex flex-col gap-1 px-4 py-3 rounded-lg transition-all text-left ${
         activeView === view
-          ? "bg-violet-50 text-violet-700 font-medium"
-          : "text-slate-600 hover:bg-slate-50"
+          ? "bg-indigo-50 text-indigo-700 font-medium border-2 border-indigo-200"
+          : "text-slate-600 hover:bg-slate-50 border-2 border-transparent"
       }`}
     >
       <div className="flex items-center gap-3">
         <Icon size={18} />
         <span className="flex-1 text-sm font-medium">{label}</span>
-        {badge && (
-          <span className="bg-violet-100 text-violet-700 text-xs px-2 py-0.5 rounded-full font-medium">
-            {badge}
-          </span>
-        )}
       </div>
       {description && (
         <span className="text-xs text-slate-500 ml-9">{description}</span>
@@ -167,66 +161,47 @@ export default function ContentPerformanceInsights() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
+    <div className="min-h-screen bg-slate-50 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center gap-2 mb-2">
-            <BarChart3 className="w-7 h-7 text-violet-600" />
+            <BarChart3 className="w-7 h-7 text-indigo-600" />
             <h1 className="text-3xl font-bold text-slate-900">
-              Content Performance Insights
+              Content Performance Analysis
             </h1>
           </div>
-          <p className="text-slate-600 text-lg">
-            Understand what your audience loves and what brands should sponsor
+          <p className="text-slate-600">
+            Understand what content works best and how your audience responds
           </p>
         </div>
 
         <div className="flex gap-6">
           {/* Sidebar */}
-          <div className="w-72 flex flex-col gap-4">
+          <div className="w-64 flex flex-col gap-4">
             {/* Navigation */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
               <h2 className="text-sm font-semibold text-slate-700 px-4 py-2 mb-2">
-                Choose What to View
+                What to View
               </h2>
               <div className="space-y-1">
                 <MenuItem 
                   icon={BarChart3} 
-                  label="Quick Summary" 
+                  label="Performance Summary" 
                   view="overview" 
-                  badge="Start Here"
-                  description="See your best content at a glance"
-                />
-                <MenuItem 
-                  icon={Sparkles} 
-                  label="Brand Partnership Opportunities" 
-                  view="sponsorship"
-                  description="What sponsors should know about you"
-                />
-                <MenuItem 
-                  icon={Flame} 
-                  label="Videos Going Viral" 
-                  view="viral"
-                  description="Your most shareable content"
+                  description="Your best performing content"
                 />
                 <MenuItem 
                   icon={Heart} 
                   label="Audience Loyalty" 
                   view="retention"
-                  description="Videos people finish watching"
+                  description="Videos people watch completely"
                 />
                 <MenuItem 
-                  icon={Clock} 
-                  label="Best Time to Post" 
-                  view="timing"
-                  description="When your audience is most active"
-                />
-                <MenuItem 
-                  icon={DollarSign} 
-                  label="Sponsorship Value" 
-                  view="roi"
-                  description="What you're worth to brands"
+                  icon={Sparkles} 
+                  label="Trending Content" 
+                  view="viral"
+                  description="Videos gaining momentum"
                 />
               </div>
             </div>
@@ -237,7 +212,7 @@ export default function ContentPerformanceInsights() {
                 Select Channel
               </h3>
               <select
-                className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-violet-500 focus:border-transparent"
+                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 value={selectedKey}
                 onChange={(e) => setSelectedKey(e.target.value)}
               >
@@ -251,17 +226,19 @@ export default function ContentPerformanceInsights() {
 
             {/* Quick Stats */}
             {results.length > 0 && results[0]?.data && (
-              <div className="bg-gradient-to-br from-violet-600 to-violet-700 rounded-xl shadow-sm p-4 text-white">
-                <div className="text-sm font-medium mb-3">At a Glance</div>
+              <div className="bg-indigo-600 rounded-xl shadow-sm p-4 text-white">
+                <div className="text-sm font-medium mb-3">Quick Stats</div>
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <span className="text-violet-200 text-sm">Channels Analyzed</span>
-                    <span className="font-semibold">{results.length}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-violet-200 text-sm">Videos Reviewed</span>
+                    <span className="text-indigo-200 text-sm">Videos Analyzed</span>
                     <span className="font-semibold">
                       {results.reduce((sum, r) => sum + (r.data?.channel?.videos_analyzed || 0), 0)}
+                    </span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-indigo-200 text-sm">Total Subscribers</span>
+                    <span className="font-semibold">
+                      {formatNumber(results.reduce((sum, r) => sum + (r.data?.channel?.subscribers || 0), 0))}
                     </span>
                   </div>
                 </div>
@@ -279,10 +256,10 @@ export default function ContentPerformanceInsights() {
               </div>
             )}
 
-            {activeView === "sponsorship" && (
+            {activeView === "retention" && (
               <div className="space-y-6">
                 {results.map((item) => (
-                  <SponsorshipPanel key={item.url} title={item.label} data={item.data} />
+                  <RetentionPanel key={item.url} title={item.label} data={item.data} />
                 ))}
               </div>
             )}
@@ -294,30 +271,6 @@ export default function ContentPerformanceInsights() {
                 ))}
               </div>
             )}
-
-            {activeView === "retention" && (
-              <div className="space-y-6">
-                {results.map((item) => (
-                  <RetentionPanel key={item.url} title={item.label} data={item.data} />
-                ))}
-              </div>
-            )}
-
-            {activeView === "timing" && (
-              <div className="space-y-6">
-                {results.map((item) => (
-                  <TimingPanel key={item.url} title={item.label} data={item.data} />
-                ))}
-              </div>
-            )}
-
-            {activeView === "roi" && (
-              <div className="space-y-6">
-                {results.map((item) => (
-                  <ROIPanel key={item.url} title={item.label} data={item.data} />
-                ))}
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -325,73 +278,73 @@ export default function ContentPerformanceInsights() {
   );
 }
 
+// Helper function
+function formatNumber(n) {
+  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
+  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
+  return n.toLocaleString();
+}
+
+// Helper to get user-friendly engagement description
+function getEngagementLevel(rate) {
+  if (rate >= 10) return { label: "Outstanding", color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" };
+  if (rate >= 5) return { label: "Excellent", color: "text-green-600", bg: "bg-green-50", border: "border-green-200" };
+  if (rate >= 3) return { label: "Very Good", color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" };
+  if (rate >= 1) return { label: "Good", color: "text-indigo-600", bg: "bg-indigo-50", border: "border-indigo-200" };
+  if (rate >= 0.1) return { label: "Moderate", color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200" };
+  return { label: "Needs Work", color: "text-slate-600", bg: "bg-slate-50", border: "border-slate-200" };
+}
+
 // Helper Components
-function InfoCard({ icon, label, value, helpText, color = "slate" }) {
+function StatCard({ icon: Icon, label, value, helpText, color = "indigo" }) {
   const colorClasses = {
-    violet: "bg-violet-50 text-violet-700 border-violet-100",
-    indigo: "bg-indigo-50 text-indigo-700 border-indigo-100",
-    emerald: "bg-emerald-50 text-emerald-700 border-emerald-100",
+    indigo: "bg-indigo-50 border-indigo-100",
+    emerald: "bg-emerald-50 border-emerald-100",
+    blue: "bg-blue-50 border-blue-100",
   };
 
   return (
-    <div className="rounded-2xl border border-slate-100 bg-white p-5">
-      <div
-        className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 ${colorClasses[color]}`}
-      >
-        {icon}
-        <span className="text-xs font-semibold">{label}</span>
+    <div className={`rounded-xl border-2 p-5 ${colorClasses[color]}`}>
+      <div className="flex items-center gap-2 mb-2">
+        <Icon size={20} className="text-slate-700" />
+        <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{label}</span>
       </div>
-      <p className="mt-3 text-3xl font-bold text-slate-900">{value}</p>
-      {helpText && <p className="mt-1 text-xs text-slate-500">{helpText}</p>}
+      <p className="text-3xl font-bold text-slate-900">{value}</p>
+      {helpText && <p className="text-xs text-slate-600 mt-1">{helpText}</p>}
     </div>
   );
 }
 
-function AudienceReactionBadge({ icon, label, value, color, helpText }) {
-  const colorClasses = {
-    emerald: "bg-emerald-100 text-emerald-700 border-emerald-200",
-    blue: "bg-blue-100 text-blue-700 border-blue-200",
-  };
-
-  return (
-    <div className={`rounded-xl border p-4 ${colorClasses[color]}`}>
-      <div className="flex items-center gap-2 mb-1">
-        {icon}
-        <span className="text-xs font-semibold">{label}</span>
-      </div>
-      <p className="text-2xl font-bold mb-1">{value}</p>
-      {helpText && <p className="text-xs opacity-80">{helpText}</p>}
-    </div>
-  );
-}
-
-function ContentTypeRow({ rank, theme, count, popularity }) {
-  const medals = ["🥇", "🥈", "🥉"];
+function ContentTypeRow({ rank, theme, count, engagement }) {
   const themeNames = {
     tutorial: "How-To & Tutorials",
     review: "Product Reviews",
     vlog: "Daily Vlogs",
-    challenge: "Challenges & Competitions",
-    listicle: "Top Lists & Rankings",
-    educational: "Educational Content",
-    entertainment: "Entertainment & Fun",
+    challenge: "Challenges",
+    listicle: "Top Lists",
+    educational: "Educational",
+    entertainment: "Entertainment",
     news: "News & Updates",
   };
 
+  const engagementLevel = getEngagementLevel(engagement);
+
   return (
-    <div className="flex items-center justify-between rounded-xl bg-slate-50 border border-slate-200 p-4 hover:bg-slate-100 transition-colors">
+    <div className="flex items-center justify-between rounded-xl bg-white border-2 border-slate-200 p-4 hover:shadow-md transition-shadow">
       <div className="flex items-center gap-3">
-        <span className="text-2xl">{medals[rank - 1] || "📊"}</span>
+        <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+          <span className="text-sm font-bold text-indigo-700">#{rank}</span>
+        </div>
         <div>
           <p className="text-sm font-semibold text-slate-900">
             {themeNames[theme] || theme}
           </p>
-          <p className="text-xs text-slate-600">{count} videos in this category</p>
+          <p className="text-xs text-slate-600">{count} videos</p>
         </div>
       </div>
       <div className="text-right">
-        <p className="text-sm font-bold text-emerald-700">{popularity.toFixed(1)}%</p>
-        <p className="text-xs text-slate-500">audience interaction</p>
+        <p className={`text-sm font-bold ${engagementLevel.color}`}>{engagementLevel.label}</p>
+        <p className="text-xs text-slate-500">{engagement.toFixed(1)}% interaction</p>
       </div>
     </div>
   );
@@ -405,10 +358,11 @@ function VideoCard({ video, rank }) {
 
   const ytId = getYouTubeId(video.id);
   const thumbnailUrl = video.thumbnail || `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`;
+  const engagementLevel = getEngagementLevel(video.engagement_rate || 0);
 
   return (
     <div
-      className="rounded-xl border border-slate-200 bg-white overflow-hidden hover:shadow-lg transition-shadow group cursor-pointer"
+      className="rounded-xl border-2 border-slate-200 bg-white overflow-hidden hover:shadow-lg transition-all group cursor-pointer"
       onClick={() => ytId && window.open(`https://www.youtube.com/watch?v=${ytId}`, "_blank")}
     >
       <div className="relative">
@@ -420,11 +374,13 @@ function VideoCard({ video, rank }) {
             e.target.src = `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`;
           }}
         />
-        <div className="absolute top-2 left-2 bg-violet-600 text-white px-2 py-1 rounded-lg text-xs font-bold">
+        <div className="absolute top-2 left-2 bg-indigo-600 text-white px-2 py-1 rounded-lg text-xs font-bold">
           #{rank}
         </div>
         <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-          <Play className="w-12 h-12 text-white opacity-0 group-hover:opacity-100 transition-opacity" />
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded-full p-3">
+            <ExternalLink className="w-6 h-6 text-indigo-600" />
+          </div>
         </div>
       </div>
 
@@ -436,22 +392,22 @@ function VideoCard({ video, rank }) {
         <div className="flex items-center gap-3 text-xs text-slate-600 mb-3">
           <div className="flex items-center gap-1">
             <Eye className="w-3 h-3" />
-            <span>{(video.views || 0).toLocaleString()} views</span>
+            <span>{formatNumber(video.views || 0)} views</span>
           </div>
           <div className="flex items-center gap-1">
             <ThumbsUp className="w-3 h-3" />
-            <span>{(video.likes || 0).toLocaleString()} likes</span>
+            <span>{formatNumber(video.likes || 0)} likes</span>
           </div>
           <div className="flex items-center gap-1">
             <MessageSquare className="w-3 h-3" />
-            <span>{(video.comments || 0).toLocaleString()} comments</span>
+            <span>{formatNumber(video.comments || 0)} comments</span>
           </div>
         </div>
 
-        <div className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 px-2 py-1">
-          <TrendingUp className="w-3 h-3 text-emerald-600" />
-          <span className="text-xs font-semibold text-emerald-700">
-            {(video.engagement_rate || 0).toFixed(2)}% audience interaction
+        <div className={`inline-flex items-center gap-1.5 rounded-lg ${engagementLevel.bg} border ${engagementLevel.border} px-3 py-1.5`}>
+          <TrendingUp className={`w-3 h-3 ${engagementLevel.color}`} />
+          <span className={`text-xs font-semibold ${engagementLevel.color}`}>
+            {engagementLevel.label} Performance
           </span>
         </div>
       </div>
@@ -468,114 +424,120 @@ function OverviewPanel({ title, data }) {
 
   const topPerformers = engagement.top_performers || [];
   const averages = engagement.averages || {};
+  const avgEngagementLevel = getEngagementLevel(averages.engagement_rate || 0);
 
   const topThemes = Object.entries(themes)
     .sort((a, b) => b[1].avg_engagement - a[1].avg_engagement)
     .slice(0, 3);
 
+  // Sentiment interpretation
+  const getSentimentStatus = (score) => {
+    if (score > 50) return { label: "Very Positive", icon: <Smile className="w-5 h-5 text-emerald-600" />, color: "text-emerald-600", bg: "bg-emerald-50", description: "Your audience loves your content!" };
+    if (score > 20) return { label: "Positive", icon: <Smile className="w-5 h-5 text-green-600" />, color: "text-green-600", bg: "bg-green-50", description: "People are responding well to your videos" };
+    if (score > -20) return { label: "Neutral", icon: <Meh className="w-5 h-5 text-slate-600" />, color: "text-slate-600", bg: "bg-slate-50", description: "Mixed reactions - room for improvement" };
+    return { label: "Needs Attention", icon: <Frown className="w-5 h-5 text-orange-600" />, color: "text-orange-600", bg: "bg-orange-50", description: "Focus on creating more engaging content" };
+  };
+
+  const sentimentStatus = getSentimentStatus(sentiment.sentiment_score || 0);
+
   return (
     <section className="space-y-6">
       {/* Channel Stats */}
-      <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
+      <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
-            <p className="text-sm text-slate-500 mt-1">Quick overview of your performance</p>
+            <p className="text-sm text-slate-500 mt-1">Performance summary of your recent content</p>
           </div>
-          <span className="text-xs text-slate-500 bg-slate-50 px-3 py-1 rounded-full">
-            Based on {channel.videos_analyzed || 0} recent videos
+          <span className="text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200">
+            {channel.videos_analyzed || 0} videos analyzed
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <InfoCard
-            icon={<Users className="w-4 h-4" />}
-            label="Your Audience"
-            value={(channel.subscribers || 0).toLocaleString()}
-            helpText="People who subscribed to your channel"
-            color="violet"
-          />
-          <InfoCard
-            icon={<Eye className="w-4 h-4" />}
-            label="Total Reach"
-            value={(channel.total_views || 0).toLocaleString()}
-            helpText="All-time video views across your channel"
+          <StatCard
+            icon={Users}
+            label="Total Subscribers"
+            value={formatNumber(channel.subscribers || 0)}
+            helpText="People following your channel"
             color="indigo"
           />
-          <InfoCard
-            icon={<TrendingUp className="w-4 h-4" />}
-            label="Audience Interaction"
-            value={`${(averages.engagement_rate || 0).toFixed(2)}%`}
-            helpText="How many people like, comment, or share"
+          <StatCard
+            icon={Eye}
+            label="Total Views"
+            value={formatNumber(channel.total_views || 0)}
+            helpText="All-time views across your content"
+            color="blue"
+          />
+          <StatCard
+            icon={TrendingUp}
+            label="Engagement Level"
+            value={avgEngagementLevel.label}
+            helpText={`${averages.engagement_rate?.toFixed(2)}% of viewers interact with your content`}
             color="emerald"
           />
         </div>
       </div>
 
-      {/* Key Metrics Grid */}
+      {/* Audience Mood & Content Types */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Sentiment */}
-        <div className="rounded-2xl bg-gradient-to-br from-emerald-50 to-teal-50 border border-emerald-100 p-6">
-          <div className="flex items-center gap-2 text-emerald-900 mb-4">
+        {/* Audience Mood */}
+        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
+          <div className="flex items-center gap-2 text-slate-900 mb-4">
             <MessageSquare className="w-5 h-5" />
             <h3 className="text-base font-semibold">How Your Audience Feels</h3>
           </div>
-          <p className="text-sm text-emerald-800 mb-4">
-            Based on comments and reactions from your viewers
+          <p className="text-sm text-slate-600 mb-4">
+            Based on comments and reactions from viewers
           </p>
 
-          <div className="space-y-3">
-            <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-emerald-100 p-4">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-slate-700">Overall Mood</span>
-                <span className="text-xl font-bold text-emerald-700">
-                  {(sentiment.sentiment_score || 0) > 0 ? "Positive 😊" : "Neutral 😐"}
-                </span>
+          <div className={`rounded-xl border-2 ${sentimentStatus.bg} p-5 mb-4`}>
+            <div className="flex items-center gap-3 mb-3">
+              {sentimentStatus.icon}
+              <div>
+                <p className={`text-lg font-bold ${sentimentStatus.color}`}>{sentimentStatus.label}</p>
+                <p className="text-sm text-slate-600">{sentimentStatus.description}</p>
               </div>
-              <div className="h-2 bg-slate-200 rounded-full overflow-hidden">
-                <div
-                  className="h-full bg-gradient-to-r from-emerald-400 to-emerald-600"
-                  style={{
-                    width: `${Math.max(0, Math.min(100, 50 + (sentiment.sentiment_score || 0) / 2))}%`,
-                  }}
-                />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <ThumbsUp className="w-4 h-4 text-emerald-600" />
+                <span className="text-xs font-semibold text-emerald-700 uppercase">Positive</span>
               </div>
-              <p className="text-xs text-slate-500 mt-2">
-                The more positive, the better your content resonates
-              </p>
+              <p className="text-2xl font-bold text-emerald-700">{sentiment.positive_count || 0}</p>
+              <p className="text-xs text-emerald-600 mt-1">Happy comments</p>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <AudienceReactionBadge
-                icon={<ThumbsUp className="w-3 h-3" />}
-                label="Happy Viewers"
-                value={sentiment.positive_count || 0}
-                color="emerald"
-                helpText="Positive comments"
-              />
-              <AudienceReactionBadge
-                icon={<MessageSquare className="w-3 h-3" />}
-                label="Curious Viewers"
-                value={sentiment.question_count || 0}
-                color="blue"
-                helpText="People asking questions"
-              />
+            <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
+              <div className="flex items-center gap-2 mb-1">
+                <MessageSquare className="w-4 h-4 text-blue-600" />
+                <span className="text-xs font-semibold text-blue-700 uppercase">Questions</span>
+              </div>
+              <p className="text-2xl font-bold text-blue-700">{sentiment.question_count || 0}</p>
+              <p className="text-xs text-blue-600 mt-1">People asking</p>
             </div>
           </div>
         </div>
 
-        {/* Top Themes */}
-        <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
+        {/* Top Content Types */}
+        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
           <div className="flex items-center gap-2 text-slate-900 mb-4">
             <Star className="w-5 h-5" />
-            <h3 className="text-base font-semibold">Your Most Popular Content Types</h3>
+            <h3 className="text-base font-semibold">Your Best Content Types</h3>
           </div>
           <p className="text-sm text-slate-600 mb-4">
-            What your audience engages with the most
+            What formats get the most audience engagement
           </p>
 
           {topThemes.length === 0 ? (
-            <p className="text-sm text-slate-500">Not enough data yet - keep creating!</p>
+            <div className="text-center py-8">
+              <Star className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+              <p className="text-sm text-slate-500">Not enough data yet</p>
+              <p className="text-xs text-slate-400 mt-1">Keep creating to see patterns!</p>
+            </div>
           ) : (
             <div className="space-y-3">
               {topThemes.map(([theme, data], idx) => (
@@ -584,7 +546,7 @@ function OverviewPanel({ title, data }) {
                   rank={idx + 1}
                   theme={theme}
                   count={data.count}
-                  popularity={data.avg_engagement}
+                  engagement={data.avg_engagement}
                 />
               ))}
             </div>
@@ -592,18 +554,21 @@ function OverviewPanel({ title, data }) {
         </div>
       </div>
 
-      {/* Top Videos */}
-      <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
+      {/* Top Performing Videos */}
+      <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
         <div className="flex items-center gap-2 text-slate-900 mb-4">
           <Award className="w-5 h-5" />
-          <h3 className="text-base font-semibold">Your Star Performers</h3>
+          <h3 className="text-base font-semibold">Your Top Performing Videos</h3>
         </div>
         <p className="text-sm text-slate-600 mb-4">
-          Videos that got the most love from your audience
+          Videos that got the best response from your audience
         </p>
 
         {topPerformers.length === 0 ? (
-          <p className="text-sm text-slate-500">No data available</p>
+          <div className="text-center py-8">
+            <Award className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+            <p className="text-sm text-slate-500">No performance data available yet</p>
+          </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {topPerformers.slice(0, 6).map((video, idx) => (
@@ -616,66 +581,104 @@ function OverviewPanel({ title, data }) {
   );
 }
 
-function SponsorshipPanel({ title, data }) {
-  const sponsorship = data?.sponsorship || {};
-  const insights = sponsorship.insights || [];
-  const recommendations = sponsorship.recommendations || [];
+function RetentionPanel({ title, data }) {
+  const retention = data?.retention || {};
+  const highRetention = retention.high_retention_videos || [];
+  const avgScore = retention.avg_retention_score || 0;
+
+  // Convert retention score to understandable level
+  const getRetentionLevel = (score) => {
+    if (score >= 5) return { label: "Exceptional", color: "text-emerald-600", description: "People love watching your entire videos" };
+    if (score >= 3) return { label: "Very Good", color: "text-green-600", description: "Strong viewer retention throughout videos" };
+    if (score >= 1.5) return { label: "Good", color: "text-blue-600", description: "Viewers stay engaged with your content" };
+    if (score >= 0.5) return { label: "Moderate", color: "text-orange-600", description: "Some viewers watch completely" };
+    return { label: "Needs Work", color: "text-slate-600", description: "Focus on keeping viewers engaged longer" };
+  };
+
+  const retentionLevel = getRetentionLevel(avgScore);
 
   return (
-    <section className="rounded-2xl bg-gradient-to-br from-violet-50 to-purple-50 border border-violet-100 p-6">
-      <div className="flex items-center gap-2 text-violet-900 mb-4">
-        <Sparkles className="w-6 h-6" />
-        <h2 className="text-xl font-semibold">{title} - Why Brands Should Work With You</h2>
+    <section className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
+      <div className="flex items-center gap-2 text-slate-900 mb-4">
+        <Heart className="w-6 h-6" />
+        <h2 className="text-xl font-semibold">{title} - Audience Loyalty</h2>
       </div>
-      <p className="text-violet-800 mb-6">
-        Key insights that make you attractive to sponsors and advertisers
+      <p className="text-slate-600 mb-6">
+        How well your videos keep people watching from start to finish
       </p>
 
-      {insights.length === 0 ? (
-        <div className="rounded-xl bg-white/80 p-6 text-center">
-          <Sparkles className="w-12 h-12 mx-auto text-violet-300 mb-3" />
-          <p className="text-sm text-violet-700">Building your sponsorship profile...</p>
-          <p className="text-xs text-violet-600 mt-1">Keep creating great content!</p>
+      <div className="rounded-xl bg-slate-50 border-2 border-slate-200 p-6 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-semibold text-slate-700 mb-1">Overall Loyalty Level</p>
+            <p className={`text-2xl font-bold ${retentionLevel.color} mb-2`}>
+              {retentionLevel.label}
+            </p>
+            <p className="text-sm text-slate-600">{retentionLevel.description}</p>
+          </div>
+          <div className="text-right">
+            <p className="text-4xl font-bold text-slate-900">{avgScore.toFixed(1)}</p>
+            <p className="text-xs text-slate-500">loyalty score</p>
+          </div>
+        </div>
+      </div>
+
+      {highRetention.length === 0 ? (
+        <div className="rounded-xl bg-slate-50 p-8 text-center">
+          <Heart className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+          <p className="text-sm text-slate-600 font-medium">No high-loyalty videos yet</p>
+          <p className="text-xs text-slate-500 mt-1">
+            Keep creating engaging content that holds viewers' attention!
+          </p>
         </div>
       ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-            {insights.map((insight, idx) => (
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900 mb-3">
+            Videos People Watch Completely ({highRetention.length})
+          </h3>
+          <p className="text-xs text-slate-600 mb-4">
+            These videos successfully kept viewers engaged throughout
+          </p>
+          <div className="space-y-3">
+            {highRetention.slice(0, 5).map((video, idx) => (
               <div
-                key={idx}
-                className="rounded-xl bg-white/80 backdrop-blur-sm border border-violet-100 p-5"
+                key={video.id}
+                className="rounded-xl bg-slate-50 border border-slate-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+                onClick={() => {
+                  const ytId = String(video.id).includes(":") ? String(video.id).split(":")[1] : video.id;
+                  window.open(`https://www.youtube.com/watch?v=${ytId}`, "_blank");
+                }}
               >
-                <div className="flex items-start justify-between gap-3 mb-3">
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-slate-900 mb-2">
-                      {insight.title}
-                    </p>
-                    <p className="text-xs text-slate-600 leading-relaxed">{insight.description}</p>
+                <div className="flex items-start gap-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
+                      <span className="text-sm font-bold text-indigo-700">#{idx + 1}</span>
+                    </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <p className="text-2xl font-bold text-violet-700">{insight.value}</p>
-                    <p className="text-xs text-violet-600">{insight.metric}</p>
+
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-slate-900 line-clamp-2 mb-2">
+                      {video.title}
+                    </p>
+
+                    <div className="flex items-center gap-4 text-xs text-slate-600 mb-2">
+                      <span>{formatNumber(video.views)} views</span>
+                      <span>{formatNumber(video.likes)} likes</span>
+                      <span>{formatNumber(video.comments)} comments</span>
+                    </div>
+
+                    <div className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-2 py-1">
+                      <Heart className="w-3 h-3 text-emerald-600" />
+                      <span className="text-xs font-semibold text-emerald-700">
+                        High Loyalty: {video.retention_score.toFixed(1)} score
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
             ))}
           </div>
-
-          <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-violet-100 p-5">
-            <div className="flex items-center gap-2 mb-4">
-              <Lightbulb className="w-5 h-5 text-violet-600" />
-              <h3 className="text-sm font-semibold text-slate-900">What This Means for Sponsors</h3>
-            </div>
-            <ul className="space-y-3">
-              {recommendations.map((rec, idx) => (
-                <li key={idx} className="flex items-start gap-3">
-                  <CheckCircle2 className="w-4 h-4 text-violet-600 mt-0.5 flex-shrink-0" />
-                  <span className="text-sm text-slate-700">{rec}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-        </>
+        </div>
       )}
     </section>
   );
@@ -686,334 +689,110 @@ function ViralPanel({ title, data }) {
   const viralCandidates = viral.viral_candidates || [];
 
   return (
-    <section className="rounded-2xl bg-gradient-to-br from-orange-50 to-red-50 border border-orange-100 p-6">
-      <div className="flex items-center gap-2 text-orange-900 mb-4">
-        <Flame className="w-6 h-6" />
-        <h2 className="text-xl font-semibold">{title} - Videos That Could Go Viral</h2>
+    <section className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
+      <div className="flex items-center gap-2 text-slate-900 mb-4">
+        <Sparkles className="w-6 h-6" />
+        <h2 className="text-xl font-semibold">{title} - Trending Content</h2>
       </div>
-      <p className="text-orange-800 mb-6">
-        Content with high sharing potential and explosive growth patterns
+      <p className="text-slate-600 mb-6">
+        Videos showing strong growth and high sharing potential
       </p>
 
       {viralCandidates.length === 0 ? (
-        <div className="rounded-xl bg-white/80 p-6 text-center">
-          <Flame className="w-12 h-12 mx-auto text-orange-300 mb-3" />
-          <p className="text-sm text-slate-600">No viral patterns detected yet</p>
+        <div className="rounded-xl bg-slate-50 p-8 text-center">
+          <Sparkles className="w-12 h-12 mx-auto text-slate-300 mb-3" />
+          <p className="text-sm text-slate-600 font-medium">No trending videos detected yet</p>
           <p className="text-xs text-slate-500 mt-1">
-            Keep creating engaging content - viral moments can happen anytime!
+            Keep creating! Viral moments can happen at any time
           </p>
         </div>
       ) : (
         <>
-          <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-orange-100 p-5 mb-6">
+          <div className="rounded-xl bg-indigo-50 border-2 border-indigo-200 p-5 mb-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-semibold text-slate-900">
-                  Videos Showing Viral Characteristics
+                  Videos with Growth Potential
                 </p>
                 <p className="text-xs text-slate-600 mt-1">
-                  High sharing rate and exceptional audience response
+                  Content showing exceptional audience response
                 </p>
               </div>
               <div className="text-right">
-                <p className="text-3xl font-bold text-orange-600">
+                <p className="text-3xl font-bold text-indigo-600">
                   {viralCandidates.length}
                 </p>
-                <p className="text-xs text-slate-500">hot videos</p>
+                <p className="text-xs text-slate-500">trending videos</p>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            {viralCandidates.map((video, idx) => (
-              <div
-                key={video.id}
-                className="rounded-xl bg-white/80 backdrop-blur-sm border border-orange-100 p-4 hover:shadow-md transition-shadow"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0">
-                    <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-orange-400 to-red-500 flex items-center justify-center">
-                      <span className="text-sm font-bold text-white">#{idx + 1}</span>
-                    </div>
-                  </div>
+          <div className="space-y-4">
+            {viralCandidates.map((video, idx) => {
+              const getViralLevel = (score) => {
+                if (score >= 8) return { label: "Very High", color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" };
+                if (score >= 5) return { label: "High", color: "text-green-600", bg: "bg-green-50", border: "border-green-200" };
+                if (score >= 3) return { label: "Moderate", color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" };
+                return { label: "Growing", color: "text-indigo-600", bg: "bg-indigo-50", border: "border-indigo-200" };
+              };
 
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-slate-900 line-clamp-2 mb-2">
-                      {video.title}
-                    </p>
+              const viralLevel = getViralLevel(video.viral_score);
 
-                    <div className="grid grid-cols-3 gap-2 text-xs mb-3">
-                      <div>
-                        <p className="text-slate-500">Views</p>
-                        <p className="font-semibold text-slate-900">
-                          {video.views.toLocaleString()}
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500">Like Rate</p>
-                        <p className="font-semibold text-emerald-600">
-                          {video.like_ratio.toFixed(2)}%
-                        </p>
-                      </div>
-                      <div>
-                        <p className="text-slate-500">Comments</p>
-                        <p className="font-semibold text-blue-600">
-                          {video.comment_ratio.toFixed(2)}%
-                        </p>
+              return (
+                <div
+                  key={video.id}
+                  className="rounded-xl bg-slate-50 border-2 border-slate-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => {
+                    const ytId = String(video.id).includes(":") ? String(video.id).split(":")[1] : video.id;
+                    window.open(`https://www.youtube.com/watch?v=${ytId}`, "_blank");
+                  }}
+                >
+                  <div className="flex items-start gap-3">
+                    <div className="flex-shrink-0">
+                      <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
+                        <span className="text-sm font-bold text-indigo-700">#{idx + 1}</span>
                       </div>
                     </div>
 
-                    <div className="inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-orange-100 to-red-100 px-2 py-1">
-                      <Share2 className="w-3 h-3 text-orange-600" />
-                      <span className="text-xs font-semibold text-orange-700">
-                        Viral Score: {video.viral_score.toFixed(1)}/10
-                      </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-slate-900 line-clamp-2 mb-3">
+                        {video.title}
+                      </p>
+
+                      <div className="grid grid-cols-3 gap-3 text-xs mb-3">
+                        <div>
+                          <p className="text-slate-500 mb-1">Views</p>
+                          <p className="font-semibold text-slate-900">
+                            {formatNumber(video.views)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500 mb-1">Likes</p>
+                          <p className="font-semibold text-emerald-600">
+                            {formatNumber(video.likes)}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500 mb-1">Comments</p>
+                          <p className="font-semibold text-blue-600">
+                            {formatNumber(video.comments)}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className={`inline-flex items-center gap-1.5 rounded-lg ${viralLevel.bg} border ${viralLevel.border} px-3 py-1.5`}>
+                        <TrendingUp className={`w-3 h-3 ${viralLevel.color}`} />
+                        <span className={`text-xs font-semibold ${viralLevel.color}`}>
+                          {viralLevel.label} Potential
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </>
-      )}
-    </section>
-  );
-}
-
-function RetentionPanel({ title, data }) {
-  const retention = data?.retention || {};
-  const highRetention = retention.high_retention_videos || [];
-  const avgScore = retention.avg_retention_score || 0;
-
-  return (
-    <section className="rounded-2xl bg-gradient-to-br from-blue-50 to-indigo-50 border border-blue-100 p-6">
-      <div className="flex items-center gap-2 text-blue-900 mb-4">
-        <Heart className="w-6 h-6" />
-        <h2 className="text-xl font-semibold">{title} - Audience Loyalty</h2>
-      </div>
-      <p className="text-blue-800 mb-6">
-        Videos that keep people watching and engaging throughout
-      </p>
-
-      <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-blue-100 p-5 mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-slate-900">
-              Average Loyalty Score
-            </p>
-            <p className="text-xs text-slate-600 mt-1">
-              How well your videos hold people's attention (higher is better)
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-3xl font-bold text-blue-600">{avgScore.toFixed(2)}%</p>
-            <p className="text-xs text-slate-500">viewer loyalty</p>
-          </div>
-        </div>
-      </div>
-
-      {highRetention.length === 0 ? (
-        <div className="rounded-xl bg-white/80 p-6 text-center">
-          <Heart className="w-12 h-12 mx-auto text-blue-300 mb-3" />
-          <p className="text-sm text-slate-600">No standout loyalty videos yet</p>
-          <p className="text-xs text-slate-500 mt-1">
-            Keep creating content that keeps people engaged!
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-3">
-          <h3 className="text-sm font-semibold text-slate-900">
-            Videos People Love to Watch ({highRetention.length})
-          </h3>
-          <p className="text-xs text-slate-600 mb-3">
-            These videos kept viewers engaged from start to finish
-          </p>
-          {highRetention.map((video, idx) => (
-            <div
-              key={video.id}
-              className="rounded-xl bg-white/80 backdrop-blur-sm border border-blue-100 p-4"
-            >
-              <div className="flex items-start gap-3">
-                <div className="flex-shrink-0">
-                  <div className="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center">
-                    <span className="text-sm font-bold text-blue-700">#{idx + 1}</span>
-                  </div>
-                </div>
-
-                <div className="flex-1">
-                  <p className="text-sm font-semibold text-slate-900 line-clamp-2 mb-2">
-                    {video.title}
-                  </p>
-
-                  <div className="flex items-center gap-4 text-xs text-slate-600 mb-2">
-                    <span>{video.views.toLocaleString()} views</span>
-                    <span>{video.likes.toLocaleString()} likes</span>
-                    <span>{video.comments.toLocaleString()} comments</span>
-                  </div>
-
-                  <div className="inline-flex items-center gap-1.5 rounded-lg bg-blue-100 px-2 py-1">
-                    <Heart className="w-3 h-3 text-blue-600" />
-                    <span className="text-xs font-semibold text-blue-700">
-                      Loyalty: {video.retention_score.toFixed(2)}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </section>
-  );
-}
-
-function TimingPanel({ title, data }) {
-  const timing = data?.timing || {};
-  const dayPerformance = timing.day_performance || {};
-  const bestDay = timing.best_day;
-
-  const days = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
-  const chartData = days
-    .filter((day) => dayPerformance[day])
-    .map((day) => ({
-      day,
-      engagement: dayPerformance[day].avg_engagement,
-      views: dayPerformance[day].avg_views,
-      count: dayPerformance[day].video_count,
-    }));
-
-  return (
-    <section className="rounded-2xl bg-gradient-to-br from-amber-50 to-yellow-50 border border-amber-100 p-6">
-      <div className="flex items-center gap-2 text-amber-900 mb-4">
-        <Clock className="w-6 h-6" />
-        <h2 className="text-xl font-semibold">{title} - Best Time to Post</h2>
-      </div>
-      <p className="text-amber-800 mb-6">
-        When your audience is most active and engaged with your content
-      </p>
-
-      {chartData.length === 0 ? (
-        <div className="rounded-xl bg-white/80 p-6 text-center">
-          <Calendar className="w-12 h-12 mx-auto text-amber-300 mb-3" />
-          <p className="text-sm text-slate-600">Not enough data to find patterns yet</p>
-          <p className="text-xs text-slate-500 mt-1">
-            Post consistently and we'll find your best posting times!
-          </p>
-        </div>
-      ) : (
-        <>
-          {bestDay && (
-            <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-amber-100 p-5 mb-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">Your Best Day to Upload</p>
-                  <p className="text-xs text-slate-600 mt-1">{timing.recommendation}</p>
-                </div>
-                <div className="text-right">
-                  <p className="text-3xl font-bold text-amber-600">{bestDay}</p>
-                  <p className="text-xs text-slate-500">most engagement</p>
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-amber-100 p-5">
-            <h3 className="text-sm font-semibold text-slate-900 mb-4">
-              Performance by Day of Week
-            </h3>
-            <p className="text-xs text-slate-600 mb-4">
-              Days ranked by how much your audience interacts with your videos
-            </p>
-            <div className="space-y-3">
-              {chartData
-                .sort((a, b) => b.engagement - a.engagement)
-                .map((item) => (
-                  <div key={item.day}>
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-sm font-medium text-slate-900">{item.day}</span>
-                      <span className="text-xs text-slate-600">
-                        {item.engagement.toFixed(2)}% interaction · {item.count} videos posted
-                      </span>
-                    </div>
-                    <div className="h-2 bg-amber-100 rounded-full overflow-hidden">
-                      <div
-                        className="h-full bg-gradient-to-r from-amber-400 to-amber-600 rounded-full"
-                        style={{
-                          width: `${(item.engagement / Math.max(...chartData.map(d => d.engagement))) * 100}%`,
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </>
-      )}
-    </section>
-  );
-}
-
-function ROIPanel({ title, data }) {
-  const roi = data?.roi || {};
-  const metrics = roi.metrics || {};
-  const recommendations = roi.recommendations || [];
-
-  return (
-    <section className="rounded-2xl bg-gradient-to-br from-emerald-50 to-green-50 border border-emerald-100 p-6">
-      <div className="flex items-center gap-2 text-emerald-900 mb-4">
-        <DollarSign className="w-6 h-6" />
-        <h2 className="text-xl font-semibold">{title} - Your Value to Sponsors</h2>
-      </div>
-      <p className="text-emerald-800 mb-6">
-        What your channel is worth to brands and advertisers
-      </p>
-
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-emerald-100 p-5">
-          <p className="text-sm font-semibold text-slate-900 mb-2">Cost Per Interaction</p>
-          <p className="text-2xl font-bold text-emerald-700">
-            ${metrics.cpe ? metrics.cpe.toFixed(2) : "N/A"}
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
-            How much sponsors pay for each like/comment (lower = better value)
-          </p>
-        </div>
-
-        <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-emerald-100 p-5">
-          <p className="text-sm font-semibold text-slate-900 mb-2">Sponsor Return Multiplier</p>
-          <p className="text-2xl font-bold text-emerald-700">
-            {metrics.roi_potential ? `${metrics.roi_potential.toFixed(1)}x` : "N/A"}
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
-            For every $1 invested, sponsors could get back this much
-          </p>
-        </div>
-
-        <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-emerald-100 p-5">
-          <p className="text-sm font-semibold text-slate-900 mb-2">Overall Value Rating</p>
-          <p className="text-2xl font-bold text-emerald-700">
-            {metrics.value_score ? metrics.value_score.toFixed(1) : "N/A"}/10
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
-            How attractive you are to potential sponsors
-          </p>
-        </div>
-      </div>
-
-      {recommendations.length > 0 && (
-        <div className="rounded-xl bg-white/80 backdrop-blur-sm border border-emerald-100 p-5">
-          <h3 className="text-sm font-semibold text-slate-900 mb-4">
-            Why Brands Should Invest in You
-          </h3>
-          <ul className="space-y-2">
-            {recommendations.map((rec, idx) => (
-              <li key={idx} className="flex items-start gap-3">
-                <ArrowRight className="w-4 h-4 text-emerald-600 mt-0.5 flex-shrink-0" />
-                <span className="text-sm text-slate-700">{rec}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
       )}
     </section>
   );

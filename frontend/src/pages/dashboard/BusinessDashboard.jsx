@@ -51,6 +51,7 @@ export default function BusinessDashboard() {
 
   const [topVideos, setTopVideos] = useState([]);
   const [latestComments, setLatestComments] = useState([]);
+  const [allVideosEngagement, setAllVideosEngagement] = useState(0);
 
   const [reportRange, setReportRange] = useState("weekly");
   const [includeSections, setIncludeSections] = useState({
@@ -88,6 +89,7 @@ export default function BusinessDashboard() {
         setTotalComments(null);
         setTopVideos([]);
         setLatestComments([]);
+        setAllVideosEngagement(0);
         return;
       }
 
@@ -134,6 +136,15 @@ export default function BusinessDashboard() {
             };
           });
 
+          // Calculate average engagement across ALL videos
+          const validVideos = allVideosForRanking.filter((v) => v.views > 0);
+          if (validVideos.length > 0) {
+            const avgEngagement = validVideos.reduce((sum, v) => sum + v.engagementScore, 0) / validVideos.length;
+            setAllVideosEngagement(avgEngagement * 100);
+          } else {
+            setAllVideosEngagement(0);
+          }
+
           // Top videos: Sorted by engagement, the top 4 are selected.
           const top = allVideosForRanking
             .filter((v) => v.videoId)
@@ -142,6 +153,7 @@ export default function BusinessDashboard() {
           setTopVideos(top);
         } else {
           setTopVideos([]);
+          setAllVideosEngagement(0);
         }
 
         // Latest comments: 5 comments from the channel
@@ -163,6 +175,7 @@ export default function BusinessDashboard() {
         setTotalComments(null);
         setTopVideos([]);
         setLatestComments([]);
+        setAllVideosEngagement(0);
       } finally {
         setLoading(false);
       }
@@ -276,11 +289,8 @@ export default function BusinessDashboard() {
     setExportMessage("Report downloaded as CSV (openable in Excel).");
   };
 
-  // Calculate engagement rate for display
-  const engagementRate = useMemo(() => {
-    if (!viewCount || viewCount === 0) return 0;
-    return ((Number(totalLikes || 0) + Number(totalComments || 0)) / Number(viewCount)) * 100;
-  }, [viewCount, totalLikes, totalComments]);
+  // Calculate engagement rate for display - using average across ALL recent videos
+  const engagementRate = allVideosEngagement;
 
   // Get engagement rate description
   const getEngagementDescription = (rate) => {
@@ -324,12 +334,12 @@ export default function BusinessDashboard() {
         label: "Needs Improvement",
         description: "Low engagement detected. Try creating more interactive content to boost viewer participation.",
         color: "text-red-600",
-        icon: ""
+        icon: "🎬"
       };
     }
   };
 
-  const engagementInfo = useMemo(() => getEngagementDescription(engagementRate), [engagementRate]);
+  const engagementInfo = useMemo(() => getEngagementDescription(engagementRate), [engagementRate, allVideosEngagement]);
 
   return (
     <div className="min-h-[calc(100vh-72px)] bg-slate-50">
@@ -452,7 +462,7 @@ export default function BusinessDashboard() {
             <StatCard label="Total comments" value={loading ? "Loading..." : formatNum(totalComments)} />
           </section>
 
-          {/* Engagement Rate Card */}
+          {/* Engagement Rate Card
           {!loading && viewCount > 0 && (
             <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-5">
               <div className="flex items-start justify-between gap-4">
@@ -468,7 +478,7 @@ export default function BusinessDashboard() {
                     {engagementInfo.description}
                   </p>
                   <p className="mt-2 text-xs text-slate-400">
-                   Based on channels likes + comments vs total views
+                    Rate: {engagementRate.toFixed(2)}% • Average across all recent videos
                   </p>
                 </div>
                 <div className={`flex items-center gap-2 ${engagementInfo.color}`}>
@@ -476,7 +486,7 @@ export default function BusinessDashboard() {
                 </div>
               </div>
             </section>
-          )}
+          )} */}
 
           {/* Right side blocks */}
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
