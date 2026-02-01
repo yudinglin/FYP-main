@@ -25,7 +25,7 @@ import Profile from "../../pages/profile/Profile.jsx";
 import BusinessProfile from "../../pages/profile/BusinessProfile.jsx";
 
 import NetworkGraph from "../../pages/Creator/NetworkGraph.jsx";
-import CentralityMetrics from "../../pages/Creator/CentralityMetrics.jsx";
+// import CentralityMetrics from "../../pages/Creator/CentralityMetrics.jsx";
 import PredictiveAnalysis from "../../pages/Creator/PredictiveAnalysis.jsx";
 import SentimentAnalysis from "../../pages/Creator/SentimentAnalysis.jsx";
 
@@ -130,14 +130,14 @@ export default function AppRouter() {
           </MainLayout>
         }
       />
-      <Route
+      {/* <Route
         path="/dashboard/centrality"
         element={
           <MainLayout>
             <CentralityMetrics />
           </MainLayout>
         }
-      />
+      /> */}
       <Route
         path="/dashboard/predictive"
         element={

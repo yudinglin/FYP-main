@@ -14,12 +14,30 @@ import {
   LabelList,
 } from "recharts";
 import { useAuth } from "../../core/context/AuthContext";
-import { Lightbulb, TrendingUp, MessageSquare, BarChart3, Network, AlertCircle } from "lucide-react";
+import {
+  Lightbulb,
+  TrendingUp,
+  MessageSquare,
+  BarChart3,
+  Network,
+  AlertCircle,
+  Sparkles,
+  Award,
+  Activity,
+  Target,
+  Zap,
+  CheckCircle,
+  ArrowRight,
+  Eye,
+  ThumbsUp,
+  ExternalLink,
+  TrendingDown,
+  Flame,
+} from "lucide-react";
 
 const API_BASE = "http://127.0.0.1:5000";
 
 export default function NetworkGraph() {
-  // In "focus" mode, maxVideos = number of similar nodes (excluding the center video)
   const [maxVideos, setMaxVideos] = useState(25);
   const [graphData, setGraphData] = useState({ nodes: [], links: [], rawMetrics: [] });
   const [loading, setLoading] = useState(false);
@@ -32,13 +50,16 @@ export default function NetworkGraph() {
   const [videoInput, setVideoInput] = useState("25");
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
 
-  // --- Focus mode (pick 1 video as center) ---
+  // Channel insights state
+  const [channelData, setChannelData] = useState(null);
+  const [channelLoading, setChannelLoading] = useState(false);
+  const [channelError, setChannelError] = useState("");
+
   // Video catalog for search/select center node
-  const [videoCatalog, setVideoCatalog] = useState([]); // [{id,title,thumbnail,publishedAt}]
+  const [videoCatalog, setVideoCatalog] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState("");
 
-  // user input (title or id) + resolved id
   const [centerInput, setCenterInput] = useState("");
   const [centerVideoId, setCenterVideoId] = useState("");
 
@@ -78,7 +99,6 @@ export default function NetworkGraph() {
         name: n.title || n.id,
         engagementRate:
           n.views > 0 ? ((n.likes || 0) + (n.comments || 0)) / n.views : 0,
-        // Mark center node (backend provides isCenter)
         isCenter: Boolean(n.isCenter),
       }));
 
@@ -104,6 +124,34 @@ export default function NetworkGraph() {
     }
   };
 
+  const fetchChannelInsights = async () => {
+    setChannelLoading(true);
+    setChannelError("");
+
+    try {
+      const channelUrl = user?.youtube_channel;
+      if (!channelUrl) {
+        setChannelError("No channel URL found. Please add your YouTube channel in settings.");
+        return;
+      }
+
+      const encodedUrl = encodeURIComponent(channelUrl);
+      const response = await fetch(
+        `${API_BASE}/api/youtube/videos.centralityMetrics?url=${encodedUrl}`
+      );
+
+      if (!response.ok) throw new Error("Failed to fetch channel insights");
+
+      const data = await response.json();
+      setChannelData(data);
+    } catch (err) {
+      console.error("Error fetching channel insights:", err);
+      setChannelError(err.message);
+    } finally {
+      setChannelLoading(false);
+    }
+  };
+
   const fetchVideoCatalog = async () => {
     setCatalogLoading(true);
     setCatalogError("");
@@ -125,7 +173,6 @@ export default function NetworkGraph() {
       const vids = Array.isArray(data.videos) ? data.videos : [];
       setVideoCatalog(vids);
 
-      // If user hasn't selected a center yet, preselect the newest video
       if (!centerVideoId && vids.length > 0) {
         setCenterVideoId(vids[0].id);
         setCenterInput(`${vids[0].title} — ${vids[0].id}`);
@@ -138,7 +185,6 @@ export default function NetworkGraph() {
     }
   };
 
-  // Update container size on mount and resize
   useEffect(() => {
     const updateSize = () => {
       if (containerRef.current) {
@@ -153,7 +199,6 @@ export default function NetworkGraph() {
     return () => window.removeEventListener("resize", updateSize);
   }, []);
 
-  // Fetch catalog when opening the Network view (so the dropdown is ready)
   useEffect(() => {
     if (activeView !== "network") return;
     if (videoCatalog.length > 0 || catalogLoading) return;
@@ -161,26 +206,20 @@ export default function NetworkGraph() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView]);
 
-  // Auto-run analysis when entering Insights view
   useEffect(() => {
     if (activeView !== "summary") return;
-
-    // already have insights data
     if (graphData.rawMetrics && graphData.rawMetrics.length > 0) return;
 
     let cancelled = false;
 
     const run = async () => {
       try {
-        // if no center video yet, fetch catalog (it auto-selects first)
         if (!centerVideoId) {
           await fetchVideoCatalog();
-          // give React one tick to apply setCenterVideoId
           await new Promise((r) => setTimeout(r, 0));
         }
 
         if (cancelled) return;
-
         await handleFetchGraph();
       } catch (e) {
         // handleFetchGraph already sets error
@@ -195,24 +234,26 @@ export default function NetworkGraph() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView, centerVideoId]);
 
+  // Auto-fetch channel insights when switching to that tab
+  useEffect(() => {
+    if (activeView !== "channel-insights") return;
+    if (channelData !== null || channelLoading) return;
+    fetchChannelInsights();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView]);
 
-  // Enhanced Force layout tuning for better spacing
   useEffect(() => {
     if (!fgRef.current) return;
     const fg = fgRef.current;
 
-    // Stronger repulsion between nodes
     fg.d3Force("charge").strength(-1200);
     
-    // Longer links based on weight
     fg.d3Force("link").distance((link) => {
       const baseDistance = 450;
       const weight = link.weight || 0;
-      // Higher correlation = shorter distance, but still keep them apart
       return baseDistance - (weight * 80);
     });
 
-    // Collision detection to prevent overlap
     const collideForce = fg.d3Force("collide");
     if (collideForce) {
       collideForce
@@ -224,14 +265,11 @@ export default function NetworkGraph() {
         .strength(0.7);
     }
 
-    // Add centering force to keep graph centered
     fg.d3Force("center")
       .x(containerSize.width / 2)
       .y(containerSize.height / 2);
 
-    // Warm up the simulation
     if (graphData.nodes.length > 0) {
-      // Fix the center node to the middle of the canvas
       const center = graphData.nodes.find((n) => n.isCenter);
       if (center) {
         center.fx = containerSize.width / 2;
@@ -249,7 +287,6 @@ export default function NetworkGraph() {
 
   const getNodeSize = (views) => {
     if (!views) return 3;
-    // Slightly larger base size for better visibility
     return 4 + Math.log10(views + 1) * 0.7;
   };
 
@@ -272,7 +309,6 @@ export default function NetworkGraph() {
 
   const resolveCenterVideoId = (value) => {
     if (!value) return "";
-    // If user typed something like "title — VIDEO_ID", take the last token
     const m = String(value).match(/([A-Za-z0-9_-]{11})\s*$/);
     return m ? m[1] : "";
   };
@@ -329,8 +365,6 @@ export default function NetworkGraph() {
     const lowVideos = sortedByViews.slice(-3).reverse();
 
     const avgViews = data.reduce((sum, v) => sum + (v.views || 0), 0) / data.length;
-    const avgLikes = data.reduce((sum, v) => sum + (v.likes || 0), 0) / data.length;
-    const avgComments = data.reduce((sum, v) => sum + (v.comments || 0), 0) / data.length;
     const avgEngagement = data.reduce((sum, v) => {
       const views = v.views || 0;
       return sum + (views > 0 ? ((v.likes || 0) + (v.comments || 0)) / views : 0);
@@ -341,7 +375,6 @@ export default function NetworkGraph() {
 
     return (
       <div className="space-y-6">
-        {/* Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <MetricCard
             title="Average Views"
@@ -366,7 +399,6 @@ export default function NetworkGraph() {
           />
         </div>
 
-        {/* Top Performers */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center">
@@ -423,7 +455,6 @@ export default function NetworkGraph() {
           </div>
         </div>
 
-        {/* Videos Needing Improvement */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-10 h-10 rounded-lg bg-orange-100 flex items-center justify-center">
@@ -476,7 +507,6 @@ export default function NetworkGraph() {
           </div>
         </div>
 
-        {/* Engagement Drivers */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <div className="flex items-center gap-2 mb-4">
             <div className="w-10 h-10 rounded-lg bg-blue-100 flex items-center justify-center">
@@ -530,7 +560,6 @@ export default function NetworkGraph() {
           </div>
         </div>
 
-        {/* Actionable Suggestions */}
         <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-6">
           <h3 className="text-lg font-semibold text-slate-900 mb-4">Recommended Actions</h3>
           <div className="space-y-3">
@@ -560,7 +589,6 @@ export default function NetworkGraph() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
       <div className="max-w-7xl mx-auto">
-        {/* Header */}
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-slate-900 mb-2">
             Video Performance Analysis
@@ -573,26 +601,24 @@ export default function NetworkGraph() {
         <div className="flex gap-6">
           {/* Sidebar */}
           <div className="w-64 flex flex-col gap-4">
-            {/* Navigation */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
               <h2 className="text-sm font-semibold text-slate-700 px-4 py-2 mb-2">
                 Views
               </h2>
               <div className="space-y-1">
-                <MenuItem icon={Lightbulb} label="Insights" view="summary" badge="Start Here" />
+                <MenuItem icon={Lightbulb} label="Video Insights" view="summary" badge="Start Here" />
+                <MenuItem icon={Activity} label="Channel Insights" view="channel-insights" />
                 <MenuItem icon={Network} label="Network Graph" view="network" />
                 <MenuItem icon={BarChart3} label="Charts" view="charts" />
               </div>
             </div>
 
-            {/* Analysis Settings */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
               <h3 className="text-sm font-semibold text-slate-700 mb-3">
                 Analysis Settings
               </h3>
               
               <div className="space-y-4">
-                {/* Center Video Selection */}
                 <div>
                   <label className="text-sm text-slate-600 block mb-2">
                     Center Video
@@ -642,7 +668,6 @@ export default function NetworkGraph() {
                   )}
                 </div>
 
-                {/* Similar Node Count Input */}
                 <div>
                   <label className="text-sm text-slate-600 block mb-2">
                     Number of Similar Videos to Show
@@ -694,7 +719,6 @@ export default function NetworkGraph() {
               </div>
             </div>
 
-            {/* Quick Stats */}
             {graphData.rawMetrics.length > 0 && (
               <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl shadow-sm p-4 text-white">
                 <div className="text-sm font-medium mb-3">Channel Overview</div>
@@ -718,6 +742,15 @@ export default function NetworkGraph() {
           <div className="flex-1">
             {activeView === "summary" && <SummaryPanel data={graphData.rawMetrics} />}
 
+            {activeView === "channel-insights" && (
+              <ChannelInsightsPanel 
+                data={channelData} 
+                loading={channelLoading} 
+                error={channelError}
+                onRetry={fetchChannelInsights}
+              />
+            )}
+
             {activeView === "network" && (
               <div className="space-y-6">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
@@ -728,7 +761,7 @@ export default function NetworkGraph() {
                     {graphData.nodes.length > 50 && " Drag to pan, scroll to zoom."}
                   </p>
 
-                  <div ref={containerRef} className="h-[600px] relative">{/* Increased height */}
+                  <div ref={containerRef} className="h-[600px] relative">
                     {graphData.nodes.length === 0 && !loading ? (
                       <div className="h-full flex items-center justify-center text-sm text-slate-400">
                         <div className="text-center">
@@ -750,7 +783,6 @@ export default function NetworkGraph() {
                       </div>
                     ) : (
                       <>
-                        {/* Engagement Rate Legend */}
                         <div className="absolute top-4 right-4 bg-white p-3 rounded shadow border text-sm max-w-xs z-10">
                           <div className="font-semibold mb-1">Engagement Rate Legend</div>
                           <p className="text-xs text-slate-500 mb-2">
@@ -764,7 +796,6 @@ export default function NetworkGraph() {
                           </div>
                         </div>
 
-                        {/* Graph Controls */}
                         <div className="absolute top-4 left-4 bg-white p-3 rounded shadow border text-sm z-10">
                           <div className="font-semibold mb-2">Controls</div>
                           <div className="space-y-1 text-xs text-slate-600">
@@ -789,12 +820,10 @@ export default function NetworkGraph() {
                             ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
                             ctx.fillStyle = getNodeColor(node.engagementRate);
                             ctx.fill();
-                            // Emphasize the selected center video
                             ctx.strokeStyle = node.isCenter ? "#0f172a" : "#fff";
                             ctx.lineWidth = node.isCenter ? 3 : 1.5;
                             ctx.stroke();
 
-                            // Only show labels when zoomed in enough or for large nodes
                             if (globalScale > 1.2 || size > 10) {
                               const fontSize = Math.max(9, 11 / globalScale);
                               ctx.font = `${fontSize}px Sans-Serif`;
@@ -835,7 +864,6 @@ export default function NetworkGraph() {
                   </div>
                 ) : (
                   <>
-                    {/* Scatter Plot */}
                     <div className="rounded-xl bg-white p-6 shadow-sm border border-slate-200">
                       <h2 className="text-xl font-semibold text-slate-900 mb-2">
                         Views vs Likes Scatter Plot
@@ -877,7 +905,6 @@ export default function NetworkGraph() {
                       </div>
                     </div>
 
-                    {/* Bar Chart */}
                     <div className="rounded-xl bg-white p-6 shadow-md border border-slate-200">
                       <div className="flex justify-between items-center mb-2">
                         <h2 className="text-xl font-semibold text-slate-900">
@@ -1028,6 +1055,489 @@ export default function NetworkGraph() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Channel Insights Panel Component
+function ChannelInsightsPanel({ data, loading, error, onRetry }) {
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-indigo-600 border-r-transparent"></div>
+        <p className="mt-4 text-slate-600">Analyzing your channel strategy...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-red-800 font-medium">Unable to analyze channel performance</p>
+            <p className="text-red-600 text-sm mt-1">{error}</p>
+            <button
+              onClick={onRetry}
+              className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+        <div className="flex items-start gap-3">
+          <Sparkles className="w-6 h-6 text-blue-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-blue-800 font-medium mb-2">Channel insights will appear here</p>
+            <p className="text-blue-700 text-sm">
+              This view shows overall channel performance, quick wins, and actionable recommendations.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const categorized = data?.categorized_videos || {};
+  const quickWins = data?.quick_wins || [];
+  const channelHealth = data?.channel_health || {};
+  const summary = data?.summary || {};
+
+  const winners = categorized.winners || [];
+  const hiddenGems = categorized.hidden_gems || [];
+  const needsWork = categorized.needs_work || [];
+
+  if (summary.total_videos === 0) {
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+        <div className="flex items-start gap-3">
+          <Sparkles className="w-6 h-6 text-blue-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-blue-800 font-medium mb-2">Start your journey!</p>
+            <p className="text-blue-700 text-sm">
+              Upload some videos to get actionable insights on what's working and what needs improvement.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const calculateMomentum = () => {
+    const score = channelHealth.overall_score || 0;
+    const trend = channelHealth.engagement_trend === 'improving' ? 'up' : 'down';
+    return {
+      current: score,
+      trend: trend,
+      benchmark: 75
+    };
+  };
+
+  const momentum = calculateMomentum();
+
+  return (
+    <div className="space-y-6">
+      {/* Momentum Score Banner */}
+      <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-xl p-6 text-white shadow-sm">
+        <div className="flex items-center justify-between">
+          <div className="flex-1">
+            <div className="flex items-center gap-2 mb-2">
+              <Flame className="w-5 h-5" />
+              <span className="text-sm font-medium">Channel Growth Status</span>
+            </div>
+            <div className="flex items-baseline gap-3 mb-2">
+              <span className="text-5xl font-bold">{momentum.current}</span>
+              <span className="text-2xl opacity-90">/100</span>
+            </div>
+            <p className="text-sm">
+              {momentum.current >= 70 ? "Excellent! Your channel is performing great." :
+               momentum.current >= 50 ? "Good progress. A few tweaks can boost your reach." :
+               "Room for improvement. Focus on quick wins below."}
+            </p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <div className="flex items-center gap-2 bg-white/20 px-4 py-2 rounded-full">
+              {momentum.trend === "up" ? (
+                <>
+                  <TrendingUp className="w-5 h-5" />
+                  <span className="font-semibold">Trending Up</span>
+                </>
+              ) : (
+                <>
+                  <TrendingDown className="w-5 h-5" />
+                  <span className="font-semibold">Needs Attention</span>
+                </>
+              )}
+            </div>
+            <div className="text-right text-sm">
+              <div>Benchmark: {momentum.benchmark}</div>
+              <div className="text-xs mt-1 opacity-90">
+                {momentum.current >= momentum.benchmark ? "Above industry average" : `${momentum.benchmark - momentum.current} pts to benchmark`}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Quick Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <StatCard
+          icon={<Activity className="w-5 h-5" />}
+          label="Health Score"
+          value={channelHealth.overall_score || 0}
+          suffix="/100"
+          color="indigo"
+          subtitle={channelHealth.health_label}
+        />
+        <StatCard
+          icon={<Target className="w-5 h-5" />}
+          label="Consistency"
+          value={channelHealth.consistency || 0}
+          suffix="%"
+          color="green"
+          subtitle="Upload quality"
+        />
+        <StatCard
+          icon={<Award className="w-5 h-5" />}
+          label="Winners"
+          value={summary.winners_count || 0}
+          color="amber"
+          subtitle="Top performers"
+        />
+        <StatCard
+          icon={<Sparkles className="w-5 h-5" />}
+          label="Hidden Gems"
+          value={summary.hidden_gems_count || 0}
+          color="purple"
+          subtitle="Untapped potential"
+        />
+      </div>
+
+      {/* Quick Wins */}
+      {quickWins.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="bg-amber-500 text-white p-3 rounded-lg">
+              <Zap className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-slate-900">Quick Wins</h2>
+              <p className="text-sm text-slate-600 mt-1 font-medium">
+                Take these actions now to see immediate improvements
+              </p>
+            </div>
+            <div className="bg-amber-100 text-amber-800 px-3 py-1 rounded-full text-sm font-semibold">
+              {quickWins.length} action{quickWins.length > 1 ? 's' : ''}
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {quickWins.map((win, idx) => (
+              <QuickWinCard key={idx} win={win} index={idx} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Winners */}
+      {winners.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="bg-green-100 text-green-700 p-3 rounded-lg">
+              <Award className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-slate-900">Your Winners</h2>
+              <p className="text-sm text-slate-600 mt-1">
+                These videos are crushing it. Study what makes them work.
+              </p>
+            </div>
+            <div className="bg-green-50 text-green-700 px-3 py-1 rounded-full text-sm font-medium">
+              {winners.length} video{winners.length > 1 ? 's' : ''}
+            </div>
+          </div>
+          <div className="space-y-3">
+            {winners.slice(0, 5).map((video) => (
+              <VideoCard key={video.id} video={video} type="winner" />
+            ))}
+          </div>
+          <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-200">
+            <div className="flex gap-3">
+              <Lightbulb className="text-blue-600 flex-shrink-0 mt-0.5" size={20} />
+              <div>
+                <div className="font-semibold text-blue-900 text-sm mb-1">Strategy Insight</div>
+                <div className="text-sm text-blue-800">
+                  Your top videos share common traits. Double down on similar topics, formats, and thumbnail styles to replicate this success.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Hidden Gems */}
+      {hiddenGems.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="bg-purple-100 text-purple-700 p-3 rounded-lg">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-slate-900">Hidden Gems</h2>
+              <p className="text-sm text-slate-600 mt-1">
+                High engagement, low views. Promote these to unlock viral potential.
+              </p>
+            </div>
+            <div className="bg-purple-50 text-purple-700 px-3 py-1 rounded-full text-sm font-medium">
+              {hiddenGems.length} video{hiddenGems.length > 1 ? 's' : ''}
+            </div>
+          </div>
+          <div className="space-y-3">
+            {hiddenGems.map((video) => (
+              <VideoCard key={video.id} video={video} type="hidden-gem" />
+            ))}
+          </div>
+          <div className="mt-4 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+            <div className="flex gap-3">
+              <Lightbulb className="text-indigo-600 flex-shrink-0 mt-0.5" size={20} />
+              <div>
+                <div className="font-semibold text-indigo-900 text-sm mb-1">Action Plan</div>
+                <div className="text-sm text-indigo-800">
+                  Share these on Twitter, LinkedIn, and Reddit. Add them to playlists. Reference them in your popular videos' descriptions.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Needs Work */}
+      {needsWork.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-sm">
+          <div className="flex items-start gap-3 mb-4">
+            <div className="bg-orange-100 text-orange-700 p-3 rounded-lg">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-slate-900">Needs Your Attention</h2>
+              <p className="text-sm text-slate-600 mt-1">
+                Fix these issues to boost performance. Small changes, big impact.
+              </p>
+            </div>
+            <div className="bg-orange-50 text-orange-700 px-3 py-1 rounded-full text-sm font-medium">
+              {needsWork.length} video{needsWork.length > 1 ? 's' : ''}
+            </div>
+          </div>
+          <div className="space-y-3">
+            {needsWork.slice(0, 5).map((video) => (
+              <VideoCard key={video.id} video={video} type="needs-work" />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function StatCard({ icon, label, value, suffix = "", color, subtitle }) {
+  const colorClasses = {
+    indigo: "bg-indigo-600",
+    green: "bg-green-600",
+    amber: "bg-amber-600",
+    purple: "bg-purple-600",
+  };
+
+  return (
+    <div className="bg-white rounded-lg border border-slate-200 p-5 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex items-center gap-3 mb-3">
+        <div className={`p-2 rounded-lg ${colorClasses[color]} text-white`}>{icon}</div>
+        <p className="text-sm font-medium text-slate-600">{label}</p>
+      </div>
+      <div className="flex items-baseline gap-1">
+        <p className="text-3xl font-bold text-slate-900">{value}</p>
+        {suffix && <p className="text-lg text-slate-500">{suffix}</p>}
+      </div>
+      {subtitle && (
+        <p className="text-xs text-slate-500 mt-1 font-medium">{subtitle}</p>
+      )}
+    </div>
+  );
+}
+
+function QuickWinCard({ win, index }) {
+  const impactColors = {
+    high: "bg-red-100 text-red-700",
+    medium: "bg-amber-100 text-amber-700",
+    low: "bg-blue-100 text-blue-700",
+  };
+
+  const effortColors = {
+    low: "bg-emerald-100 text-emerald-700",
+    medium: "bg-amber-100 text-amber-700",
+    high: "bg-red-100 text-red-700",
+  };
+
+  return (
+    <div className="bg-white rounded-lg border border-amber-200 p-5 hover:shadow-md transition-all">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start gap-2 flex-1">
+          <div className="bg-amber-500 text-white w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+            {index + 1}
+          </div>
+          <h3 className="font-bold text-slate-900 text-base">{win.title}</h3>
+        </div>
+      </div>
+      <p className="text-sm text-slate-700 mb-3 leading-relaxed">{win.description}</p>
+      
+      <div className="flex items-center gap-2 mb-3">
+        <span className={`text-xs px-3 py-1 rounded-full font-semibold ${impactColors[win.impact]}`}>
+          {win.impact.toUpperCase()} IMPACT
+        </span>
+        <span className={`text-xs px-3 py-1 rounded-full font-semibold ${effortColors[win.effort]}`}>
+          {win.effort.toUpperCase()} EFFORT
+        </span>
+      </div>
+
+      <div className="flex items-start gap-2 p-3 bg-amber-50 rounded-lg border border-amber-200">
+        <ArrowRight className="w-4 h-4 text-amber-700 shrink-0 mt-0.5" />
+        <p className="text-sm font-semibold text-amber-900">{win.action}</p>
+      </div>
+      
+      {win.video_count > 0 && (
+        <div className="flex items-center gap-1 mt-3 text-xs text-slate-600">
+          <Target className="w-3 h-3" />
+          <span>Affects <span className="font-semibold text-slate-900">{win.video_count}</span> video{win.video_count > 1 ? 's' : ''}</span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VideoCard({ video, type }) {
+  const config = {
+    winner: {
+      borderColor: "border-green-200",
+      bgColor: "bg-gradient-to-r from-green-50 to-transparent",
+      icon: <CheckCircle className="w-5 h-5 text-green-600" />,
+      scoreColor: "text-green-600",
+      scoreBg: "bg-green-100",
+      barColor: "bg-green-500",
+    },
+    "hidden-gem": {
+      borderColor: "border-purple-200",
+      bgColor: "bg-gradient-to-r from-purple-50 to-transparent",
+      icon: <Sparkles className="w-5 h-5 text-purple-600" />,
+      scoreColor: "text-purple-600",
+      scoreBg: "bg-purple-100",
+      barColor: "bg-purple-500",
+    },
+    "needs-work": {
+      borderColor: "border-orange-200",
+      bgColor: "bg-gradient-to-r from-orange-50 to-transparent",
+      icon: <AlertCircle className="w-5 h-5 text-orange-600" />,
+      scoreColor: "text-orange-600",
+      scoreBg: "bg-orange-100",
+      barColor: "bg-orange-500",
+    },
+  };
+
+  const style = config[type];
+  const score = video.performance_score || 0;
+  const videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
+
+  const formatNumber = (num) => {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+    if (num >= 1000) return (num / 1000).toFixed(1) + "K";
+    return Math.round(num).toString();
+  };
+
+  return (
+    <div className={`border ${style.borderColor} ${style.bgColor} rounded-lg p-4 hover:shadow-sm transition-shadow`}>
+      <div className="flex gap-4">
+        {video.thumbnail && (
+          <a href={videoUrl} target="_blank" rel="noopener noreferrer" className="flex-shrink-0">
+            <img
+              src={video.thumbnail}
+              alt={video.title}
+              className="w-28 h-16 object-cover rounded-lg"
+            />
+          </a>
+        )}
+
+        <div className="flex-1 min-w-0">
+          <a
+            href={videoUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-slate-900 hover:text-indigo-600 mb-1 line-clamp-2 block group"
+          >
+            {video.title}
+            <ExternalLink className="w-3 h-3 inline ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </a>
+
+          <div className="flex items-center gap-4 text-sm text-slate-600 mb-2">
+            <span className="flex items-center gap-1">
+              <Eye className="w-4 h-4" />
+              {formatNumber(video.views || 0)}
+            </span>
+            <span className="flex items-center gap-1">
+              <ThumbsUp className="w-4 h-4" />
+              {formatNumber(video.likes || 0)}
+            </span>
+            <span className="flex items-center gap-1">
+              <MessageSquare className="w-4 h-4" />
+              {formatNumber(video.comments || 0)}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-600 font-medium">Score:</span>
+            <div className={`${style.scoreBg} px-2 py-1 rounded text-xs font-bold ${style.scoreColor}`}>
+              {score}/100
+            </div>
+            <div className="flex-1 bg-slate-200 rounded-full h-2">
+              <div
+                className={`h-2 rounded-full ${style.barColor}`}
+                style={{ width: `${score}%` }}
+              />
+            </div>
+          </div>
+
+          {type === "winner" && (
+            <p className="mt-3 pt-3 border-t border-green-200 text-sm font-medium text-green-800 flex items-center gap-2">
+              <TrendingUp className="w-4 h-4" /> Winning formula! Replicate this content style and format.
+            </p>
+          )}
+
+          {type === "hidden-gem" && (
+            <p className="mt-3 pt-3 border-t border-purple-200 text-sm font-medium text-purple-800 flex items-center gap-2">
+              <Sparkles className="w-4 h-4" /> High engagement! Promote on social media and in popular videos.
+            </p>
+          )}
+
+          {type === "needs-work" && video.improvements && (
+            <div className="mt-3 pt-3 border-t border-orange-200 space-y-2">
+              <p className="text-sm font-bold text-orange-800 mb-2">How to fix:</p>
+              {video.improvements.slice(0, 2).map((improvement, idx) => (
+                <div key={idx} className="flex items-start gap-2 bg-white rounded p-2 border border-orange-100">
+                  <div className="w-1.5 h-1.5 rounded-full bg-orange-600 mt-1.5 shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs text-slate-800 font-semibold">{improvement.issue}</p>
+                    <p className="text-xs text-slate-600 mt-0.5">→ {improvement.action}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>

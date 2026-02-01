@@ -221,7 +221,7 @@ export default function CreatorDashboard() {
             <SidebarItem label="Overview" to="/dashboard" active />
             <div className="mt-4 border-t border-slate-800 pt-3" />
             <SidebarItem label="Network Graph" to="/dashboard/network" />
-            <SidebarItem label="Centrality Metrics" to="/dashboard/centrality" />
+            {/* <SidebarItem label="Centrality Metrics" to="/dashboard/centrality" /> */}
             <SidebarItem label="Predictive Analysis" to="/dashboard/predictive" />
             <SidebarItem label="Analyse Comments" to="/dashboard/sentiment" />
           </nav>
