@@ -1,24 +1,52 @@
 import React, { useEffect, useState } from "react";
+import { useAuth } from "../../core/context/AuthContext";
 
 export default function AdminDashboard() {
+  const { token } = useAuth();
+
   const [users, setUsers] = useState([]);
   const [roleFilter, setRoleFilter] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  // Fetch users from backend
+  // Fetch users from backend (admin)
   useEffect(() => {
-    fetch("http://localhost:5000/users")
-      .then((res) => res.json())
-      .then((data) => setUsers(data))
-      .catch((err) => console.error("Error fetching users:", err));
-  }, []);
+    if (!token) {
+      setError("You are not logged in.");
+      return;
+    }
+
+    setLoading(true);
+    setError("");
+
+    fetch("http://localhost:5000/api/admin/users", {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    })
+      .then(async (res) => {
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.message || "Failed to load users");
+
+        // support either { users: [...] } or direct array [...]
+        const list = Array.isArray(data) ? data : (data.users || []);
+        setUsers(list);
+      })
+      .catch((err) => setError(err.message || "Error fetching users"))
+      .finally(() => setLoading(false));
+  }, [token]);
 
   // Filter users based on selected role & status
   const filteredUsers = users.filter((user) => {
+    const role = (user.role || "").toUpperCase();
+    const status = (user.status || "").toUpperCase();
+
     const roleMatch =
-      roleFilter === "All" || user.role.toUpperCase() === roleFilter.toUpperCase();
+      roleFilter === "All" || role === roleFilter.toUpperCase();
+
     const statusMatch =
-      statusFilter === "All" || user.status.toUpperCase() === statusFilter.toUpperCase();
+      statusFilter === "All" || status === statusFilter.toUpperCase();
+
     return roleMatch && statusMatch;
   });
 
@@ -71,6 +99,14 @@ export default function AdminDashboard() {
             ))}
           </div>
 
+          {loading && (
+            <div className="py-3 text-sm text-slate-500">Loading users...</div>
+          )}
+
+          {error && (
+            <div className="py-3 text-sm text-red-600">{error}</div>
+          )}
+
           {/* Users Table */}
           <table className="w-full text-xs text-left">
             <thead className="text-slate-400 border-b border-slate-100">
@@ -82,31 +118,34 @@ export default function AdminDashboard() {
               </tr>
             </thead>
             <tbody className="text-slate-700">
-              {filteredUsers.length === 0 ? (
+              {!loading && !error && filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan="4" className="py-4 text-center text-slate-400">
                     No users found.
                   </td>
                 </tr>
               ) : (
-                filteredUsers.map((user) => (
-                  <tr key={user.user_id}>
-                    <td className="py-2 pr-4">{user.email}</td>
-                    <td className="py-2 pr-4">{user.role}</td>
-                    <td className="py-2 pr-4">{user.status}</td>
-                    <td className="py-2 pr-4 text-right">
-                      {user.status.toLowerCase() === "active" ? (
-                        <button className="px-4 py-1 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition w-24">
-                          Suspend
-                        </button>
-                      ) : (
-                        <button className="px-4 py-1 text-sm font-medium text-white bg-teal-500 rounded-lg hover:bg-teal-600 transition w-24">
-                          Reactivate
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                filteredUsers.map((user) => {
+                  const status = (user.status || "").toLowerCase();
+                  return (
+                    <tr key={user.user_id}>
+                      <td className="py-2 pr-4">{user.email}</td>
+                      <td className="py-2 pr-4">{user.role}</td>
+                      <td className="py-2 pr-4">{user.status}</td>
+                      <td className="py-2 pr-4 text-right">
+                        {status === "active" ? (
+                          <button className="px-4 py-1 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition w-24">
+                            Suspend
+                          </button>
+                        ) : (
+                          <button className="px-4 py-1 text-sm font-medium text-white bg-teal-500 rounded-lg hover:bg-teal-600 transition w-24">
+                            Reactivate
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
