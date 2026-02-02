@@ -2,6 +2,7 @@ from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from models.SupportTicket import SupportTicket
 from models.SupportResponse import SupportResponse
 from models.UserAccount import UserAccount
+from utils.email_service import email_service
 
 
 def submit_ticket(request):
@@ -97,6 +98,37 @@ def respond_to_ticket(request, ticket_id):
         
         # Update ticket status to ANSWERED
         SupportTicket.update_status(ticket_id, 'ANSWERED')
+        
+        # Send email notification to the user
+        try:
+            # Determine user name and email
+            user_name = ticket.name or "User"
+            user_email = ticket.email
+            
+            # If ticket has a user_id, get the registered user's info
+            if ticket.user_id:
+                ticket_user = UserAccount.find_by_id(ticket.user_id)
+                if ticket_user:
+                    user_name = f"{ticket_user.first_name} {ticket_user.last_name}".strip() or ticket_user.email
+                    user_email = ticket_user.email
+            
+            # Send email notification
+            if user_email:
+                email_service.send_support_response(
+                    user_email=user_email,
+                    user_name=user_name,
+                    ticket_subject=ticket.subject,
+                    original_message=ticket.message,
+                    admin_response=message,
+                    ticket_id=ticket.ticket_id
+                )
+                print(f"✅ Support response email sent to {user_email}")
+            else:
+                print("⚠️  No email address found for ticket user")
+                
+        except Exception as email_error:
+            print(f"❌ Error sending support response email: {str(email_error)}")
+            # Don't fail the response creation if email fails
         
         return {
             "message": "Response submitted successfully",

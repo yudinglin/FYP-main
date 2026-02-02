@@ -175,7 +175,7 @@ export default function Landing() {
 
             <video
               className="w-full aspect-video"
-              src="/prototype-demo.mp4"
+              src="/YouAnalyze-demo.mp4"
               controls
               autoPlay
             />

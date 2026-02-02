@@ -20,6 +20,8 @@ export default function AdminSupport() {
   const [error, setError] = useState(null);
 
   const [replyText, setReplyText] = useState({});
+  const [submittingReply, setSubmittingReply] = useState({});
+  const [successMessage, setSuccessMessage] = useState(null);
 
   useEffect(() => {
     fetchTickets();
@@ -48,8 +50,13 @@ export default function AdminSupport() {
     if (!message) return;
 
     try {
+      setSubmittingReply({ ...submittingReply, [id]: true });
       const res = await respondToSupportTicket(id, message);
       if (res.ok) {
+        // Show success message
+        setSuccessMessage(`Response sent successfully! Email notification has been sent to the user.`);
+        setTimeout(() => setSuccessMessage(null), 5000);
+        
         // Refresh tickets to get updated data
         await fetchTickets();
         setReplyText({ ...replyText, [id]: "" });
@@ -59,6 +66,8 @@ export default function AdminSupport() {
     } catch (err) {
       alert("Error submitting response");
       console.error(err);
+    } finally {
+      setSubmittingReply({ ...submittingReply, [id]: false });
     }
   };
 
@@ -109,6 +118,11 @@ export default function AdminSupport() {
 
         {loading && <p className="text-gray-500">Loading tickets...</p>}
         {error && <p className="text-red-500">{error}</p>}
+        {successMessage && (
+          <div className="bg-green-50 border border-green-200 rounded-md p-4">
+            <p className="text-green-700">✅ {successMessage}</p>
+          </div>
+        )}
         {!loading && !error && filteredRequests.length === 0 && (
           <p className="text-gray-500">No {view} requests at the moment.</p>
         )}
@@ -152,6 +166,11 @@ export default function AdminSupport() {
 
             {req.status === "OPEN" && (
               <>
+                <div className="bg-blue-50 border border-blue-200 rounded-md p-3 mb-3">
+                  <p className="text-sm text-blue-700">
+                    📧 When you submit a reply, an email notification will be automatically sent to the user at: <strong>{req.email}</strong>
+                  </p>
+                </div>
                 <textarea
                   rows={3}
                   placeholder="Write your reply..."
@@ -161,9 +180,10 @@ export default function AdminSupport() {
                 />
                 <button
                   onClick={() => handleReplySubmit(req.ticket_id)}
-                  className="bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition font-semibold"
+                  disabled={submittingReply[req.ticket_id]}
+                  className="bg-red-600 text-white py-2 px-4 rounded-lg hover:bg-red-700 transition font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Submit Reply
+                  {submittingReply[req.ticket_id] ? "Sending..." : "Submit Reply & Send Email"}
                 </button>
               </>
             )}

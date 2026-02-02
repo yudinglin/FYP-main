@@ -657,6 +657,203 @@ This is an automated email. Please do not reply to this message.
 
         return self.send_email(user_email, subject, html_body, text_body)
 
+    def send_support_response(self, user_email, user_name, ticket_subject, original_message, admin_response, ticket_id):
+        """
+        Send support response notification email to user
+        """
+        subject = f"YouAnalyze Support - Response to: {ticket_subject}"
+
+        response_date = datetime.now().strftime("%B %d, %Y at %I:%M %p")
+
+        html_body = f"""
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <meta charset="UTF-8">
+            <style>
+                body {{
+                    font-family: Arial, sans-serif;
+                    line-height: 1.6;
+                    color: #333;
+                    max-width: 600px;
+                    margin: 0 auto;
+                    padding: 20px;
+                    background-color: #f4f4f4;
+                }}
+                .container {{
+                    background-color: white;
+                    padding: 30px;
+                    border-radius: 10px;
+                    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+                }}
+                .header {{
+                    text-align: center;
+                    border-bottom: 3px solid #dc2626;
+                    padding-bottom: 20px;
+                    margin-bottom: 30px;
+                }}
+                .header h1 {{
+                    color: #dc2626;
+                    margin: 0;
+                    font-size: 28px;
+                }}
+                .response-badge {{
+                    background-color: #10b981;
+                    color: white;
+                    padding: 10px 20px;
+                    border-radius: 5px;
+                    display: inline-block;
+                    margin-bottom: 20px;
+                    font-weight: bold;
+                }}
+                .ticket-info {{
+                    background-color: #f9fafb;
+                    padding: 20px;
+                    border-radius: 5px;
+                    margin: 20px 0;
+                    border-left: 4px solid #6b7280;
+                }}
+                .response-section {{
+                    background-color: #ecfdf5;
+                    padding: 20px;
+                    border-radius: 5px;
+                    margin: 20px 0;
+                    border-left: 4px solid #10b981;
+                }}
+                .original-message {{
+                    background-color: #f8fafc;
+                    padding: 15px;
+                    border-radius: 5px;
+                    margin: 15px 0;
+                    border-left: 3px solid #cbd5e1;
+                    font-style: italic;
+                    color: #64748b;
+                }}
+                .footer {{
+                    margin-top: 30px;
+                    padding-top: 20px;
+                    border-top: 1px solid #e5e7eb;
+                    text-align: center;
+                    color: #6b7280;
+                    font-size: 12px;
+                }}
+                .button {{
+                    display: inline-block;
+                    background-color: #dc2626;
+                    color: white;
+                    padding: 12px 30px;
+                    text-decoration: none;
+                    border-radius: 5px;
+                    margin-top: 20px;
+                    font-weight: bold;
+                }}
+                .info-row {{
+                    display: flex;
+                    justify-content: space-between;
+                    padding: 8px 0;
+                    border-bottom: 1px solid #e5e7eb;
+                }}
+                .info-row:last-child {{
+                    border-bottom: none;
+                }}
+            </style>
+        </head>
+        <body>
+            <div class="container">
+                <div class="header">
+                    <h1>💬 YouAnalyze Support</h1>
+                </div>
+
+                <div class="response-badge">✓ New Response Available</div>
+
+                <p>Dear {user_name},</p>
+
+                <p>Great news! Our support team has responded to your support request.</p>
+
+                <div class="ticket-info">
+                    <h2 style="margin-top: 0; color: #374151;">Ticket Information</h2>
+                    <div class="info-row">
+                        <span><strong>Ticket ID:</strong></span>
+                        <span>#{ticket_id}</span>
+                    </div>
+                    <div class="info-row">
+                        <span><strong>Subject:</strong></span>
+                        <span>{ticket_subject}</span>
+                    </div>
+                    <div class="info-row">
+                        <span><strong>Response Date:</strong></span>
+                        <span>{response_date}</span>
+                    </div>
+                </div>
+
+                <div class="response-section">
+                    <h2 style="margin-top: 0; color: #059669;">Support Team Response</h2>
+                    <p style="margin: 0; white-space: pre-wrap;">{admin_response}</p>
+                </div>
+
+                <div class="original-message">
+                    <h3 style="margin-top: 0; color: #64748b; font-size: 14px;">Your Original Message:</h3>
+                    <p style="margin: 0; white-space: pre-wrap;">{original_message}</p>
+                </div>
+
+                <p style="margin-top: 30px;">
+                    If you have any follow-up questions or need additional assistance, please feel free to submit a new support request.
+                </p>
+
+                <div style="text-align: center; margin: 30px 0;">
+                    <a href="http://localhost:5174/contact-support" class="button">Contact Support Again</a>
+                </div>
+
+                <p>Thank you for using YouAnalyze. We're here to help!</p>
+
+                <p>Best regards,<br>
+                <strong>The YouAnalyze Support Team</strong></p>
+
+                <div class="footer">
+                    <p>This is an automated email. Please do not reply to this message.</p>
+                    <p>For additional support, please visit our contact support page.</p>
+                    <p>&copy; {datetime.now().year} YouAnalyze. All rights reserved.</p>
+                </div>
+            </div>
+        </body>
+        </html>
+        """
+
+        text_body = f"""
+YouAnalyze Support - Response to: {ticket_subject}
+
+Dear {user_name},
+
+Great news! Our support team has responded to your support request.
+
+Ticket Information:
+- Ticket ID: #{ticket_id}
+- Subject: {ticket_subject}
+- Response Date: {response_date}
+
+Support Team Response:
+{admin_response}
+
+Your Original Message:
+{original_message}
+
+If you have any follow-up questions or need additional assistance, please feel free to submit a new support request.
+
+Contact Support: http://localhost:5174/contact-support
+
+Thank you for using YouAnalyze. We're here to help!
+
+Best regards,
+The YouAnalyze Support Team
+
+---
+This is an automated email. Please do not reply to this message.
+For additional support, please visit our contact support page.
+© {datetime.now().year} YouAnalyze. All rights reserved.
+        """
+
+        return self.send_email(user_email, subject, html_body, text_body)
+
 
 # Global instance
 email_service = EmailService()
