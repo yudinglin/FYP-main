@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from models.UserAccount import UserAccount
 from models.SubscriptionPlan import SubscriptionPlan
 from utils.email_service import email_service
-from flask_jwt_extended import get_jwt_identity 
+from flask_jwt_extended import get_jwt_identity
 
 
 class Subscription:
@@ -41,13 +41,15 @@ class Subscription:
             "cancelled_at": self.cancelled_at.isoformat() if self.cancelled_at and isinstance(self.cancelled_at, datetime) else (str(self.cancelled_at) if self.cancelled_at else None)
         }
 
+    # ------------------------------------------------------------------
+    # CREATE / FIND
+    # ------------------------------------------------------------------
+
     @classmethod
     def create(cls, user_id, plan_id):
-        """Create a new subscription for a user"""
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
-        # Calculate end_date (1 month from now)
         start_date = datetime.now()
         end_date = start_date + timedelta(days=30)
 
@@ -58,7 +60,6 @@ class Subscription:
         conn.commit()
 
         subscription_id = cursor.lastrowid
-
         cursor.close()
         conn.close()
 
@@ -66,7 +67,6 @@ class Subscription:
 
     @classmethod
     def find_by_id(cls, subscription_id):
-        """Find a subscription by ID"""
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
@@ -83,7 +83,6 @@ class Subscription:
 
     @classmethod
     def find_active_by_user_id(cls, user_id):
-        """Find active subscription for a user"""
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
@@ -100,20 +99,63 @@ class Subscription:
         conn.close()
         return cls.from_row(row)
 
+    # ------------------------------------------------------------------
+    # ADMIN: GET ALL 
+    # ------------------------------------------------------------------
+
     @classmethod
-    def update_plan(cls, subscription_id, new_plan_id):
-        """Update subscription to a new plan"""
+    def get_all(cls):
+        """
+        Get all subscriptions WITH user email and plan name.
+        This matches frontend expectations exactly.
+        """
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
-        # Get current subscription
+        cursor.execute("""
+            SELECT
+                s.subscription_id,
+                s.user_id,
+                s.plan_id,
+                s.status,
+                s.start_date,
+                s.end_date,
+                s.cancelled_at,
+                u.email AS user_email,
+                COALESCE(p.name,
+                    CASE
+                        WHEN u.role = 'business' THEN 'Business'
+                        WHEN u.role = 'creator' THEN 'Content Creator'
+                        ELSE '-'
+                    END
+                ) AS plan_name
+            FROM Subscription s
+            LEFT JOIN User u ON u.user_id = s.user_id
+            LEFT JOIN SubscriptionPlan p ON p.plan_id = s.plan_id
+            ORDER BY s.start_date DESC
+        """)
+
+        rows = cursor.fetchall()
+        cursor.close()
+        conn.close()
+
+        return rows
+
+    # ------------------------------------------------------------------
+    # UPDATE
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def update_plan(cls, subscription_id, new_plan_id):
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
         current_sub = cls.find_by_id(subscription_id)
         if not current_sub or current_sub.status != 'ACTIVE':
             cursor.close()
             conn.close()
             return None
 
-        # Update the plan_id
         cursor.execute("""
             UPDATE Subscription
             SET plan_id = %s
@@ -126,48 +168,21 @@ class Subscription:
         return cls.find_by_id(subscription_id)
 
     @classmethod
-    def cancel_subscription(cls, subscription_id):
-        """Cancel a subscription and delete the user from all tables"""
+    def update_status(cls, subscription_id, new_status):
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
-        try:
-            # Get the subscription FIRST
-            subscription = cls.find_by_id(subscription_id)
-            if not subscription or subscription.status != 'ACTIVE':
-                cursor.close()
-                conn.close()
-                return None
+        cursor.execute("""
+            UPDATE Subscription
+            SET status = %s
+            WHERE subscription_id = %s
+        """, (new_status, subscription_id))
+        conn.commit()
 
-            cancelled_at = datetime.utcnow()
+        updated = cursor.rowcount > 0
+        cursor.close()
+        conn.close()
 
-            # Update subscription status to CANCELLED
-            cursor.execute("""
-                UPDATE Subscription
-                SET status = 'CANCELLED', cancelled_at = %s
-                WHERE subscription_id = %s
-            """, (cancelled_at, subscription_id))
-            conn.commit()
-
-            # Fetch and store the cancelled subscription data BEFORE user deletion
-            cancelled_subscription = cls.find_by_id(subscription_id)
-            
-            cursor.close()
-            conn.close()
-            
-            # Delete the user and all associated data (cascades through foreign keys)
-            deleted = UserAccount.delete_by_id(subscription.user_id)
-            if not deleted:
-                print(f"Warning: Failed to delete user {subscription.user_id}")
-                return None
-            
-            # Return the stored subscription data
-            return cancelled_subscription
-            
-        except Exception as e:
-            cursor.close()
-            conn.close()
-            print(f"Error cancelling subscription: {e}")
+        if not updated:
             return None
-
-
+        return cls.find_by_id(subscription_id)

@@ -1,14 +1,8 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useAuth } from "../../core/context/AuthContext";
 
-// ------------------------------------------------------
-// Config
-// ------------------------------------------------------
 const API_BASE = "http://localhost:5000";
 
-// ------------------------------------------------------
-// Helper: format ISO datetime to DD/MM/YY HH:mm
-// ------------------------------------------------------
 function formatDateTime(value) {
   if (!value) return "-";
   const date = new Date(value);
@@ -23,9 +17,6 @@ function formatDateTime(value) {
   return `${day}/${month}/${year} ${hours}:${minutes}`;
 }
 
-// ------------------------------------------------------
-// Helpers: search + sort
-// ------------------------------------------------------
 function normStr(v) {
   return String(v ?? "").trim().toLowerCase();
 }
@@ -45,14 +36,11 @@ export default function ManageSubscriptions() {
 
   const [subscriptions, setSubscriptions] = useState([]);
   const [statusFilter, setStatusFilter] = useState("ALL");
-
   const [searchTerm, setSearchTerm] = useState("");
   const [sortKey, setSortKey] = useState("START_DESC");
-
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [success, setSuccess] = useState("");
-
   const [selectedIds, setSelectedIds] = useState(new Set());
 
   function toggleSelect(id) {
@@ -77,10 +65,17 @@ export default function ManageSubscriptions() {
       cache: "no-store",
     });
 
-    const data = await res.json().catch(() => ({}));
+    const data = await res.json();
     if (!res.ok) throw new Error(data.message || "Failed to load subscriptions");
 
-    setSubscriptions(data.subscriptions || []);
+    // ONLY FIX: normalize keys so UI can keep using email/plan
+    setSubscriptions(
+      (data.subscriptions || []).map((s) => ({
+        ...s,
+        email: s.email ?? s.user_email ?? "",
+        plan: s.plan ?? s.plan_name ?? "",
+      }))
+    );
   }, [token]);
 
   useEffect(() => {
@@ -99,15 +94,7 @@ export default function ManageSubscriptions() {
   }, [token, fetchSubscriptions]);
 
   async function updateStatus(subscriptionId, newStatus) {
-    if (!token) {
-      setError("You are not logged in.");
-      return false;
-    }
-
     try {
-      setError("");
-      setSuccess("");
-
       const res = await fetch(
         `${API_BASE}/api/admin/subscriptions/${subscriptionId}/status`,
         {
@@ -120,47 +107,37 @@ export default function ManageSubscriptions() {
         }
       );
 
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.message || "Failed to update subscription");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.message);
 
-      if (data.subscription) {
-        setSubscriptions((prev) =>
-          prev.map((s) =>
-            s.subscription_id === subscriptionId ? data.subscription : s
-          )
-        );
-      } else {
-        setSubscriptions((prev) =>
-          prev.map((s) =>
-            s.subscription_id === subscriptionId
-              ? { ...s, status: newStatus }
-              : s
-          )
-        );
-      }
+      setSubscriptions((prev) =>
+        prev.map((s) =>
+          s.subscription_id === subscriptionId
+            ? { ...s, status: newStatus }
+            : s
+        )
+      );
 
-      setSuccess(`Subscription ${subscriptionId} updated to ${newStatus}.`);
-      return true;
+      setSuccess(`Subscription ${subscriptionId} updated.`);
     } catch (e) {
       setError(e.message);
-      return false;
     }
   }
 
   const visibleRows = useMemo(() => {
     const q = normStr(searchTerm);
 
-    let rows = subscriptions.filter((s) => {
-      const st = normUpper(s.status);
-      return statusFilter === "ALL" ? true : st === statusFilter;
-    });
+    let rows = subscriptions.filter((s) =>
+      statusFilter === "ALL" ? true : normUpper(s.status) === statusFilter
+    );
 
     if (q) {
       rows = rows.filter((s) => {
-        const sid = normStr(s.subscription_id);
-        const email = normStr(s.user_email);
-        const plan = normStr(s.plan_name);
-        return sid.includes(q) || email.includes(q) || plan.includes(q);
+        return (
+          normStr(s.subscription_id).includes(q) ||
+          normStr(s.email).includes(q) ||
+          normStr(s.plan).includes(q)
+        );
       });
     }
 
@@ -168,15 +145,12 @@ export default function ManageSubscriptions() {
     sorted.sort((a, b) => {
       if (sortKey === "START_DESC") return toStartMs(b) - toStartMs(a);
       if (sortKey === "START_ASC") return toStartMs(a) - toStartMs(b);
-      if (sortKey === "EMAIL_AZ") {
-        return normStr(a.user_email).localeCompare(normStr(b.user_email));
-      }
-      if (sortKey === "EMAIL_ZA") {
-        return normStr(b.user_email).localeCompare(normStr(a.user_email));
-      }
-      if (sortKey === "STATUS_AZ") {
+      if (sortKey === "EMAIL_AZ")
+        return normStr(a.email).localeCompare(normStr(b.email));
+      if (sortKey === "EMAIL_ZA")
+        return normStr(b.email).localeCompare(normStr(a.email));
+      if (sortKey === "STATUS_AZ")
         return normUpper(a.status).localeCompare(normUpper(b.status));
-      }
       return 0;
     });
 
@@ -305,89 +279,87 @@ export default function ManageSubscriptions() {
           </div>
         )}
 
-        {!loading && !error && (
-          <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
-            <table className="w-full text-xs text-left">
-              <thead className="text-slate-400 border-b">
-                <tr>
-                  <th className="py-2">
-                    <input
-                      type="checkbox"
-                      checked={
-                        visibleRows.length > 0 &&
-                        visibleRows.every((r) => selectedIds.has(r.subscription_id))
+        <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
+          <table className="w-full text-xs text-left">
+            <thead className="text-slate-400 border-b">
+              <tr>
+                <th className="py-2">
+                  <input
+                    type="checkbox"
+                    checked={
+                      visibleRows.length > 0 &&
+                      visibleRows.every((r) => selectedIds.has(r.subscription_id))
+                    }
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedIds(
+                          new Set(visibleRows.map((r) => r.subscription_id))
+                        );
+                      } else {
+                        setSelectedIds(new Set());
                       }
-                      onChange={(e) => {
-                        if (e.target.checked) {
-                          setSelectedIds(
-                            new Set(visibleRows.map((r) => r.subscription_id))
-                          );
-                        } else {
-                          setSelectedIds(new Set());
-                        }
-                      }}
-                    />
-                  </th>
-                  <th className="py-2">Subscription ID</th>
-                  <th className="py-2">Email</th>
-                  <th className="py-2">Plan</th>
-                  <th className="py-2">Status</th>
-                  <th className="py-2">Start</th>
-                  <th className="py-2">End</th>
+                    }}
+                  />
+                </th>
+                <th className="py-2">Subscription ID</th>
+                <th className="py-2">Email</th>
+                <th className="py-2">Plan</th>
+                <th className="py-2">Status</th>
+                <th className="py-2">Start</th>
+                <th className="py-2">End</th>
+              </tr>
+            </thead>
+
+            <tbody className="text-slate-700">
+              {visibleRows.length === 0 ? (
+                <tr>
+                  <td colSpan="7" className="py-4 text-center text-slate-400">
+                    No subscriptions found.
+                  </td>
                 </tr>
-              </thead>
+              ) : (
+                visibleRows.map((sub) => {
+                  const st = (sub.status || "").toUpperCase();
 
-              <tbody className="text-slate-700">
-                {visibleRows.length === 0 ? (
-                  <tr>
-                    <td colSpan="7" className="py-4 text-center text-slate-400">
-                      No subscriptions found.
-                    </td>
-                  </tr>
-                ) : (
-                  visibleRows.map((sub) => {
-                    const st = (sub.status || "").toUpperCase();
-
-                    return (
-                      <tr
-                        key={sub.subscription_id}
-                        className="border-b last:border-b-0"
-                      >
-                        <td className="py-2">
-                          <input
-                            type="checkbox"
-                            checked={selectedIds.has(sub.subscription_id)}
-                            onChange={() => toggleSelect(sub.subscription_id)}
-                          />
-                        </td>
-                        <td className="py-2">{sub.subscription_id}</td>
-                        <td className="py-2">{sub.user_email || sub.user_id}</td>
-                        <td className="py-2">{sub.plan_name || sub.plan_id}</td>
-                        <td className="py-2">
-                          <span
-                            className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
-                              st === "ACTIVE"
-                                ? "bg-green-100 text-green-700"
-                                : st === "SUSPENDED"
-                                ? "bg-amber-100 text-amber-700"
-                                : st === "CANCELLED"
-                                ? "bg-red-100 text-red-700"
-                                : "bg-gray-100 text-gray-700"
-                            }`}
-                          >
-                            {st || "-"}
-                          </span>
-                        </td>
-                        <td className="py-2">{formatDateTime(sub.start_date)}</td>
-                        <td className="py-2">{formatDateTime(sub.end_date)}</td>
-                      </tr>
-                    );
-                  })
-                )}
-              </tbody>
-            </table>
-          </div>
-        )}
+                  return (
+                    <tr
+                      key={sub.subscription_id}
+                      className="border-b last:border-b-0"
+                    >
+                      <td className="py-2">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(sub.subscription_id)}
+                          onChange={() => toggleSelect(sub.subscription_id)}
+                        />
+                      </td>
+                      <td className="py-2">{sub.subscription_id}</td>
+                      <td className="py-2">{sub.email || "-"}</td>
+                      <td className="py-2">{sub.plan || "-"}</td>
+                      <td className="py-2">
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-xs font-semibold ${
+                            st === "ACTIVE"
+                              ? "bg-green-100 text-green-700"
+                              : st === "SUSPENDED"
+                              ? "bg-amber-100 text-amber-700"
+                              : st === "CANCELLED"
+                              ? "bg-red-100 text-red-700"
+                              : "bg-gray-100 text-gray-700"
+                          }`}
+                        >
+                          {st || "-"}
+                        </span>
+                      </td>
+                      <td className="py-2">{formatDateTime(sub.start_date)}</td>
+                      <td className="py-2">{formatDateTime(sub.end_date)}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

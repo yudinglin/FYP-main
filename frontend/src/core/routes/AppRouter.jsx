@@ -32,6 +32,7 @@ import SentimentAnalysis from "../../pages/Creator/SentimentAnalysis.jsx";
 import EditPricing from "../../pages/Admin/EditPricing.jsx";
 import AdminSupport from "../../pages/Admin/AdminSupport.jsx";
 import AdminProfile from "../../pages/profile/AdminProfile.jsx";
+import ManageSubscriptions from "../../pages/Admin/ManageSubscriptions.jsx";
 
 import BusinessNetworkGraph from "../../pages/Business/NetworkGraph.jsx";
 import BusinessCentrality from "../../pages/Business/CentralityMetrics.jsx";
@@ -207,6 +208,16 @@ export default function AppRouter() {
           </MainLayout>
         }
       />
+
+      <Route
+        path="/admin/manage-subscriptions"
+        element={
+          <MainLayout>
+            <ManageSubscriptions />
+          </MainLayout>
+        }
+      />
+
       <Route path="/admin/enquiries" element={<MainLayout><AdminSupport /></MainLayout>} />
       <Route
         path="/analytics"

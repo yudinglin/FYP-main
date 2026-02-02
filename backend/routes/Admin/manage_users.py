@@ -18,7 +18,22 @@ def normalize_status(value):
         return None
     return status
 
-@manage_users_bp.put("/api/admin/users/<int:user_id>/status")
+
+
+@manage_users_bp.get("/api/admin/users")
+def get_users_admin():
+    admin = require_admin()
+    if not admin:
+        return jsonify({"message": "Admin access required"}), 403
+
+    try:
+        users = UserAccount.get_all()
+        return jsonify({"users": [u.to_dict() for u in users]}), 200
+    except Exception as e:
+        return jsonify({"message": str(e)}), 500
+
+
+@manage_users_bp.put("/users/<int:user_id>/status")
 def update_user_status(user_id):
     admin = require_admin()
     if not admin:
@@ -46,7 +61,8 @@ def update_user_status(user_id):
     except Exception as e:
         return jsonify({"message": str(e)}), 400
 
-@manage_users_bp.put("/api/admin/users/status")
+
+@manage_users_bp.put("/users/status")
 def update_users_status_bulk():
     admin = require_admin()
     if not admin:
