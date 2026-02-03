@@ -28,7 +28,7 @@ class UserAccount:
 
         # business channels (multiple)
         self.youtube_channels = youtube_channels or []
-        
+
     @classmethod
     def get_all_basic(cls):
         """
@@ -59,7 +59,6 @@ class UserAccount:
                 status=r.get("status"),
             ))
         return users
-
 
     @classmethod
     def get_all(cls):
@@ -344,6 +343,52 @@ class UserAccount:
         cursor.close()
         conn.close()
         return cls.find_by_email(email)
+
+    @classmethod
+    def update_status_by_id(cls, user_id, status):
+        """
+        Update one user's status (ACTIVE / SUSPENDED).
+        Returns True if updated, False if user not found.
+        """
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        cursor.execute("""
+            UPDATE User
+            SET status = %s
+            WHERE user_id = %s
+        """, (status, user_id))
+        conn.commit()
+
+        updated = cursor.rowcount > 0
+        cursor.close()
+        conn.close()
+        return updated
+
+    @classmethod
+    def update_status_bulk(cls, user_ids, status):
+        """
+        Bulk update user status for a list of ids.
+        Returns affected row count.
+        """
+        if not user_ids:
+            return 0
+
+        conn = get_connection()
+        cursor = conn.cursor()
+
+        placeholders = ",".join(["%s"] * len(user_ids))
+        cursor.execute(f"""
+            UPDATE User
+            SET status = %s
+            WHERE user_id IN ({placeholders})
+        """, (status, *user_ids))
+        conn.commit()
+
+        affected = cursor.rowcount
+        cursor.close()
+        conn.close()
+        return affected
 
     def check_password(self, plain_password):
         return check_password_hash(self.password_hash, plain_password)
