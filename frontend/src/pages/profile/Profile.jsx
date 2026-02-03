@@ -24,6 +24,11 @@ export default function Profile() {
   const [loadingSubscription, setLoadingSubscription] = useState(false);
   const [availablePlans, setAvailablePlans] = useState([]);
 
+  // Normalize token once (prevents "Bearer Bearer ..." and fixes 401 inconsistency)
+  const authHeader = token
+    ? `Bearer ${String(token).replace(/^Bearer\s+/i, "").trim()}`
+    : null;
+
   useEffect(() => {
     if (user) {
       setFirstName(user.first_name || "");
@@ -44,13 +49,13 @@ export default function Profile() {
   }, [activeSection, token]);
 
   async function fetchSubscriptionInfo() {
-    if (!token) return;
-    
+    if (!authHeader) return;
+
     setLoadingSubscription(true);
     try {
       const resp = await fetch("http://localhost:5000/api/profile/subscription", {
         headers: {
-          Authorization: `Bearer ${token}`,
+          Authorization: authHeader,
         },
       });
       const data = await resp.json();
@@ -79,7 +84,7 @@ export default function Profile() {
   }
 
   async function handleSaveProfile() {
-    if (!token) return setError("You are not logged in.");
+    if (!authHeader) return setError("You are not logged in.");
 
     setSaving(true);
     setError("");
@@ -90,7 +95,7 @@ export default function Profile() {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: authHeader,
         },
         body: JSON.stringify({
           first_name: firstName,
@@ -111,26 +116,26 @@ export default function Profile() {
   }
 
   async function handleSaveChannel() {
-    if (!token) return setError("You are not logged in.");
+    if (!authHeader) return setError("You are not logged in.");
 
     setSaving(true);
     setError("");
     setSuccess("");
 
     try {
-      const resp = await fetch("http://localhost:5000/api/profile/youtube-channels", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-        channels: youtubeUrl
-          ? [{ url: youtubeUrl, name: "Primary Channel" }]
-          : []
-      }),
-
-      });
+      const resp = await fetch(
+        "http://localhost:5000/api/profile/youtube-channels",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: authHeader,
+          },
+          body: JSON.stringify({
+            channels: youtubeUrl ? [{ url: youtubeUrl, name: "Primary Channel" }] : [],
+          }),
+        }
+      );
 
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.message || "Failed to update");
@@ -333,9 +338,7 @@ function LinkChannelSection({
       <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-6 space-y-4">
         <p className="text-sm text-slate-600">
           Paste your YouTube channel ID. Example:{" "}
-          <span className="text-sky-600">
-            UCxYpJqNzKfLmWvB8T9zRwS2g
-          </span>
+          <span className="text-sky-600">UCxYpJqNzKfLmWvB8T9zRwS2g</span>
         </p>
 
         <input
@@ -381,13 +384,7 @@ function ProfileAvatar({ name }) {
   );
 }
 
-function ProfileField({
-  label,
-  value,
-  onChange,
-  placeholder,
-  readOnly = false,
-}) {
+function ProfileField({ label, value, onChange, placeholder, readOnly = false }) {
   return (
     <label className="block text-xs">
       <span className="text-slate-500">{label}</span>
@@ -439,7 +436,6 @@ function SubscriptionSection({
   // Filter available plans - show both creator and business plans for switching
   // Both creator and business users can switch to either plan
   const filteredPlans = availablePlans.filter((p) => {
-    // Show plans that match the user's role OR are available to both
     if (user?.role === "creator") {
       return p.target_role === "creator" || p.target_role === "BOTH";
     } else if (user?.role === "business") {
@@ -448,10 +444,7 @@ function SubscriptionSection({
     return true;
   });
 
-  // Get all alternative plans (excluding current plan)
-  const alternativePlans = filteredPlans.filter(
-    (p) => p.plan_id !== plan?.plan_id
-  );
+  const alternativePlans = filteredPlans.filter((p) => p.plan_id !== plan?.plan_id);
 
   async function handleUpdatePlan(planName) {
     if (!token || !planName) {
@@ -505,9 +498,7 @@ function SubscriptionSection({
       const data = await resp.json();
       if (!resp.ok) throw new Error(data.message || "Failed to cancel subscription");
 
-      // Subscription cancelled - log out user and redirect
       setShowCancelConfirm(false);
-      // Small delay to show success message, then logout
       setTimeout(() => {
         onCancel();
       }, 1500);
@@ -557,9 +548,7 @@ function SubscriptionSection({
           <h2 className="text-lg font-semibold text-slate-900">Current Subscription</h2>
           <span
             className={`px-3 py-1 rounded-full text-xs font-semibold ${
-              isCancelled
-                ? "bg-red-100 text-red-700"
-                : "bg-emerald-100 text-emerald-700"
+              isCancelled ? "bg-red-100 text-red-700" : "bg-emerald-100 text-emerald-700"
             }`}
           >
             {subscription.status}
