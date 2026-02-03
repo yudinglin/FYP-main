@@ -14,7 +14,26 @@ import {
   LabelList,
 } from "recharts";
 import { useAuth } from "../../core/context/AuthContext";
-import { Lightbulb, TrendingUp, MessageSquare, BarChart3, Network, AlertCircle } from "lucide-react";
+import {
+  Lightbulb,
+  TrendingUp,
+  MessageSquare,
+  BarChart3,
+  Network,
+  AlertCircle,
+  Sparkles,
+  Award,
+  Activity,
+  Target,
+  Zap,
+  CheckCircle,
+  ArrowRight,
+  Eye,
+  ThumbsUp,
+  ExternalLink,
+  TrendingDown,
+  Flame,
+} from "lucide-react";
 
 const API_BASE = "http://127.0.0.1:5000";
 
@@ -30,8 +49,13 @@ export default function NetworkGraph() {
   const [activeView, setActiveView] = useState("summary");
   const [videoInput, setVideoInput] = useState("25");
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
-  const rafFitRef = useRef(null);
 
+  // Channel insights state
+  const [channelData, setChannelData] = useState(null);
+  const [channelLoading, setChannelLoading] = useState(false);
+  const [channelError, setChannelError] = useState("");
+
+  // Video catalog for search/select center node
   const [videoCatalog, setVideoCatalog] = useState([]);
   const [catalogLoading, setCatalogLoading] = useState(false);
   const [catalogError, setCatalogError] = useState("");
@@ -73,7 +97,8 @@ export default function NetworkGraph() {
       const nodes = (data.nodes || []).map((n) => ({
         ...n,
         name: n.title || n.id,
-        engagementRate: n.views > 0 ? ((n.likes || 0) + (n.comments || 0)) / n.views : 0,
+        engagementRate:
+          n.views > 0 ? ((n.likes || 0) + (n.comments || 0)) / n.views : 0,
         isCenter: Boolean(n.isCenter),
       }));
 
@@ -82,22 +107,48 @@ export default function NetworkGraph() {
       setGraphData({
         nodes,
         links,
-        rawMetrics:
-          data.rawMetrics ||
-          nodes.map((n) => ({
-            views: n.views || 0,
-            likes: n.likes || 0,
-            comments: n.comments || 0,
-            thumbnail: n.thumbnail,
-            title: n.title || n.id,
-            id: n.id,
-          })),
+        rawMetrics: data.rawMetrics || nodes.map(n => ({
+          views: n.views || 0,
+          likes: n.likes || 0,
+          comments: n.comments || 0,
+          thumbnail: n.thumbnail,
+          title: n.title || n.id,
+          id: n.id,
+        }))
       });
     } catch (err) {
       console.error(err);
       setError(err.message);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchChannelInsights = async () => {
+    setChannelLoading(true);
+    setChannelError("");
+
+    try {
+      const channelUrl = user?.youtube_channel;
+      if (!channelUrl) {
+        setChannelError("No channel URL found. Please add your YouTube channel in settings.");
+        return;
+      }
+
+      const encodedUrl = encodeURIComponent(channelUrl);
+      const response = await fetch(
+        `${API_BASE}/api/youtube/videos.centralityMetrics?url=${encodedUrl}`
+      );
+
+      if (!response.ok) throw new Error("Failed to fetch channel insights");
+
+      const data = await response.json();
+      setChannelData(data);
+    } catch (err) {
+      console.error("Error fetching channel insights:", err);
+      setChannelError(err.message);
+    } finally {
+      setChannelLoading(false);
     }
   };
 
@@ -134,57 +185,20 @@ export default function NetworkGraph() {
     }
   };
 
-  // Keep ForceGraph canvas in sync with its container (SPA nav hides/shows the panel)
   useEffect(() => {
-    if (activeView !== "network") return;
-
-    const measure = () => {
-      const el = containerRef.current;
-      if (!el) return;
-      const w = el.clientWidth;
-      const h = el.clientHeight;
-      if (!w || !h) return;
-      setContainerSize((prev) => (prev.width === w && prev.height === h ? prev : { width: w, height: h }));
+    const updateSize = () => {
+      if (containerRef.current) {
+        setContainerSize({
+          width: containerRef.current.clientWidth,
+          height: containerRef.current.clientHeight
+        });
+      }
     };
+    updateSize();
+    window.addEventListener("resize", updateSize);
+    return () => window.removeEventListener("resize", updateSize);
+  }, []);
 
-    measure();
-
-    let ro;
-    if (typeof ResizeObserver !== "undefined" && containerRef.current) {
-      ro = new ResizeObserver(() => measure());
-      ro.observe(containerRef.current);
-    }
-
-    window.addEventListener("resize", measure);
-    return () => {
-      window.removeEventListener("resize", measure);
-      if (ro) ro.disconnect();
-    };
-  }, [activeView]);
-
-  // When returning to the Network tab, re-fit and reheat (prevents "broken" layouts after tab switching)
-  useEffect(() => {
-    if (activeView !== "network") return;
-    if (!fgRef.current) return;
-    if (graphData.nodes.length === 0) return;
-    if (!containerSize.width || !containerSize.height) return;
-
-    if (rafFitRef.current) cancelAnimationFrame(rafFitRef.current);
-    rafFitRef.current = requestAnimationFrame(() => {
-      const fg = fgRef.current;
-      if (!fg) return;
-      if (typeof fg.refresh === "function") fg.refresh();
-      if (typeof fg.d3ReheatSimulation === "function") fg.d3ReheatSimulation();
-      if (typeof fg.zoomToFit === "function") fg.zoomToFit(400, 50);
-    });
-
-    return () => {
-      if (rafFitRef.current) cancelAnimationFrame(rafFitRef.current);
-      rafFitRef.current = null;
-    };
-  }, [activeView, graphData.nodes.length, graphData.links.length, containerSize.width, containerSize.height]);
-
-  // Fetch catalog when opening the Network view (so the dropdown is ready)
   useEffect(() => {
     if (activeView !== "network") return;
     if (videoCatalog.length > 0 || catalogLoading) return;
@@ -192,7 +206,6 @@ export default function NetworkGraph() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView]);
 
-  // Auto-run analysis when entering Insights view
   useEffect(() => {
     if (activeView !== "summary") return;
     if (graphData.rawMetrics && graphData.rawMetrics.length > 0) return;
@@ -205,9 +218,12 @@ export default function NetworkGraph() {
           await fetchVideoCatalog();
           await new Promise((r) => setTimeout(r, 0));
         }
+
         if (cancelled) return;
         await handleFetchGraph();
-      } catch (e) {}
+      } catch (e) {
+        // handleFetchGraph already sets error
+      }
     };
 
     run();
@@ -215,21 +231,27 @@ export default function NetworkGraph() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeView, centerVideoId]);
 
-  // Enhanced Force layout tuning for better spacing
+  // Auto-fetch channel insights when switching to that tab
   useEffect(() => {
-    if (activeView !== "network") return;
+    if (activeView !== "channel-insights") return;
+    if (channelData !== null || channelLoading) return;
+    fetchChannelInsights();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView]);
+
+  useEffect(() => {
     if (!fgRef.current) return;
     const fg = fgRef.current;
 
     fg.d3Force("charge").strength(-1200);
-
+    
     fg.d3Force("link").distance((link) => {
       const baseDistance = 450;
       const weight = link.weight || 0;
-      return baseDistance - weight * 80;
+      return baseDistance - (weight * 80);
     });
 
     const collideForce = fg.d3Force("collide");
@@ -243,7 +265,9 @@ export default function NetworkGraph() {
         .strength(0.7);
     }
 
-    fg.d3Force("center").x(containerSize.width / 2).y(containerSize.height / 2);
+    fg.d3Force("center")
+      .x(containerSize.width / 2)
+      .y(containerSize.height / 2);
 
     if (graphData.nodes.length > 0) {
       const center = graphData.nodes.find((n) => n.isCenter);
@@ -253,7 +277,7 @@ export default function NetworkGraph() {
       }
       fg.d3ReheatSimulation();
     }
-  }, [activeView, graphData, containerSize]);
+  }, [graphData, containerSize]);
 
   const getNodeColor = (engagement) => {
     if (engagement > 0.05) return "#4f46e5";
@@ -281,7 +305,7 @@ export default function NetworkGraph() {
     window.open(`https://www.youtube.com/watch?v=${node.id}`, "_blank");
   };
 
-  const truncate = (str, n = 30) => (str?.length > n ? str.substr(0, n) + "..." : str);
+  const truncate = (str, n = 30) => str?.length > n ? str.substr(0, n) + "..." : str;
 
   const resolveCenterVideoId = (value) => {
     if (!value) return "";
@@ -293,13 +317,17 @@ export default function NetworkGraph() {
     <button
       onClick={() => setActiveView(view)}
       className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-        activeView === view ? "bg-indigo-50 text-indigo-700 font-medium" : "text-slate-600 hover:bg-slate-50"
+        activeView === view
+          ? "bg-indigo-50 text-indigo-700 font-medium"
+          : "text-slate-600 hover:bg-slate-50"
       }`}
     >
       <Icon size={20} />
       <span className="flex-1 text-left">{label}</span>
       {badge && (
-        <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">{badge}</span>
+        <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">
+          {badge}
+        </span>
       )}
     </button>
   );
@@ -337,16 +365,12 @@ export default function NetworkGraph() {
     const lowVideos = sortedByViews.slice(-3).reverse();
 
     const avgViews = data.reduce((sum, v) => sum + (v.views || 0), 0) / data.length;
-    const avgLikes = data.reduce((sum, v) => sum + (v.likes || 0), 0) / data.length;
-    const avgComments = data.reduce((sum, v) => sum + (v.comments || 0), 0) / data.length;
-    const avgEngagement =
-      data.reduce((sum, v) => {
-        const views = v.views || 0;
-        return sum + (views > 0 ? ((v.likes || 0) + (v.comments || 0)) / views : 0);
-      }, 0) / data.length;
+    const avgEngagement = data.reduce((sum, v) => {
+      const views = v.views || 0;
+      return sum + (views > 0 ? ((v.likes || 0) + (v.comments || 0)) / views : 0);
+    }, 0) / data.length;
 
-    const overallPerformance =
-      avgEngagement > 0.05 ? "excellent" : avgEngagement > 0.02 ? "good" : "needs improvement";
+    const overallPerformance = avgEngagement > 0.05 ? "excellent" : avgEngagement > 0.02 ? "good" : "needs improvement";
     const engagementDrivers = sortedByComments.slice(0, 3);
 
     return (
@@ -395,7 +419,11 @@ export default function NetworkGraph() {
               >
                 <div className="text-2xl font-bold text-green-600 w-8">#{idx + 1}</div>
                 {video.thumbnail && (
-                  <img src={video.thumbnail} alt={video.title} className="w-24 h-18 object-cover rounded" />
+                  <img
+                    src={video.thumbnail}
+                    alt={video.title}
+                    className="w-24 h-18 object-cover rounded"
+                  />
                 )}
                 <div className="flex-1">
                   <div className="font-medium text-slate-900 group-hover:text-indigo-600 transition-colors">
@@ -419,7 +447,8 @@ export default function NetworkGraph() {
               <div>
                 <div className="font-medium text-blue-900 text-sm mb-1">Pro Tip</div>
                 <div className="text-sm text-blue-700">
-                  These videos have high engagement rates. Consider creating similar content or making follow-up videos on these topics to maintain momentum.
+                  These videos have high engagement rates. Consider creating similar content 
+                  or making follow-up videos on these topics to maintain momentum.
                 </div>
               </div>
             </div>
@@ -445,7 +474,11 @@ export default function NetworkGraph() {
                 onClick={() => window.open(`https://www.youtube.com/watch?v=${video.id}`, "_blank")}
               >
                 {video.thumbnail && (
-                  <img src={video.thumbnail} alt={video.title} className="w-24 h-18 object-cover rounded" />
+                  <img
+                    src={video.thumbnail}
+                    alt={video.title}
+                    className="w-24 h-18 object-cover rounded"
+                  />
                 )}
                 <div className="flex-1">
                   <div className="font-medium text-slate-900 group-hover:text-indigo-600 transition-colors">
@@ -494,7 +527,11 @@ export default function NetworkGraph() {
               >
                 <div className="text-2xl font-bold text-blue-600 w-8">#{idx + 1}</div>
                 {video.thumbnail && (
-                  <img src={video.thumbnail} alt={video.title} className="w-24 h-18 object-cover rounded" />
+                  <img
+                    src={video.thumbnail}
+                    alt={video.title}
+                    className="w-24 h-18 object-cover rounded"
+                  />
                 )}
                 <div className="flex-1">
                   <div className="font-medium text-slate-900 group-hover:text-indigo-600 transition-colors">
@@ -532,16 +569,13 @@ export default function NetworkGraph() {
               { action: "Engage with comments on high-engagement videos", impact: "Medium" },
               { action: "Post consistently to keep viewers coming back", impact: "High" },
             ].map((item, idx) => (
-              <div
-                key={idx}
-                className="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:border-indigo-300 transition-colors"
-              >
+              <div key={idx} className="flex items-center justify-between p-3 rounded-lg border border-slate-200 hover:border-indigo-300 transition-colors">
                 <span className="text-slate-700">{item.action}</span>
-                <span
-                  className={`text-xs px-3 py-1 rounded-full font-medium ${
-                    item.impact === "High" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"
-                  }`}
-                >
+                <span className={`text-xs px-3 py-1 rounded-full font-medium ${
+                  item.impact === "High" 
+                    ? "bg-red-100 text-red-700" 
+                    : "bg-amber-100 text-amber-700"
+                }`}>
                   {item.impact} Impact
                 </span>
               </div>
@@ -556,29 +590,39 @@ export default function NetworkGraph() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">Video Performance Analysis</h1>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">
+            Video Performance Analysis
+          </h1>
           <p className="text-slate-600">
             Understand which videos resonate with your audience and discover patterns in your content
           </p>
         </div>
 
         <div className="flex gap-6">
+          {/* Sidebar */}
           <div className="w-64 flex flex-col gap-4">
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
-              <h2 className="text-sm font-semibold text-slate-700 px-4 py-2 mb-2">Views</h2>
+              <h2 className="text-sm font-semibold text-slate-700 px-4 py-2 mb-2">
+                Views
+              </h2>
               <div className="space-y-1">
-                <MenuItem icon={Lightbulb} label="Insights" view="summary" badge="Start Here" />
+                <MenuItem icon={Lightbulb} label="Video Insights" view="summary" badge="Start Here" />
+                <MenuItem icon={Activity} label="Channel Insights" view="channel-insights" />
                 <MenuItem icon={Network} label="Network Graph" view="network" />
                 <MenuItem icon={BarChart3} label="Charts" view="charts" />
               </div>
             </div>
 
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h3 className="text-sm font-semibold text-slate-700 mb-3">Analysis Settings</h3>
-
+              <h3 className="text-sm font-semibold text-slate-700 mb-3">
+                Analysis Settings
+              </h3>
+              
               <div className="space-y-4">
                 <div>
-                  <label className="text-sm text-slate-600 block mb-2">Center Video</label>
+                  <label className="text-sm text-slate-600 block mb-2">
+                    Center Video
+                  </label>
 
                   <input
                     type="text"
@@ -606,7 +650,9 @@ export default function NetworkGraph() {
                   </datalist>
 
                   <div className="flex items-center justify-between mt-1">
-                    <p className="text-xs text-slate-500">Pick one video; it will be the center node.</p>
+                    <p className="text-xs text-slate-500">
+                      Pick one video; it will be the center node.
+                    </p>
                     <button
                       type="button"
                       onClick={fetchVideoCatalog}
@@ -617,11 +663,15 @@ export default function NetworkGraph() {
                     </button>
                   </div>
 
-                  {catalogError && <p className="text-xs text-red-600 mt-1">{catalogError}</p>}
+                  {catalogError && (
+                    <p className="text-xs text-red-600 mt-1">{catalogError}</p>
+                  )}
                 </div>
 
                 <div>
-                  <label className="text-sm text-slate-600 block mb-2">Number of Similar Videos to Show</label>
+                  <label className="text-sm text-slate-600 block mb-2">
+                    Number of Similar Videos to Show
+                  </label>
                   <input
                     type="number"
                     min="1"
@@ -676,9 +726,7 @@ export default function NetworkGraph() {
                   <div className="flex justify-between items-center">
                     <span className="text-indigo-200 text-sm">Avg. Views</span>
                     <span className="font-semibold">
-                      {Math.round(
-                        graphData.rawMetrics.reduce((s, v) => s + (v.views || 0), 0) / graphData.rawMetrics.length
-                      ).toLocaleString()}
+                      {Math.round(graphData.rawMetrics.reduce((s, v) => s + (v.views || 0), 0) / graphData.rawMetrics.length).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -690,8 +738,18 @@ export default function NetworkGraph() {
             )}
           </div>
 
+          {/* Main Content */}
           <div className="flex-1">
             {activeView === "summary" && <SummaryPanel data={graphData.rawMetrics} />}
+
+            {activeView === "channel-insights" && (
+              <ChannelInsightsPanel 
+                data={channelData} 
+                loading={channelLoading} 
+                error={channelError}
+                onRetry={fetchChannelInsights}
+              />
+            )}
 
             {activeView === "network" && (
               <div className="space-y-6">
@@ -718,7 +776,7 @@ export default function NetworkGraph() {
                           <AlertCircle className="mx-auto text-amber-600 mb-4" size={48} />
                           <h3 className="font-semibold text-lg mb-2 text-slate-900">No Strong Connections Found</h3>
                           <p className="text-slate-600 text-sm mb-4">
-                            Your videos have unique performance patterns. This means each video appeals to different audiences,
+                            Your videos have unique performance patterns. This means each video appeals to different audiences, 
                             which can be a good sign of content diversity!
                           </p>
                         </div>
@@ -772,7 +830,7 @@ export default function NetworkGraph() {
                               ctx.fillStyle = "#1e293b";
                               ctx.textAlign = "center";
                               ctx.textBaseline = "bottom";
-
+                              
                               const maxChars = Math.floor(30 / globalScale) + 10;
                               ctx.fillText(truncate(node.title || node.id, maxChars), node.x, node.y - size - 3);
                             }
@@ -807,7 +865,9 @@ export default function NetworkGraph() {
                 ) : (
                   <>
                     <div className="rounded-xl bg-white p-6 shadow-sm border border-slate-200">
-                      <h2 className="text-xl font-semibold text-slate-900 mb-2">Views vs Likes Scatter Plot</h2>
+                      <h2 className="text-xl font-semibold text-slate-900 mb-2">
+                        Views vs Likes Scatter Plot
+                      </h2>
                       <p className="text-sm text-slate-500 mb-4">
                         Each point represents a video. Higher points indicate videos with more likes.
                       </p>
@@ -867,7 +927,9 @@ export default function NetworkGraph() {
                         </div>
                       </div>
 
-                      <p className="text-sm text-slate-500 mb-4">Shows which videos are performing the best in terms of {barMetric}.</p>
+                      <p className="text-sm text-slate-500 mb-4">
+                        Shows which videos are performing the best in terms of {barMetric}.
+                      </p>
 
                       <div className="w-full overflow-x-auto">
                         <div className="min-w-[700px] h-[420px]">
@@ -877,12 +939,18 @@ export default function NetworkGraph() {
                               data={graphData.rawMetrics
                                 .slice()
                                 .sort((a, b) => (b[barMetric] || 0) - (a[barMetric] || 0))
-                                .slice(0, 10)}
+                                .slice(0, 10)
+                              }
                               margin={{ top: 20, right: 30, bottom: 20, left: 150 }}
                               barCategoryGap={20}
                             >
                               <CartesianGrid strokeDasharray="4 4" stroke="#e5e7eb" />
-                              <XAxis type="number" tick={{ fontSize: 12 }} tickLine={false} axisLine={{ stroke: "#cbd5e1" }} />
+                              <XAxis
+                                type="number"
+                                tick={{ fontSize: 12 }}
+                                tickLine={false}
+                                axisLine={{ stroke: "#cbd5e1" }}
+                              />
                               <YAxis
                                 type="category"
                                 dataKey="title"
@@ -890,27 +958,92 @@ export default function NetworkGraph() {
                                 width={150}
                                 tickFormatter={(val) => (val.length > 30 ? val.slice(0, 27) + "..." : val)}
                               />
-                              <Tooltip />
-                              <Bar dataKey={barMetric} radius={[6, 6, 6, 6]} barSize={20}>
+                              <Tooltip
+                                content={({ active, payload }) => {
+                                  if (active && payload && payload.length) {
+                                    const vid = payload[0].payload;
+                                    return (
+                                      <div className="bg-white p-2 border rounded shadow text-sm flex gap-2 items-center">
+                                        {vid.thumbnail && (
+                                          <img
+                                            src={vid.thumbnail}
+                                            alt={vid.title}
+                                            className="w-16 h-16 object-cover rounded"
+                                          />
+                                        )}
+                                        <div className="flex flex-col">
+                                          <div className="font-semibold">{vid.title}</div>
+                                          <div>Views: {vid.views?.toLocaleString()}</div>
+                                          <div>Likes: {vid.likes?.toLocaleString()}</div>
+                                          <div>Comments: {vid.comments?.toLocaleString()}</div>
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+                                  return null;
+                                }}
+                              />
+                              <Bar
+                                dataKey={barMetric}
+                                radius={[6, 6, 6, 6]}
+                                barSize={20}
+                                isAnimationActive={true}
+                                animationDuration={1000}
+                                animationEasing="ease-out"
+                              >
                                 {graphData.rawMetrics
                                   .slice()
                                   .sort((a, b) => (b[barMetric] || 0) - (a[barMetric] || 0))
                                   .slice(0, 10)
-                                  .map((entry, index) => (
-                                    <Cell
-                                      key={`cell-${index}`}
-                                      fill={
-                                        barMetric === "views"
-                                          ? "#4f46e5"
-                                          : barMetric === "likes"
-                                          ? "#10b981"
-                                          : "#f97316"
-                                      }
-                                      style={{ cursor: "pointer" }}
-                                      onClick={() => entry.id && window.open(`https://www.youtube.com/watch?v=${entry.id}`, "_blank")}
-                                    />
-                                  ))}
-                                <LabelList dataKey={barMetric} position="right" formatter={(value) => value.toLocaleString()} />
+                                  .map((entry, index) => {
+                                    const gradientId = `grad-${barMetric}-${index}`;
+                                    return (
+                                      <React.Fragment key={index}>
+                                        <defs>
+                                          <linearGradient id={gradientId} x1="0" y1="0" x2="1" y2="0">
+                                            <stop
+                                              offset="0%"
+                                              stopColor={
+                                                barMetric === "views"
+                                                  ? "#6C5DD3"
+                                                  : barMetric === "likes"
+                                                  ? "#00C49F"
+                                                  : "#FF8042"
+                                              }
+                                              stopOpacity={0.8}
+                                            />
+                                            <stop
+                                              offset="100%"
+                                              stopColor={
+                                                barMetric === "views"
+                                                  ? "#4f46e5"
+                                                  : barMetric === "likes"
+                                                  ? "#10b981"
+                                                  : "#f97316"
+                                              }
+                                              stopOpacity={1}
+                                            />
+                                          </linearGradient>
+                                        </defs>
+                                        <Cell
+                                          key={`cell-${index}`}
+                                          fill={`url(#${gradientId})`}
+                                          style={{ cursor: "pointer", transition: "transform 0.2s" }}
+                                          onMouseEnter={(e) => (e.target.style.transform = "scaleX(1.05)")}
+                                          onMouseLeave={(e) => (e.target.style.transform = "scaleX(1)")}
+                                          onClick={() =>
+                                            entry.id &&
+                                            window.open(`https://www.youtube.com/watch?v=${entry.id}`, "_blank")
+                                          }
+                                        />
+                                      </React.Fragment>
+                                    );
+                                  })}
+                                <LabelList
+                                  dataKey={barMetric}
+                                  position="right"
+                                  formatter={(value) => value.toLocaleString()}
+                                />
                               </Bar>
                             </BarChart>
                           </ResponsiveContainer>
@@ -922,6 +1055,354 @@ export default function NetworkGraph() {
               </div>
             )}
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// SIMPLIFIED Channel Insights Panel Component
+function ChannelInsightsPanel({ data, loading, error, onRetry }) {
+  if (loading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm p-8 text-center">
+        <div className="inline-block h-8 w-8 animate-spin rounded-full border-4 border-solid border-indigo-600 border-r-transparent"></div>
+        <p className="mt-4 text-slate-600">Analyzing your channel strategy...</p>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="bg-red-50 border border-red-200 rounded-xl p-6">
+        <div className="flex items-start gap-3">
+          <AlertCircle className="w-6 h-6 text-red-600 shrink-0 mt-0.5" />
+          <div className="flex-1">
+            <p className="text-red-800 font-medium">Unable to analyze channel performance</p>
+            <p className="text-red-600 text-sm mt-1">{error}</p>
+            <button
+              onClick={onRetry}
+              className="mt-3 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm font-medium"
+            >
+              Try Again
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!data) {
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+        <div className="flex items-start gap-3">
+          <Sparkles className="w-6 h-6 text-blue-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-blue-800 font-medium mb-2">Channel insights will appear here</p>
+            <p className="text-blue-700 text-sm">
+              This view shows overall channel performance, quick wins, and actionable recommendations.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const categorized = data?.categorized_videos || {};
+  const quickWins = data?.quick_wins || [];
+  const channelHealth = data?.channel_health || {};
+  const summary = data?.summary || {};
+
+  const winners = categorized.winners || [];
+  const hiddenGems = categorized.hidden_gems || [];
+  const needsWork = categorized.needs_work || [];
+
+  if (summary.total_videos === 0) {
+    return (
+      <div className="bg-blue-50 border border-blue-200 rounded-xl p-6">
+        <div className="flex items-start gap-3">
+          <Sparkles className="w-6 h-6 text-blue-600 shrink-0 mt-0.5" />
+          <div>
+            <p className="text-blue-800 font-medium mb-2">Start your journey!</p>
+            <p className="text-blue-700 text-sm">
+              Upload some videos to get actionable insights on what's working and what needs improvement.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const getHealthMessage = () => {
+    const score = channelHealth.overall_score || 0;
+    
+    if (score >= 70) {
+      return {
+        title: "Your Channel Is Thriving",
+        message: "Your videos are performing well and engaging viewers effectively. Keep doing what you're doing.",
+        color: "green",
+        icon: CheckCircle
+      };
+    } else if (score >= 50) {
+      return {
+        title: "You're On The Right Track",
+        message: "Your channel shows promise. A few strategic improvements can take it to the next level.",
+        color: "indigo",
+        icon: TrendingUp
+      };
+    } else {
+      return {
+        title: "Let's Boost Your Performance",
+        message: "There's significant room for growth. Focus on the recommended actions below to start seeing results.",
+        color: "orange",
+        icon: Target
+      };
+    }
+  };
+
+  const healthInfo = getHealthMessage();
+
+  return (
+    <div className="space-y-6">
+      {/* Main Status Card - Simplified */}
+      <div className={`bg-gradient-to-br ${
+        healthInfo.color === 'green' ? 'from-green-600 to-green-700' :
+        healthInfo.color === 'indigo' ? 'from-indigo-600 to-indigo-700' :
+        'from-orange-600 to-orange-700'
+      } rounded-xl p-8 text-white shadow-lg`}>
+        <div className="flex items-start gap-4 mb-6">
+          <div className="bg-white/20 p-3 rounded-lg">
+            <healthInfo.icon className="w-8 h-8" />
+          </div>
+          <div className="flex-1">
+            <h2 className="text-2xl font-bold mb-2">{healthInfo.title}</h2>
+            <p className="text-base leading-relaxed opacity-95">{healthInfo.message}</p>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 gap-6 pt-6 border-t border-white/20">
+          <div>
+            <p className="text-sm opacity-75 mb-1">Top Performers</p>
+            <p className="text-3xl font-bold">{summary.winners_count || 0} videos</p>
+          </div>
+          <div>
+            <p className="text-sm opacity-75 mb-1">Need Attention</p>
+            <p className="text-3xl font-bold">{summary.needs_work_count || 0} videos</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Recommended Actions */}
+      {quickWins.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-lg">
+          <div className="flex items-start gap-3 mb-6">
+            <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 text-white p-3 rounded-lg">
+              <Zap className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-xl font-bold text-slate-900">Recommended Actions</h2>
+              <p className="text-sm text-slate-600 mt-1">
+                Start with these to see the biggest impact on your channel
+              </p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {quickWins.map((win, idx) => (
+              <QuickWinCard key={idx} win={win} index={idx} />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Winners */}
+      {winners.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-lg">
+          <div className="flex items-start gap-3 mb-6">
+            <div className="bg-gradient-to-br from-green-600 to-green-700 text-white p-3 rounded-lg">
+              <Award className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-slate-900">Your Top Performers</h2>
+              <p className="text-sm text-slate-600 mt-1">
+                These videos are doing great. Study what makes them work.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {winners.slice(0, 5).map((video) => (
+              <SimpleVideoCard key={video.id} video={video} type="winner" />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Hidden Gems */}
+      {hiddenGems.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-lg">
+          <div className="flex items-start gap-3 mb-6">
+            <div className="bg-gradient-to-br from-purple-600 to-purple-700 text-white p-3 rounded-lg">
+              <Sparkles className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-slate-900">Hidden Gems</h2>
+              <p className="text-sm text-slate-600 mt-1">
+                High engagement but low views. Promote these to unlock their potential.
+              </p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {hiddenGems.map((video) => (
+              <SimpleVideoCard key={video.id} video={video} type="hidden-gem" />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Needs Work */}
+      {needsWork.length > 0 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-6 shadow-lg">
+          <div className="flex items-start gap-3 mb-6">
+            <div className="bg-gradient-to-br from-orange-600 to-orange-700 text-white p-3 rounded-lg">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-slate-900">Needs Your Attention</h2>
+              <p className="text-sm text-slate-600 mt-1">
+                These videos need some improvements
+              </p>
+            </div>
+          </div>
+          <div className="space-y-3">
+            {needsWork.slice(0, 5).map((video) => (
+              <SimpleVideoCard key={video.id} video={video} type="needs-work" />
+            ))}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function QuickWinCard({ win, index }) {
+  const impactColors = {
+    high: "bg-red-100 text-red-700 border-red-200",
+    medium: "bg-amber-100 text-amber-700 border-amber-200",
+    low: "bg-slate-100 text-slate-700 border-slate-200",
+  };
+
+  const effortColors = {
+    low: "bg-emerald-100 text-emerald-700 border-emerald-200",
+    medium: "bg-amber-100 text-amber-700 border-amber-200",
+    high: "bg-red-100 text-red-700 border-red-200",
+  };
+
+  return (
+    <div className="bg-gradient-to-r from-indigo-50 to-transparent rounded-lg border border-indigo-200 p-5 hover:shadow-md hover:border-indigo-300 transition-all">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex items-start gap-3 flex-1">
+          <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 text-white w-7 h-7 rounded-lg flex items-center justify-center text-sm font-bold flex-shrink-0 mt-0.5">
+            {index + 1}
+          </div>
+          <div className="flex-1">
+            <h3 className="font-bold text-slate-900 text-base mb-2">{win.title}</h3>
+            <p className="text-sm text-slate-700 leading-relaxed">{win.description}</p>
+          </div>
+        </div>
+      </div>
+      
+      <div className="flex items-center gap-2 mb-3 ml-10">
+        <span className={`text-xs px-3 py-1 rounded-full font-semibold border ${impactColors[win.impact]}`}>
+          {win.impact.toUpperCase()} IMPACT
+        </span>
+        <span className={`text-xs px-3 py-1 rounded-full font-semibold border ${effortColors[win.effort]}`}>
+          {win.effort.toUpperCase()} EFFORT
+        </span>
+      </div>
+
+      <div className="flex items-start gap-2 p-3 bg-indigo-50 rounded-lg border border-indigo-200 ml-10">
+        <ArrowRight className="w-4 h-4 text-indigo-700 shrink-0 mt-0.5" />
+        <p className="text-sm font-semibold text-indigo-900">{win.action}</p>
+      </div>
+    </div>
+  );
+}
+
+function SimpleVideoCard({ video, type }) {
+  const config = {
+    winner: {
+      borderColor: "border-green-200",
+      bgColor: "bg-gradient-to-r from-green-50 to-transparent",
+      hoverBorder: "hover:border-green-300",
+      textColor: "text-green-700",
+    },
+    "hidden-gem": {
+      borderColor: "border-purple-200",
+      bgColor: "bg-gradient-to-r from-purple-50 to-transparent",
+      hoverBorder: "hover:border-purple-300",
+      textColor: "text-purple-700",
+    },
+    "needs-work": {
+      borderColor: "border-orange-200",
+      bgColor: "bg-gradient-to-r from-orange-50 to-transparent",
+      hoverBorder: "hover:border-orange-300",
+      textColor: "text-orange-700",
+    },
+  };
+
+  const style = config[type];
+  const videoUrl = `https://www.youtube.com/watch?v=${video.id}`;
+
+  const formatNumber = (num) => {
+    if (num >= 1000000) return (num / 1000000).toFixed(1) + "M";
+    if (num >= 1000) return (num / 1000).toFixed(1) + "K";
+    return Math.round(num).toString();
+  };
+
+  return (
+    <div className={`border ${style.borderColor} ${style.bgColor} ${style.hoverBorder} rounded-lg p-4 hover:shadow-md transition-all cursor-pointer`}
+      onClick={() => window.open(videoUrl, "_blank")}>
+      <div className="flex gap-4">
+        {video.thumbnail && (
+          <div className="flex-shrink-0">
+            <img
+              src={video.thumbnail}
+              alt={video.title}
+              className="w-32 h-20 object-cover rounded-lg"
+            />
+          </div>
+        )}
+
+        <div className="flex-1 min-w-0">
+          <div className="font-semibold text-slate-900 hover:text-indigo-600 mb-2 line-clamp-2 transition-colors group">
+            {video.title}
+            <ExternalLink className="w-3 h-3 inline ml-1 opacity-0 group-hover:opacity-100 transition-opacity" />
+          </div>
+
+          <div className="flex items-center gap-4 text-sm text-slate-600">
+            <span className="flex items-center gap-1.5">
+              <Eye className="w-4 h-4" />
+              {formatNumber(video.views || 0)}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <ThumbsUp className="w-4 h-4" />
+              {formatNumber(video.likes || 0)}
+            </span>
+            <span className="flex items-center gap-1.5">
+              <MessageSquare className="w-4 h-4" />
+              {formatNumber(video.comments || 0)}
+            </span>
+          </div>
+
+          {type === "needs-work" && video.improvements && video.improvements.length > 0 && (
+            <div className="mt-3 pt-3 border-t border-orange-200">
+              <p className="text-xs font-semibold text-orange-800 mb-1">
+                {video.improvements[0].issue}
+              </p>
+              <p className="text-xs text-slate-600">
+                {video.improvements[0].action}
+              </p>
+            </div>
+          )}
         </div>
       </div>
     </div>

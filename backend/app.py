@@ -62,6 +62,7 @@ app.register_blueprint(sentiment_bp)
 app.register_blueprint(subscriber_predict_bp)
 app.register_blueprint(performance_bp)
 app.register_blueprint(predictive_bp)
+app.register_blueprint(bp)
 
 # admin routes
 app.register_blueprint(user_bp, url_prefix="/api/admin")
