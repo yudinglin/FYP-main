@@ -30,7 +30,7 @@ from routes.YouTube.video_sentiment import sentiment_bp
 from routes.YouTube.subscriber_prediction import subscriber_predict_bp
 from routes.YouTube.video_correlation_business import performance_bp
 from routes.YouTube.predictive_analysis_business import predictive_bp
-from routes.YouTube.audience_resonance import bp
+from routes.YouTube.audience_resonance import performance_analyzer_bp
 
 load_dotenv()
 
@@ -62,7 +62,7 @@ app.register_blueprint(sentiment_bp)
 app.register_blueprint(subscriber_predict_bp)
 app.register_blueprint(performance_bp)
 app.register_blueprint(predictive_bp)
-app.register_blueprint(bp)
+app.register_blueprint(performance_analyzer_bp)
 
 # admin routes
 app.register_blueprint(user_bp, url_prefix="/api/admin")

@@ -1,275 +1,358 @@
-import React, { useEffect, useMemo, useState } from "react";
+// frontend/src/pages/Business/ChannelPerformanceAnalyzer.jsx
+import React, { useEffect, useMemo, useState, useRef } from "react";
+import { useAuth } from "../../core/context/AuthContext";
 import {
-  TrendingUp,
-  Users,
-  MessageSquare,
-  ThumbsUp,
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  LineChart,
+  Line,
+  ResponsiveContainer,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+  Area,
+  AreaChart,
+} from "recharts";
+import {
   Play,
-  Eye,
-  Award,
+  MessageCircle,
+  TrendingUp as TrendingUpIcon,
+  TrendingUp,
+  TrendingDown,
   AlertCircle,
-  CheckCircle2,
-  BarChart3,
-  Sparkles,
-  Heart,
-  Star,
+  CheckCircle,
+  Lightbulb,
+  Target,
+  Award,
+  Zap,
+  Eye,
+  ThumbsUp,
   Smile,
   Frown,
   Meh,
-  ExternalLink,
+  Hash,
+  BarChart3,
+  Activity,
+  Filter,
+  Calendar,
+  Video,
+  Heart,
+  MessageSquare,
+  BookOpen,
+  Star,
+  Newspaper,
+  Users,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
-import { useAuth } from "../../core/context/AuthContext";
 
-const API_BASE = "http://localhost:5000";
+const API_BASE = "http://127.0.0.1:5000";
 
-/**
- * Simplified Content Performance Insights
- * Business-focused: Easy to understand metrics for non-technical users
- */
-export default function ContentPerformanceInsights() {
+// Error boundary component for charts
+class ChartErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error) {
+    return { hasError: true };
+  }
+
+  componentDidCatch(error, errorInfo) {
+    console.error('Chart error:', error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex items-center justify-center h-48 bg-slate-50 rounded-lg border border-slate-200">
+          <div className="text-center text-slate-500">
+            <AlertCircle className="mx-auto mb-2" size={24} />
+            <p className="text-sm">Chart temporarily unavailable</p>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+export default function ChannelPerformanceAnalyzer() {
   const { user } = useAuth();
 
-  // Channel selector
-  const channels = Array.isArray(user?.youtube_channels) ? user.youtube_channels : [];
+  // Channel list from business profile
+  const channels = useMemo(() => {
+    const list = Array.isArray(user?.youtube_channels) ? user.youtube_channels : [];
+    return list
+      .map((c) => ({
+        url: (c?.url || "").trim(),
+        name: (c?.name || "").trim(),
+        is_primary: Boolean(c?.is_primary),
+      }))
+      .filter((c) => c.url);
+  }, [user]);
 
   const options = useMemo(() => {
-    const base = [
-      {
-        key: "ALL",
-        label: "All my channels",
-        urls: channels.map((c) => c.url).filter(Boolean),
-      },
-    ];
-    const singles = channels
-      .map((c, idx) => ({
-        key: `CH_${idx}`,
-        label: c?.name || `Channel ${idx + 1}`,
-        urls: c?.url ? [c.url] : [],
-      }))
-      .filter((o) => o.urls.length > 0);
-    return [...base, ...singles];
+    const singles = channels.map((c, idx) => ({
+      key: c.url || String(idx),
+      label: c.name
+        ? `${c.name}${c.is_primary ? " (Your Channel)" : ""}`
+        : `${c.url}${c.is_primary ? " (Your Channel)" : ""}`,
+      url: c.url,
+      is_primary: c.is_primary,
+    }));
+    
+    // Add "All Channels" option for retention and trending tabs
+    const allOption = {
+      key: "all",
+      label: "All Channels (Comparison)",
+      url: "all",
+      is_primary: false,
+    };
+    
+    return [allOption, ...singles];
   }, [channels]);
 
-  const [selectedKey, setSelectedKey] = useState("ALL");
-  const selectedOption = options.find((o) => o.key === selectedKey) || options[0];
-  const selectedUrls = selectedOption?.urls || [];
+  const [selectedKey, setSelectedKey] = useState(options[0]?.key || "");
+  const [activeTab, setActiveTab] = useState("viral");
 
-  // States
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [results, setResults] = useState([]);
-  const [activeView, setActiveView] = useState("overview");
+  const selectedUrl = useMemo(() => {
+    const one = options.find((o) => o.key === selectedKey);
+    return one?.url || "";
+  }, [selectedKey, options]);
 
-  useEffect(() => {
-    async function fetchOne(url, label) {
-      const encodedUrl = encodeURIComponent(url);
-      const res = await fetch(
-        `${API_BASE}/api/youtube/audience.resonance?url=${encodedUrl}&maxVideos=50`
-      );
+  const [maxVideos, setMaxVideos] = useState(30);
+  const [videoInput, setVideoInput] = useState("30");
 
-      if (!res.ok) {
-        const text = await res.text();
-        throw new Error(text || `Failed to fetch data for ${label}`);
+  // Tab-specific states
+  const [retentionData, setRetentionData] = useState(null);
+  const [sentimentData, setSentimentData] = useState(null);
+  const [trendingData, setTrendingData] = useState(null);
+  const [viralData, setViralData] = useState(null);
+  const [contentGapData, setContentGapData] = useState(null);
+
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+
+  // Sentiment filter state
+  const [sentimentFilter, setSentimentFilter] = useState("all");
+  const [selectedChannelSentiment, setSelectedChannelSentiment] = useState(null);
+
+  const formatNum = (n) => (Number(n) || 0).toLocaleString();
+
+  // Fetch data based on active tab
+  const handleAnalyze = async () => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const parsed = Math.max(5, Math.min(100, Number(videoInput) || 30));
+      setMaxVideos(parsed);
+
+      if (!selectedUrl) {
+        setError("No channel selected.");
+        return;
       }
 
-      const data = await res.json();
-      return { label, url, data };
-    }
+      // Clear previous data
+      setRetentionData(null);
+      setSentimentData(null);
+      setTrendingData(null);
+      setSelectedChannelSentiment(null);
 
-    async function fetchAll() {
-      setLoading(true);
-      setError(null);
-      setResults([]);
-
-      try {
-        if (!selectedUrls || selectedUrls.length === 0) {
-          throw new Error(
-            "No channels connected. Please add channels in Business Profile → Link Channel."
-          );
+      if (activeTab === "retention") {
+        if (channels.length < 2) {
+          setError("Retention analysis requires at least 2 channels for comparison. Please add more channels in your Business Profile.");
+          return;
         }
-
-        const urlToLabel = new Map();
-        channels.forEach((c, idx) => {
-          if (c?.url) urlToLabel.set(c.url, c?.name || `Channel ${idx + 1}`);
-        });
-
-        const tasks = selectedUrls.map((url) =>
-          fetchOne(url, urlToLabel.get(url) || "Channel")
+        const urlsParam = channels.map(c => c.url).join(",");
+        const res = await fetch(
+          `${API_BASE}/api/youtube/analyzer.retentionOptimizer?urls=${encodeURIComponent(urlsParam)}&maxVideos=${parsed}`
         );
-        const res = await Promise.all(tasks);
-
-        setResults(res);
-      } catch (e) {
-        console.error(e);
-        setError(e?.message || "Failed to load performance data");
-      } finally {
-        setLoading(false);
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || "Failed to fetch retention data");
+        }
+        const data = await res.json();
+        setRetentionData(data);
+      } else if (activeTab === "sentiment") {
+        const urlToUse = selectedUrl === "all" ? channels.map(c => c.url).join(",") : selectedUrl;
+        const res = await fetch(
+          `${API_BASE}/api/youtube/analyzer.commentSentiment?urls=${encodeURIComponent(urlToUse)}&maxVideos=${parsed}&maxComments=50`
+        );
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || "Failed to fetch sentiment data");
+        }
+        const data = await res.json();
+        setSentimentData(data);
+        if (data.channels && data.channels.length > 0) {
+          setSelectedChannelSentiment(data.channels[0]);
+        }
+      } else if (activeTab === "trending") {
+        const urlToUse = selectedUrl === "all" ? channels.map(c => c.url).join(",") : selectedUrl;
+        const res = await fetch(
+          `${API_BASE}/api/youtube/analyzer.trendingContent?urls=${encodeURIComponent(urlToUse)}&maxVideos=${parsed}`
+        );
+        if (!res.ok) {
+          const errorText = await res.text();
+          throw new Error(errorText || "Failed to fetch trending data");
+        }
+        const data = await res.json();
+        setTrendingData(data);
       }
+    } catch (err) {
+      console.error("Analysis error:", err);
+      setError(err?.message || "Failed to fetch analysis");
+      setRetentionData(null);
+      setSentimentData(null);
+      setTrendingData(null);
+      setSelectedChannelSentiment(null);
+    } finally {
+      setLoading(false);
     }
-
-    fetchAll();
-  }, [selectedKey, selectedUrls.length]);
-
-  if (loading) {
-    return (
-      <div className="min-h-[calc(100vh-72px)] bg-slate-50">
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="flex items-center gap-3">
-            <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-indigo-600"></div>
-            <p className="text-slate-600">Analyzing your content performance...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error) {
-    return (
-      <div className="min-h-[calc(100vh-72px)] bg-slate-50">
-        <div className="max-w-7xl mx-auto px-6 py-8">
-          <div className="rounded-2xl bg-white border border-slate-100 p-6">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="w-5 h-5 text-red-500 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-slate-900">Error loading data</p>
-                <p className="text-sm text-red-600 mt-1">{error}</p>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  const MenuItem = ({ icon: Icon, label, view, description }) => (
-    <button
-      onClick={() => setActiveView(view)}
-      className={`w-full flex flex-col gap-1 px-4 py-3 rounded-lg transition-all text-left ${
-        activeView === view
-          ? "bg-indigo-50 text-indigo-700 font-medium border-2 border-indigo-200"
-          : "text-slate-600 hover:bg-slate-50 border-2 border-transparent"
-      }`}
-    >
-      <div className="flex items-center gap-3">
-        <Icon size={18} />
-        <span className="flex-1 text-sm font-medium">{label}</span>
-      </div>
-      {description && (
-        <span className="text-xs text-slate-500 ml-9">{description}</span>
-      )}
-    </button>
-  );
+  };
 
   return (
-    <div className="min-h-screen bg-slate-50 p-6">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <div className="flex items-center gap-2 mb-2">
-            <BarChart3 className="w-7 h-7 text-indigo-600" />
-            <h1 className="text-3xl font-bold text-slate-900">
-              Content Performance Analysis
-            </h1>
-          </div>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">
+            Channel Performance Analyzer
+          </h1>
           <p className="text-slate-600">
-            Understand what content works best and how your audience responds
+            Optimize retention, understand sentiment, and discover trending content patterns.
           </p>
         </div>
 
         <div className="flex gap-6">
           {/* Sidebar */}
           <div className="w-64 flex flex-col gap-4">
-            {/* Navigation */}
+            {/* Tab Navigation */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
               <h2 className="text-sm font-semibold text-slate-700 px-4 py-2 mb-2">
-                What to View
+                Analysis Tools
               </h2>
               <div className="space-y-1">
-                <MenuItem 
-                  icon={BarChart3} 
-                  label="Performance Summary" 
-                  view="overview" 
-                  description="Your best performing content"
+                <TabButton
+                  icon={Play}
+                  label="Retention Optimizer"
+                  tab="retention"
+                  activeTab={activeTab}
+                  onClick={() => setActiveTab("retention")}
                 />
-                <MenuItem 
-                  icon={Heart} 
-                  label="Audience Loyalty" 
-                  view="retention"
-                  description="Videos people watch completely"
+                <TabButton
+                  icon={MessageCircle}
+                  label="Comment Sentiment"
+                  tab="sentiment"
+                  activeTab={activeTab}
+                  onClick={() => setActiveTab("sentiment")}
                 />
-                <MenuItem 
-                  icon={Sparkles} 
-                  label="Trending Content" 
-                  view="viral"
-                  description="Videos gaining momentum"
+                <TabButton
+                  icon={TrendingUpIcon}
+                  label="Trending Content"
+                  tab="trending"
+                  activeTab={activeTab}
+                  onClick={() => setActiveTab("trending")}
                 />
               </div>
             </div>
 
-            {/* Channel Selector */}
+            {/* Settings */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
               <h3 className="text-sm font-semibold text-slate-700 mb-3">
-                Select Channel
+                Settings
               </h3>
-              <select
-                className="w-full px-3 py-2 rounded-lg border border-slate-200 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-                value={selectedKey}
-                onChange={(e) => setSelectedKey(e.target.value)}
-              >
-                {options.map((o) => (
-                  <option key={o.key} value={o.key}>
-                    {o.label}
-                  </option>
-                ))}
-              </select>
-            </div>
 
-            {/* Quick Stats */}
-            {results.length > 0 && results[0]?.data && (
-              <div className="bg-indigo-600 rounded-xl shadow-sm p-4 text-white">
-                <div className="text-sm font-medium mb-3">Quick Stats</div>
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center">
-                    <span className="text-indigo-200 text-sm">Videos Analyzed</span>
-                    <span className="font-semibold">
-                      {results.reduce((sum, r) => sum + (r.data?.channel?.videos_analyzed || 0), 0)}
-                    </span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-indigo-200 text-sm">Total Subscribers</span>
-                    <span className="font-semibold">
-                      {formatNumber(results.reduce((sum, r) => sum + (r.data?.channel?.subscribers || 0), 0))}
-                    </span>
-                  </div>
-                </div>
+              <div className="mb-4">
+                <label className="text-sm text-slate-600 block mb-2">
+                  Select Channel
+                </label>
+                <select
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  value={selectedKey}
+                  onChange={(e) => setSelectedKey(e.target.value)}
+                >
+                  {options.map((o) => (
+                    <option key={o.key} value={o.key}>
+                      {o.label}
+                    </option>
+                  ))}
+                </select>
+                {selectedKey === "all" && (
+                  <p className="text-xs text-indigo-600 mt-1">
+                    Compare primary channel with all linked channels
+                  </p>
+                )}
               </div>
-            )}
+
+              <div className="mb-4">
+                <label className="text-sm text-slate-600 block mb-2">
+                  Videos to Analyze
+                </label>
+                <input
+                  type="number"
+                  min="5"
+                  max="100"
+                  value={videoInput}
+                  onChange={(e) => setVideoInput(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                />
+                <p className="text-xs text-slate-500 mt-1">5-100 recent videos</p>
+              </div>
+
+              <button
+                onClick={handleAnalyze}
+                disabled={loading}
+                className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-60"
+              >
+                {loading ? "Analyzing..." : "Analyze"}
+              </button>
+
+              {error && (
+                <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
+                  {error}
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Main Content */}
           <div className="flex-1">
-            {activeView === "overview" && (
-              <div className="space-y-6">
-                {results.map((item) => (
-                  <OverviewPanel key={item.url} title={item.label} data={item.data} />
-                ))}
-              </div>
+            {/* RETENTION OPTIMIZER */}
+            {activeTab === "retention" && (
+              <RetentionOptimizerView 
+                retentionData={retentionData}
+                loading={loading}
+              />
             )}
 
-            {activeView === "retention" && (
-              <div className="space-y-6">
-                {results.map((item) => (
-                  <RetentionPanel key={item.url} title={item.label} data={item.data} />
-                ))}
-              </div>
+            {/* COMMENT SENTIMENT */}
+            {activeTab === "sentiment" && (
+              <CommentSentimentView
+                sentimentData={sentimentData}
+                loading={loading}
+                sentimentFilter={sentimentFilter}
+                setSentimentFilter={setSentimentFilter}
+                selectedChannelSentiment={selectedChannelSentiment}
+                setSelectedChannelSentiment={setSelectedChannelSentiment}
+              />
             )}
 
-            {activeView === "viral" && (
-              <div className="space-y-6">
-                {results.map((item) => (
-                  <ViralPanel key={item.url} title={item.label} data={item.data} />
-                ))}
-              </div>
+            {/* TRENDING CONTENT */}
+            {activeTab === "trending" && (
+              <TrendingContentView
+                trendingData={trendingData}
+                loading={loading}
+              />
             )}
           </div>
         </div>
@@ -278,632 +361,1357 @@ export default function ContentPerformanceInsights() {
   );
 }
 
-// Helper function
-function formatNumber(n) {
-  if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
-  if (n >= 1000) return `${(n / 1000).toFixed(1)}K`;
-  return n.toLocaleString();
-}
+// ==================== IMPROVED RETENTION OPTIMIZER VIEW ====================
+function RetentionOptimizerView({ retentionData, loading }) {
+  if (!retentionData && !loading) {
+    return (
+      <EmptyState
+        icon={Play}
+        title="Retention Rate Optimizer"
+        description="Understand what content types and pacing keep viewers watching."
+        features={[
+          "See which content types work best (Tutorial, Review, etc.)",
+          "Analyze video pacing effectiveness (Fast vs Deep-dive)",
+          "Compare your title hook strength vs competitors",
+          "Get specific recommendations with expected impact"
+        ]}
+      />
+    );
+  }
 
-// Helper to get user-friendly engagement description
-function getEngagementLevel(rate) {
-  if (rate >= 10) return { label: "Outstanding", color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" };
-  if (rate >= 5) return { label: "Excellent", color: "text-green-600", bg: "bg-green-50", border: "border-green-200" };
-  if (rate >= 3) return { label: "Very Good", color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" };
-  if (rate >= 1) return { label: "Good", color: "text-indigo-600", bg: "bg-indigo-50", border: "border-indigo-200" };
-  if (rate >= 0.1) return { label: "Moderate", color: "text-orange-600", bg: "bg-orange-50", border: "border-orange-200" };
-  return { label: "Needs Work", color: "text-slate-600", bg: "bg-slate-50", border: "border-slate-200" };
-}
+  if (loading) {
+    return <LoadingState message="Analyzing retention patterns..." />;
+  }
 
-// Helper Components
-function StatCard({ icon: Icon, label, value, helpText, color = "indigo" }) {
-  const colorClasses = {
-    indigo: "bg-indigo-50 border-indigo-100",
-    emerald: "bg-emerald-50 border-emerald-100",
-    blue: "bg-blue-50 border-blue-100",
-  };
+  if (!retentionData || typeof retentionData !== 'object') {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-12">
+        <div className="text-center text-slate-600">
+          <AlertCircle className="mx-auto text-slate-300 mb-4" size={64} />
+          <div className="font-medium text-slate-900 text-xl mb-2">No Data Available</div>
+          <div className="text-sm text-slate-500">Unable to analyze retention data. Please try again.</div>
+        </div>
+      </div>
+    );
+  }
+
+  const formatNum = (n) => (Number(n) || 0).toLocaleString();
+
+  // Safe access to data properties
+  const yourAvgEngagement = retentionData.your_avg_engagement || 0;
+  const competitorAvgEngagement = retentionData.competitor_avg_engagement || 0;
+  const yourAvgHook = retentionData.your_avg_hook_score || 0;
+  const competitorAvgHook = retentionData.competitor_avg_hook_score || 0;
+  const analyzedVideos = retentionData.analyzed_videos || 0;
+  const engagementDistribution = retentionData.engagement_distribution || {};
+  const topPrimaryVideos = retentionData.top_primary_videos || [];
+  const topCompetitorVideos = retentionData.top_competitor_videos || [];
+  const recommendations = retentionData.recommendations || [];
+  const contentTypePerformance = retentionData.content_type_performance || {};
+  const pacingPerformance = retentionData.pacing_performance || {};
+  const primaryChannelName = retentionData.primary_channel_name || "Your Channel";
 
   return (
-    <div className={`rounded-xl border-2 p-5 ${colorClasses[color]}`}>
-      <div className="flex items-center gap-2 mb-2">
-        <Icon size={20} className="text-slate-700" />
-        <span className="text-xs font-semibold text-slate-600 uppercase tracking-wide">{label}</span>
-      </div>
-      <p className="text-3xl font-bold text-slate-900">{value}</p>
-      {helpText && <p className="text-xs text-slate-600 mt-1">{helpText}</p>}
+    <div className="space-y-6">
+      {/* Engagement & Hook Score Comparison */}
+      <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+        <div className="flex items-center gap-2 mb-6">
+          <BarChart3 className="text-indigo-600" size={20} />
+          <h2 className="text-lg font-semibold text-slate-900">Performance Overview</h2>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Engagement Rate Comparison */}
+          <div>
+            <h3 className="text-sm font-medium text-slate-700 mb-3">Engagement Rate</h3>
+            <ChartErrorBoundary>
+              <ResponsiveContainer width="100%" height={200}>
+                <BarChart data={[
+                  { name: 'Your Channel', value: Math.max(0, yourAvgEngagement * 100) },
+                  { name: 'Competitors', value: Math.max(0, competitorAvgEngagement * 100) }
+                ]}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} label={{ value: 'Engagement %', angle: -90, position: 'insideLeft', fontSize: 12 }} />
+                  <Tooltip formatter={(value) => `${Number(value).toFixed(2)}%`} />
+                  <Bar dataKey="value" fill="#4f46e5" radius={[8, 8, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </ChartErrorBoundary>
+            
+            <div className="flex items-center justify-between mt-3 p-3 bg-indigo-50 rounded-lg">
+              <div>
+                <p className="text-xs text-indigo-700">Your Average</p>
+                <p className="text-2xl font-bold text-indigo-600">
+                  {(yourAvgEngagement * 100).toFixed(1)}%
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-xs text-green-700">Competitors</p>
+                <p className="text-2xl font-bold text-green-600">
+                  {(competitorAvgEngagement * 100).toFixed(1)}%
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Hook Strength Comparison */}
+          <div>
+            <h3 className="text-sm font-medium text-slate-700 mb-3">Title Hook Strength</h3>
+            <div className="grid grid-cols-2 gap-4">
+              {/* Your Hook Score */}
+              <div className="text-center">
+                <p className="text-xs text-slate-600 mb-2">Your Hooks</p>
+                <div className="relative w-24 h-24 mx-auto">
+                  <svg className="transform -rotate-90" viewBox="0 0 120 120">
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      fill="none"
+                      stroke="#e2e8f0"
+                      strokeWidth="10"
+                    />
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      fill="none"
+                      stroke="#4f46e5"
+                      strokeWidth="10"
+                      strokeDasharray={`${(yourAvgHook / 100) * 314} 314`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div>
+                      <p className="text-2xl font-bold text-indigo-600">
+                        {yourAvgHook.toFixed(0)}
+                      </p>
+                      <p className="text-xs text-slate-500">/ 100</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Competitor Hook Score */}
+              <div className="text-center">
+                <p className="text-xs text-slate-600 mb-2">Competitors</p>
+                <div className="relative w-24 h-24 mx-auto">
+                  <svg className="transform -rotate-90" viewBox="0 0 120 120">
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      fill="none"
+                      stroke="#e2e8f0"
+                      strokeWidth="10"
+                    />
+                    <circle
+                      cx="60"
+                      cy="60"
+                      r="50"
+                      fill="none"
+                      stroke="#10b981"
+                      strokeWidth="10"
+                      strokeDasharray={`${(competitorAvgHook / 100) * 314} 314`}
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                  <div className="absolute inset-0 flex items-center justify-center">
+                    <div>
+                      <p className="text-2xl font-bold text-green-600">
+                        {competitorAvgHook.toFixed(0)}
+                      </p>
+                      <p className="text-xs text-slate-500">/ 100</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="mt-3 p-3 bg-slate-50 rounded-lg">
+              <p className="text-xs text-slate-600 text-center">
+                {yourAvgHook > competitorAvgHook ? (
+                  <span className="text-green-700 font-semibold">
+                    ✅ Your titles are {(yourAvgHook - competitorAvgHook).toFixed(0)} points stronger!
+                  </span>
+                ) : yourAvgHook < competitorAvgHook ? (
+                  <span className="text-amber-700 font-semibold">
+                    ⚠️ Competitors are {(competitorAvgHook - yourAvgHook).toFixed(0)} points ahead
+                  </span>
+                ) : (
+                  <span className="text-slate-700 font-semibold">
+                    You're matched with competitors
+                  </span>
+                )}
+              </p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Content Type Performance */}
+      {Object.keys(contentTypePerformance).length > 0 && (
+        <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Video className="text-purple-600" size={20} />
+            <h2 className="text-lg font-semibold text-slate-900">Content Type Performance</h2>
+          </div>
+
+          <ChartErrorBoundary>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={Object.entries(contentTypePerformance)
+                .filter(([_, stats]) => stats && typeof stats === 'object')
+                .map(([type, stats]) => ({
+                  type: type.charAt(0).toUpperCase() + type.slice(1),
+                  engagement: Math.max(0, (stats.avg_engagement || 0) * 100),
+                  views: Math.max(0, stats.avg_views || 0),
+                  count: stats.video_count || 0
+                }))}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="type" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} label={{ value: 'Engagement %', angle: -90, position: 'insideLeft' }} />
+                <Tooltip formatter={(value) => `${Number(value).toFixed(2)}%`} />
+                <Bar dataKey="engagement" fill="#8b5cf6" radius={[8, 8, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartErrorBoundary>
+
+          <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-3">
+            {Object.entries(contentTypePerformance).map(([type, stats]) => (
+              <ContentTypeCard key={type} type={type} stats={stats} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Pacing Performance */}
+      {Object.keys(pacingPerformance).length > 0 && (
+        <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Activity className="text-blue-600" size={20} />
+            <h2 className="text-lg font-semibold text-slate-900">Video Pacing Analysis</h2>
+          </div>
+
+          <ChartErrorBoundary>
+            <ResponsiveContainer width="100%" height={220}>
+              <BarChart data={Object.entries(pacingPerformance)
+                .filter(([_, stats]) => stats && typeof stats === 'object')
+                .map(([pacing, stats]) => ({
+                  pacing: pacing.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '),
+                  engagement: Math.max(0, (stats.avg_engagement || 0) * 100),
+                  hookScore: Math.max(0, stats.avg_hook_score || 0),
+                  count: stats.video_count || 0
+                }))}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="pacing" tick={{ fontSize: 11 }} />
+                <YAxis tick={{ fontSize: 11 }} />
+                <Tooltip />
+                <Bar dataKey="engagement" fill="#3b82f6" radius={[8, 8, 0, 0]} name="Engagement %" />
+              </BarChart>
+            </ResponsiveContainer>
+          </ChartErrorBoundary>
+
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3">
+            {Object.entries(pacingPerformance).map(([pacing, stats]) => (
+              <PacingCard key={pacing} pacing={pacing} stats={stats} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Top Performing Videos Comparison */}
+      {topPrimaryVideos.length > 0 && topCompetitorVideos.length > 0 && (
+        <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Award className="text-amber-500" size={20} />
+            <h2 className="text-lg font-semibold text-slate-900">Top Performers Comparison</h2>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Your Top Videos */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-3 h-3 bg-indigo-600 rounded-full"></div>
+                <h3 className="font-medium text-slate-900">Your Best Videos</h3>
+              </div>
+              <div className="space-y-2">
+                {topPrimaryVideos.slice(0, 5).map((video, idx) => (
+                  <CompactVideoCard key={idx} video={video} rank={idx + 1} color="indigo" />
+                ))}
+              </div>
+            </div>
+
+            {/* Competitor Top Videos */}
+            <div>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-3 h-3 bg-green-600 rounded-full"></div>
+                <h3 className="font-medium text-slate-900">Competitor Best Videos</h3>
+              </div>
+              <div className="space-y-2">
+                {topCompetitorVideos.slice(0, 5).map((video, idx) => (
+                  <CompactVideoCard key={idx} video={video} rank={idx + 1} color="green" />
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* Recommendations */}
+      {recommendations.length > 0 && (
+        <section className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Lightbulb className="text-amber-600" size={24} />
+            <h2 className="text-xl font-bold text-slate-900">💡 What You Should Do</h2>
+          </div>
+
+          <div className="space-y-3">
+            {recommendations.map((rec, idx) => (
+              <ImprovedRecommendationCard key={idx} recommendation={rec} />
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }
 
-function ContentTypeRow({ rank, theme, count, engagement }) {
-  const themeNames = {
-    tutorial: "How-To & Tutorials",
-    review: "Product Reviews",
-    vlog: "Daily Vlogs",
-    challenge: "Challenges",
-    listicle: "Top Lists",
-    educational: "Educational",
-    entertainment: "Entertainment",
-    news: "News & Updates",
+// Content Type Card Component
+function ContentTypeCard({ type, stats }) {
+  const icons = {
+    tutorial: BookOpen,
+    review: Star,
+    entertainment: Smile,
+    news: Newspaper,
+    other: Video
+  };
+  
+  const colors = {
+    tutorial: "purple",
+    review: "blue",
+    entertainment: "pink",
+    news: "green",
+    other: "slate"
   };
 
-  const engagementLevel = getEngagementLevel(engagement);
-
+  const colorMap = {
+    purple: { bg: "bg-purple-50", border: "border-purple-200", text: "text-purple-900", icon: "text-purple-600" },
+    blue: { bg: "bg-blue-50", border: "border-blue-200", text: "text-blue-900", icon: "text-blue-600" },
+    pink: { bg: "bg-pink-50", border: "border-pink-200", text: "text-pink-900", icon: "text-pink-600" },
+    green: { bg: "bg-green-50", border: "border-green-200", text: "text-green-900", icon: "text-green-600" },
+    slate: { bg: "bg-slate-50", border: "border-slate-200", text: "text-slate-900", icon: "text-slate-600" }
+  };
+  
+  const Icon = icons[type] || Video;
+  const color = colorMap[colors[type] || "slate"];
+  
   return (
-    <div className="flex items-center justify-between rounded-xl bg-white border-2 border-slate-200 p-4 hover:shadow-md transition-shadow">
-      <div className="flex items-center gap-3">
-        <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
-          <span className="text-sm font-bold text-indigo-700">#{rank}</span>
+    <div className={`p-4 rounded-lg border ${color.border} ${color.bg}`}>
+      <div className="flex items-center gap-2 mb-2">
+        <Icon size={16} className={color.icon} />
+        <span className={`font-semibold ${color.text} capitalize text-sm`}>
+          {type.replace(/_/g, ' ')}
+        </span>
+      </div>
+      
+      <div className="space-y-1 text-xs">
+        <div className="flex justify-between">
+          <span className="text-slate-600">Engagement</span>
+          <span className={`font-bold ${color.text}`}>
+            {((stats.avg_engagement || 0) * 100).toFixed(1)}%
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-slate-600">Videos</span>
+          <span className={`font-bold ${color.text}`}>{stats.video_count || 0}</span>
+        </div>
+      </div>
+      
+      {stats.top_video && (
+        <div className="mt-2 pt-2 border-t border-slate-200">
+          <p className="text-xs text-slate-600">Top: {stats.top_video.title?.slice(0, 35) || 'N/A'}...</p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Pacing Card Component
+function PacingCard({ pacing, stats }) {
+  const pacingName = pacing.replace(/_/g, ' ').split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+  
+  return (
+    <div className="p-4 bg-blue-50 rounded-lg border border-blue-200">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-sm font-semibold text-blue-900">{pacingName}</span>
+        <span className="text-xs px-2 py-1 bg-blue-200 text-blue-900 rounded-full">
+          {stats.video_count || 0} videos
+        </span>
+      </div>
+      
+      <div className="grid grid-cols-2 gap-2 text-xs">
+        <div>
+          <p className="text-blue-700">Engagement</p>
+          <p className="font-bold text-blue-900">{((stats.avg_engagement || 0) * 100).toFixed(1)}%</p>
         </div>
         <div>
-          <p className="text-sm font-semibold text-slate-900">
-            {themeNames[theme] || theme}
-          </p>
-          <p className="text-xs text-slate-600">{count} videos</p>
+          <p className="text-blue-700">Hook Score</p>
+          <p className="font-bold text-blue-900">{(stats.avg_hook_score || 0).toFixed(0)}/100</p>
         </div>
       </div>
-      <div className="text-right">
-        <p className={`text-sm font-bold ${engagementLevel.color}`}>{engagementLevel.label}</p>
-        <p className="text-xs text-slate-500">{engagement.toFixed(1)}% interaction</p>
+      
+      {stats.top_videos && stats.top_videos[0] && (
+        <div className="mt-2 pt-2 border-t border-blue-200">
+          <p className="text-xs text-blue-700 mb-1">Top performer:</p>
+          <div className="flex items-center gap-2">
+            {stats.top_videos[0].thumbnail && (
+              <img 
+                src={stats.top_videos[0].thumbnail} 
+                alt="" 
+                className="w-12 h-8 object-cover rounded"
+              />
+            )}
+            <p className="text-xs text-slate-700 line-clamp-2 flex-1">
+              {stats.top_videos[0].title || 'N/A'}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ==================== IMPROVED COMMENT SENTIMENT VIEW ====================
+function CommentSentimentView({ sentimentData, loading, sentimentFilter, setSentimentFilter, selectedChannelSentiment, setSelectedChannelSentiment }) {
+  if (!sentimentData && !loading) {
+    return (
+      <EmptyState
+        icon={MessageCircle}
+        title="Comment Sentiment Analyzer"
+        description="Understand how your audience feels and how you compare to other channels."
+        features={[
+          "Track positive, negative, and neutral comments",
+          "Compare your sentiment vs other channels",
+          "See sentiment trends over time",
+          "Discover what topics your audience discusses most"
+        ]}
+      />
+    );
+  }
+
+  if (loading) {
+    return <LoadingState message="Analyzing comments..." />;
+  }
+
+  if (!sentimentData || typeof sentimentData !== 'object') {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-12">
+        <div className="text-center text-slate-600">
+          <AlertCircle className="mx-auto text-slate-300 mb-4" size={64} />
+          <div className="font-medium text-slate-900 text-xl mb-2">No Sentiment Data</div>
+          <div className="text-sm text-slate-500">Unable to analyze comment sentiment. Please try again.</div>
+        </div>
+      </div>
+    );
+  }
+
+  const channels = sentimentData.channels || [];
+  const hasComparison = sentimentData.has_comparison || false;
+  const comparisonInsights = sentimentData.comparison_insights || [];
+
+  if (channels.length === 0) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-12">
+        <div className="text-center text-slate-600">
+          <MessageCircle className="mx-auto text-slate-300 mb-4" size={64} />
+          <div className="font-medium text-slate-900 text-xl mb-2">No Comments Found</div>
+          <div className="text-sm text-slate-500">No comments were found for analysis.</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!selectedChannelSentiment) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-12">
+        <div className="text-center text-slate-600">
+          <MessageCircle className="mx-auto text-slate-300 mb-4" size={64} />
+          <div className="font-medium text-slate-900 text-xl mb-2">Select a Channel</div>
+          <div className="text-sm text-slate-500">Please select a channel to view sentiment analysis.</div>
+        </div>
+      </div>
+    );
+  }
+
+  const filteredComments = sentimentFilter === "all"
+    ? (selectedChannelSentiment.categorized_comments || [])
+    : (selectedChannelSentiment.categorized_comments || []).filter(comment => comment && comment.sentiment === sentimentFilter);
+
+  const sentimentColors = {
+    positive: { bg: "bg-green-50", border: "border-green-200", text: "text-green-800" },
+    neutral: { bg: "bg-slate-50", border: "border-slate-200", text: "text-slate-800" },
+    negative: { bg: "bg-red-50", border: "border-red-200", text: "text-red-800" }
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* CROSS-CHANNEL COMPARISON INSIGHTS */}
+      {hasComparison && comparisonInsights.length > 0 && (
+        <section className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border-2 border-blue-300 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Users className="text-blue-600" size={24} />
+            <h2 className="text-xl font-bold text-slate-900">How You Compare to Other Channels</h2>
+          </div>
+          
+          <div className="space-y-3">
+            {comparisonInsights.map((insight, idx) => (
+              <ComparisonInsightCard key={idx} insight={insight} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Channel Selector */}
+      {channels.length > 1 && (
+        <div className="bg-white rounded-xl border border-slate-200 p-4">
+          <label className="text-sm font-medium text-slate-700 block mb-3">
+            Select Channel to View Details
+          </label>
+          <div className="flex gap-2 flex-wrap">
+            {channels.map((channel, idx) => (
+              <button
+                key={idx}
+                onClick={() => setSelectedChannelSentiment(channel)}
+                className={`px-4 py-2.5 rounded-lg text-sm font-medium transition-all ${
+                  selectedChannelSentiment?.channel_url === channel.channel_url
+                    ? "bg-indigo-600 text-white shadow-lg scale-105"
+                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+                }`}
+              >
+                {channel.is_primary && <span className="mr-1.5">👤</span>}
+                {channel.channel_name || `Channel ${idx + 1}`}
+                {channel.is_primary && <span className="text-xs ml-1.5 opacity-75">(You)</span>}
+              </button>
+            ))}
+          </div>
+          <p className="text-xs text-slate-500 mt-2">
+            👤 = Your primary channel • Other channels shown for comparison
+          </p>
+        </div>
+      )}
+
+      {/* Overview Cards */}
+      <div className="grid grid-cols-3 gap-4">
+        <SentimentCard
+          icon={Smile}
+          label="Positive"
+          percentage={Math.round((selectedChannelSentiment.sentiment_distribution?.positive || 0))}
+          count={selectedChannelSentiment.sentiment_counts?.positive || 0}
+          color="green"
+        />
+        <SentimentCard
+          icon={Meh}
+          label="Neutral"
+          percentage={Math.round((selectedChannelSentiment.sentiment_distribution?.neutral || 0))}
+          count={selectedChannelSentiment.sentiment_counts?.neutral || 0}
+          color="slate"
+        />
+        <SentimentCard
+          icon={Frown}
+          label="Negative"
+          percentage={Math.round((selectedChannelSentiment.sentiment_distribution?.negative || 0))}
+          count={selectedChannelSentiment.sentiment_counts?.negative || 0}
+          color="red"
+        />
+      </div>
+
+      {/* Individual Channel Insights */}
+      {selectedChannelSentiment.insights && selectedChannelSentiment.insights.length > 0 && (
+        <section className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl border border-purple-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Lightbulb className="text-amber-500" size={24} />
+            <h2 className="text-xl font-bold text-slate-900">
+              {selectedChannelSentiment.is_primary ? "Your Channel Insights" : `${selectedChannelSentiment.channel_name} Insights`}
+            </h2>
+          </div>
+
+          <div className="space-y-3">
+            {selectedChannelSentiment.insights.map((insight, idx) => (
+              <SimpleInsightCard key={idx} insight={insight} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Timeline Chart */}
+      {selectedChannelSentiment.timeline && selectedChannelSentiment.timeline.length > 0 && (
+        <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Calendar className="text-blue-600" size={20} />
+            <h2 className="text-lg font-semibold text-slate-900">Sentiment Over Time</h2>
+          </div>
+
+          <div className="h-[300px]">
+            <ChartErrorBoundary>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={selectedChannelSentiment.timeline}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" tick={{ fontSize: 11 }} />
+                  <YAxis tick={{ fontSize: 11 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Area
+                    type="monotone"
+                    dataKey="positive"
+                    stackId="1"
+                    stroke="#10b981"
+                    fill="#10b981"
+                    fillOpacity={0.6}
+                    name="Positive"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="neutral"
+                    stackId="1"
+                    stroke="#64748b"
+                    fill="#64748b"
+                    fillOpacity={0.6}
+                    name="Neutral"
+                  />
+                  <Area
+                    type="monotone"
+                    dataKey="negative"
+                    stackId="1"
+                    stroke="#ef4444"
+                    fill="#ef4444"
+                    fillOpacity={0.6}
+                    name="Negative"
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </ChartErrorBoundary>
+          </div>
+        </section>
+      )}
+
+      {/* Comment Filter & Display */}
+      <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2">
+            <Filter className="text-indigo-600" size={20} />
+            <h2 className="text-lg font-semibold text-slate-900">Comments ({filteredComments.length})</h2>
+          </div>
+
+          <div className="flex gap-2 flex-wrap">
+            <FilterButton
+              label="All"
+              active={sentimentFilter === "all"}
+              onClick={() => setSentimentFilter("all")}
+              count={selectedChannelSentiment.total_comments || 0}
+            />
+            <FilterButton
+              label="Positive"
+              active={sentimentFilter === "positive"}
+              onClick={() => setSentimentFilter("positive")}
+              count={selectedChannelSentiment.sentiment_counts?.positive || 0}
+              color="green"
+            />
+            <FilterButton
+              label="Neutral"
+              active={sentimentFilter === "neutral"}
+              onClick={() => setSentimentFilter("neutral")}
+              count={selectedChannelSentiment.sentiment_counts?.neutral || 0}
+              color="slate"
+            />
+            <FilterButton
+              label="Negative"
+              active={sentimentFilter === "negative"}
+              onClick={() => setSentimentFilter("negative")}
+              count={selectedChannelSentiment.sentiment_counts?.negative || 0}
+              color="red"
+            />
+          </div>
+        </div>
+
+        <div className="max-h-[500px] overflow-y-auto space-y-2">
+          {filteredComments.length > 0 ? (
+            filteredComments.slice(0, 50).map((comment, idx) => {
+              if (!comment || !comment.sentiment) return null;
+              const colors = sentimentColors[comment.sentiment] || sentimentColors.neutral;
+              return (
+                <div key={idx} className={`p-3 rounded-lg border ${colors.border} ${colors.bg}`}>
+                  <p className={`text-sm ${colors.text} mb-1`}>{comment.text || 'No comment text'}</p>
+                  <div className="flex items-center gap-3 text-xs text-slate-500">
+                    <span className="capitalize font-medium">{comment.sentiment}</span>
+                    {comment.video_title && (
+                      <span className="truncate">• {comment.video_title}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          ) : (
+            <div className="text-center py-8 text-slate-500">
+              <MessageCircle className="mx-auto mb-2" size={32} />
+              <p>No comments found for the selected filter.</p>
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Trending Topics */}
+      {selectedChannelSentiment.trending_topics && selectedChannelSentiment.trending_topics.length > 0 && (
+        <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Hash className="text-green-600" size={20} />
+            <h2 className="text-lg font-semibold text-slate-900">Trending Discussion Topics</h2>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {selectedChannelSentiment.trending_topics.map((topic, idx) => (
+              <div
+                key={idx}
+                className="px-4 py-2 bg-green-100 text-green-800 rounded-full text-sm font-medium"
+              >
+                {topic.topic || 'Unknown Topic'} <span className="text-green-600">({topic.mentions || 0})</span>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+// Comparison Insight Card Component
+function ComparisonInsightCard({ insight }) {
+  const impactStyles = {
+    positive: {
+      bg: "bg-green-50",
+      border: "border-green-300",
+      icon: "text-green-600",
+      badge: "bg-green-600 text-white",
+      arrow: ArrowUp
+    },
+    needs_improvement: {
+      bg: "bg-amber-50",
+      border: "border-amber-300",
+      icon: "text-amber-600",
+      badge: "bg-amber-600 text-white",
+      arrow: ArrowDown
+    },
+    critical: {
+      bg: "bg-red-50",
+      border: "border-red-300",
+      icon: "text-red-600",
+      badge: "bg-red-600 text-white",
+      arrow: ArrowDown
+    }
+  };
+
+  const style = impactStyles[insight.impact] || impactStyles.needs_improvement;
+  const ArrowIcon = style.arrow;
+
+  return (
+    <div className={`p-5 rounded-xl border-2 ${style.border} ${style.bg}`}>
+      <div className="flex items-start justify-between mb-3">
+        <h3 className="font-bold text-slate-900 text-lg flex-1">{insight.title}</h3>
+        <div className="flex items-center gap-1.5">
+          <span className={`text-xs px-3 py-1.5 rounded-full ${style.badge} font-semibold flex items-center gap-1`}>
+            <ArrowIcon size={14} />
+            {insight.metric}
+          </span>
+        </div>
+      </div>
+      
+      <p className="text-slate-700 mb-3 leading-relaxed">{insight.description}</p>
+      
+      <div className="p-4 bg-white rounded-lg border border-slate-200">
+        <div className="flex items-start gap-2">
+          <Target className={`${style.icon} flex-shrink-0 mt-0.5`} size={18} />
+          <div>
+            <p className="text-xs font-semibold text-slate-700 mb-1">Action Step:</p>
+            <p className="text-sm text-slate-700">{insight.action}</p>
+          </div>
+        </div>
       </div>
     </div>
+  );
+}
+
+function SentimentCard({ icon: Icon, label, percentage, count, color }) {
+  const colors = {
+    green: { bg: "bg-green-50", border: "border-green-200", text: "text-green-700", icon: "text-green-600", bold: "text-green-900" },
+    slate: { bg: "bg-slate-50", border: "border-slate-200", text: "text-slate-700", icon: "text-slate-600", bold: "text-slate-900" },
+    red: { bg: "bg-red-50", border: "border-red-200", text: "text-red-700", icon: "text-red-600", bold: "text-red-900" },
+  };
+
+  const c = colors[color];
+
+  return (
+    <div className={`p-5 rounded-xl border ${c.border} ${c.bg}`}>
+      <div className="flex items-center gap-2 mb-3">
+        <Icon className={c.icon} size={24} />
+        <p className={`font-medium ${c.bold}`}>{label}</p>
+      </div>
+      <p className={`text-3xl font-bold ${c.bold} mb-1`}>{percentage}%</p>
+      <p className={`text-sm ${c.text}`}>{count} comments</p>
+    </div>
+  );
+}
+
+function FilterButton({ label, active, onClick, count, color = "indigo" }) {
+  const colors = {
+    indigo: active ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200",
+    green: active ? "bg-green-600 text-white" : "bg-green-100 text-green-700 hover:bg-green-200",
+    slate: active ? "bg-slate-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200",
+    red: active ? "bg-red-600 text-white" : "bg-red-100 text-red-700 hover:bg-red-200",
+  };
+
+  return (
+    <button
+      onClick={onClick}
+      className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${colors[color]}`}
+    >
+      {label} ({count})
+    </button>
+  );
+}
+
+function SimpleInsightCard({ insight }) {
+  return (
+    <div className="p-4 rounded-xl bg-white border border-purple-200">
+      <h3 className="font-semibold text-slate-900 mb-2">{insight.title}</h3>
+      <p className="text-sm text-slate-700 mb-3">{insight.description}</p>
+      <div className="p-3 bg-purple-50 rounded-lg">
+        <p className="text-xs font-medium text-purple-900 mb-1">💡 What to do:</p>
+        <p className="text-sm text-purple-800">{insight.action}</p>
+      </div>
+    </div>
+  );
+}
+
+// ==================== TRENDING CONTENT VIEW ====================
+function TrendingContentView({ trendingData, loading }) {
+  const [viewType, setViewType] = useState("grid");
+
+  if (!trendingData && !loading) {
+    return (
+      <EmptyState
+        icon={TrendingUpIcon}
+        title="Trending Content Analyzer"
+        description="Discover what's working best and why certain videos perform better."
+        features={[
+          "See your top-performing videos by views and engagement",
+          "Identify successful title patterns",
+          "Find trending topics that resonate",
+          "Get insights on what makes content succeed"
+        ]}
+      />
+    );
+  }
+
+  if (loading) {
+    return <LoadingState message="Analyzing trending content..." />;
+  }
+
+  if (!trendingData || typeof trendingData !== 'object') {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-12">
+        <div className="text-center text-slate-600">
+          <AlertCircle className="mx-auto text-slate-300 mb-4" size={64} />
+          <div className="font-medium text-slate-900 text-xl mb-2">No Trending Data</div>
+          <div className="text-sm text-slate-500">Unable to analyze trending content.</div>
+        </div>
+      </div>
+    );
+  }
+
+  const formatNum = (n) => (Number(n) || 0).toLocaleString();
+  const channelMetrics = trendingData.channel_metrics || {};
+  const topByViews = trendingData.top_by_views || [];
+  const topByEngagement = trendingData.top_by_engagement || [];
+  const insights = trendingData.insights || [];
+  const titlePatterns = trendingData.title_patterns || {};
+  const trendingTopics = trendingData.trending_topics || [];
+
+  return (
+    <div className="space-y-6">
+      {/* Channel Metrics Overview */}
+      {Object.keys(channelMetrics).length > 0 && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <SimpleMetricCard
+            icon={Video}
+            label="Videos Analyzed"
+            value={channelMetrics.total_videos_analyzed || 0}
+            color="indigo"
+          />
+          <SimpleMetricCard
+            icon={Eye}
+            label="Total Views"
+            value={formatNum(channelMetrics.total_views || 0)}
+            color="blue"
+          />
+          <SimpleMetricCard
+            icon={ThumbsUp}
+            label="Avg Views/Video"
+            value={formatNum(channelMetrics.avg_views_per_video || 0)}
+            color="green"
+          />
+          <SimpleMetricCard
+            icon={TrendingUp}
+            label="Above Average"
+            value={`${channelMetrics.above_average_count || 0}/${channelMetrics.total_videos_analyzed || 0}`}
+            subtitle={channelMetrics.total_videos_analyzed > 0 ? `${(((channelMetrics.above_average_count || 0) / channelMetrics.total_videos_analyzed) * 100).toFixed(0)}% consistency` : '0%'}
+            color="purple"
+          />
+        </div>
+      )}
+
+      {/* Top Performers */}
+      <TopPerformersSection trendingData={trendingData} />
+
+      {/* Insights */}
+      {insights.length > 0 && (
+        <section className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl border border-amber-200 p-6">
+          <div className="flex items-center gap-2 mb-4">
+            <Lightbulb className="text-amber-600" size={24} />
+            <h2 className="text-xl font-bold text-slate-900">💡 What's Working</h2>
+          </div>
+
+          <div className="space-y-3">
+            {insights.map((insight, idx) => (
+              <SimpleRecommendationCard key={idx} recommendation={insight} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Title Patterns & Topics Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {Object.keys(titlePatterns).length > 0 && (
+          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Target className="text-purple-600" size={20} />
+              <h2 className="text-lg font-semibold text-slate-900">Title Patterns</h2>
+            </div>
+
+            <ChartErrorBoundary>
+              <ResponsiveContainer width="100%" height={250}>
+                <PieChart>
+                  <Pie
+                    data={Object.entries(titlePatterns)
+                      .filter(([_, count]) => count > 0)
+                      .map(([pattern, count]) => ({
+                        name: pattern.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
+                        value: count
+                      }))}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={80}
+                    dataKey="value"
+                  >
+                    {Object.entries(titlePatterns)
+                      .filter(([_, count]) => count > 0)
+                      .map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={['#4f46e5', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6'][index % 5]} />
+                      ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            </ChartErrorBoundary>
+          </section>
+        )}
+
+        {trendingTopics.length > 0 && (
+          <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Hash className="text-green-600" size={20} />
+              <h2 className="text-lg font-semibold text-slate-900">Hot Topics</h2>
+            </div>
+
+            <div className="space-y-2">
+              {trendingTopics.slice(0, 10).map((topic, idx) => (
+                <div key={idx} className="flex items-center justify-between p-3 bg-green-50 rounded-lg border border-green-200">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-bold text-white bg-green-600 px-2 py-1 rounded">
+                      #{idx + 1}
+                    </span>
+                    <span className="font-medium text-green-900">{topic.topic || 'Unknown'}</span>
+                  </div>
+                  <span className="text-sm font-semibold text-green-700">{topic.count || 0}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TopPerformersSection({ trendingData }) {
+  const [viewType, setViewType] = useState("views");
+  const topByViews = trendingData?.top_by_views || [];
+  const topByEngagement = trendingData?.top_by_engagement || [];
+  const videos = viewType === "views" ? topByViews : topByEngagement;
+
+  if (videos.length === 0) {
+    return (
+      <div className="text-center py-8 text-slate-500">
+        <Video className="mx-auto mb-2" size={32} />
+        <p>No video data available.</p>
+      </div>
+    );
+  }
+
+  return (
+    <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+      <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center gap-2">
+          <Award className="text-amber-500" size={20} />
+          <h2 className="text-lg font-semibold text-slate-900">Top Performers</h2>
+        </div>
+
+        <div className="flex gap-2">
+          <button
+            onClick={() => setViewType("views")}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              viewType === "views" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            By Views
+          </button>
+          <button
+            onClick={() => setViewType("engagement")}
+            className={`px-3 py-1.5 rounded-lg text-sm font-medium transition-colors ${
+              viewType === "engagement" ? "bg-indigo-600 text-white" : "bg-slate-100 text-slate-700 hover:bg-slate-200"
+            }`}
+          >
+            By Engagement
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {videos.map((video, idx) => (
+          <VideoCard key={idx} video={video} rank={idx + 1} />
+        ))}
+      </div>
+    </section>
   );
 }
 
 function VideoCard({ video, rank }) {
-  const getYouTubeId = (id) => {
-    if (!id) return null;
-    return String(id).includes(":") ? String(id).split(":")[1] : id;
-  };
+  const formatNum = (n) => (Number(n) || 0).toLocaleString();
 
-  const ytId = getYouTubeId(video.id);
-  const thumbnailUrl = video.thumbnail || `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`;
-  const engagementLevel = getEngagementLevel(video.engagement_rate || 0);
+  if (!video || typeof video !== 'object') {
+    return <div className="p-4 rounded-xl border border-slate-200 bg-white">
+      <div className="text-sm text-slate-500">Video data unavailable</div>
+    </div>;
+  }
+
+  const videoId = video.id || video.video_id || '';
+  const videoTitle = video.title || 'Untitled';
+  const videoViews = video.views || 0;
+  const videoLikes = video.likes || 0;
+  const videoComments = video.comments || 0;
+  const videoEngagement = video.engagement_rate || 0;
+  const videoThumbnail = video.thumbnail || '';
 
   return (
     <div
-      className="rounded-xl border-2 border-slate-200 bg-white overflow-hidden hover:shadow-lg transition-all group cursor-pointer"
-      onClick={() => ytId && window.open(`https://www.youtube.com/watch?v=${ytId}`, "_blank")}
+      className="p-4 rounded-xl border border-slate-200 hover:border-indigo-300 hover:shadow-md transition-all cursor-pointer bg-white"
+      onClick={() => {
+        if (videoId) window.open(`https://www.youtube.com/watch?v=${videoId}`, "_blank");
+      }}
     >
-      <div className="relative">
-        <img
-          src={thumbnailUrl}
-          alt={video.title}
-          className="w-full h-40 object-cover"
-          onError={(e) => {
-            e.target.src = `https://img.youtube.com/vi/${ytId}/mqdefault.jpg`;
-          }}
-        />
-        <div className="absolute top-2 left-2 bg-indigo-600 text-white px-2 py-1 rounded-lg text-xs font-bold">
-          #{rank}
-        </div>
-        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-          <div className="opacity-0 group-hover:opacity-100 transition-opacity bg-white rounded-full p-3">
-            <ExternalLink className="w-6 h-6 text-indigo-600" />
+      <div className="flex gap-3">
+        {videoThumbnail && (
+          <img src={videoThumbnail} alt={videoTitle} className="w-32 h-20 object-cover rounded-lg flex-shrink-0" />
+        )}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start gap-2 mb-2">
+            <span className="text-xs font-bold text-white bg-indigo-600 px-2 py-1 rounded">#{rank}</span>
+            <h4 className="text-sm font-medium text-slate-900 line-clamp-2 flex-1">{videoTitle}</h4>
           </div>
-        </div>
-      </div>
-
-      <div className="p-4">
-        <p className="text-sm font-semibold text-slate-900 line-clamp-2 mb-3">
-          {video.title}
-        </p>
-
-        <div className="flex items-center gap-3 text-xs text-slate-600 mb-3">
-          <div className="flex items-center gap-1">
-            <Eye className="w-3 h-3" />
-            <span>{formatNumber(video.views || 0)} views</span>
+          
+          <div className="grid grid-cols-2 gap-2 text-xs">
+            <div className="flex items-center gap-1 text-slate-600">
+              <Eye size={12} />
+              <span>{formatNum(videoViews)}</span>
+            </div>
+            <div className="flex items-center gap-1 text-slate-600">
+              <ThumbsUp size={12} />
+              <span>{formatNum(videoLikes)}</span>
+            </div>
+            <div className="flex items-center gap-1 text-slate-600">
+              <MessageSquare size={12} />
+              <span>{formatNum(videoComments)}</span>
+            </div>
+            <div className="flex items-center gap-1 text-green-600 font-medium">
+              <Zap size={12} />
+              <span>{(videoEngagement * 100).toFixed(1)}%</span>
+            </div>
           </div>
-          <div className="flex items-center gap-1">
-            <ThumbsUp className="w-3 h-3" />
-            <span>{formatNumber(video.likes || 0)} likes</span>
-          </div>
-          <div className="flex items-center gap-1">
-            <MessageSquare className="w-3 h-3" />
-            <span>{formatNumber(video.comments || 0)} comments</span>
-          </div>
-        </div>
-
-        <div className={`inline-flex items-center gap-1.5 rounded-lg ${engagementLevel.bg} border ${engagementLevel.border} px-3 py-1.5`}>
-          <TrendingUp className={`w-3 h-3 ${engagementLevel.color}`} />
-          <span className={`text-xs font-semibold ${engagementLevel.color}`}>
-            {engagementLevel.label} Performance
-          </span>
         </div>
       </div>
     </div>
   );
 }
 
-// Main Panel Components
-function OverviewPanel({ title, data }) {
-  const channel = data?.channel || {};
-  const engagement = data?.engagement || {};
-  const themes = data?.content_themes?.themes || {};
-  const sentiment = data?.audience_sentiment || {};
+// ==================== HELPER COMPONENTS ====================
 
-  const topPerformers = engagement.top_performers || [];
-  const averages = engagement.averages || {};
-  const avgEngagementLevel = getEngagementLevel(averages.engagement_rate || 0);
+function TabButton({ icon: Icon, label, tab, activeTab, onClick }) {
+  const isActive = activeTab === tab;
+  return (
+    <button
+      onClick={onClick}
+      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
+        isActive
+          ? "bg-indigo-50 text-indigo-700 font-medium"
+          : "text-slate-600 hover:bg-slate-50"
+      }`}
+    >
+      <Icon size={18} />
+      <span className="flex-1 text-left text-sm">{label}</span>
+    </button>
+  );
+}
 
-  const topThemes = Object.entries(themes)
-    .sort((a, b) => b[1].avg_engagement - a[1].avg_engagement)
-    .slice(0, 3);
-
-  // Sentiment interpretation
-  const getSentimentStatus = (score) => {
-    if (score > 50) return { label: "Very Positive", icon: <Smile className="w-5 h-5 text-emerald-600" />, color: "text-emerald-600", bg: "bg-emerald-50", description: "Your audience loves your content!" };
-    if (score > 20) return { label: "Positive", icon: <Smile className="w-5 h-5 text-green-600" />, color: "text-green-600", bg: "bg-green-50", description: "People are responding well to your videos" };
-    if (score > -20) return { label: "Neutral", icon: <Meh className="w-5 h-5 text-slate-600" />, color: "text-slate-600", bg: "bg-slate-50", description: "Mixed reactions - room for improvement" };
-    return { label: "Needs Attention", icon: <Frown className="w-5 h-5 text-orange-600" />, color: "text-orange-600", bg: "bg-orange-50", description: "Focus on creating more engaging content" };
+function SimpleMetricCard({ icon: Icon, label, value, subtitle, color = "indigo" }) {
+  const colors = {
+    indigo: { bg: "bg-indigo-100", icon: "text-indigo-600", text: "text-indigo-900" },
+    blue: { bg: "bg-blue-100", icon: "text-blue-600", text: "text-blue-900" },
+    green: { bg: "bg-green-100", icon: "text-green-600", text: "text-green-900" },
+    purple: { bg: "bg-purple-100", icon: "text-purple-600", text: "text-purple-900" },
   };
 
-  const sentimentStatus = getSentimentStatus(sentiment.sentiment_score || 0);
+  const c = colors[color];
 
   return (
-    <section className="space-y-6">
-      {/* Channel Stats */}
-      <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h2 className="text-xl font-semibold text-slate-900">{title}</h2>
-            <p className="text-sm text-slate-500 mt-1">Performance summary of your recent content</p>
-          </div>
-          <span className="text-xs text-slate-500 bg-slate-50 px-3 py-1.5 rounded-full border border-slate-200">
-            {channel.videos_analyzed || 0} videos analyzed
+    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-5">
+      <div className="flex items-center gap-3 mb-2">
+        <div className={`w-10 h-10 rounded-lg ${c.bg} flex items-center justify-center`}>
+          <Icon className={c.icon} size={20} />
+        </div>
+        <p className="text-sm text-slate-600">{label}</p>
+      </div>
+      <p className={`text-2xl font-bold ${c.text}`}>{value}</p>
+      {subtitle && <p className="text-xs text-slate-500 mt-1">{subtitle}</p>}
+    </div>
+  );
+}
+
+function SimpleRecommendationCard({ recommendation }) {
+  const impactColors = {
+    critical: { border: "border-red-300", bg: "bg-red-50", badge: "bg-red-100 text-red-700" },
+    high: { border: "border-amber-300", bg: "bg-amber-50", badge: "bg-amber-100 text-amber-700" },
+    medium: { border: "border-blue-300", bg: "bg-blue-50", badge: "bg-blue-100 text-blue-700" },
+    low: { border: "border-green-300", bg: "bg-green-50", badge: "bg-green-100 text-green-700" },
+  };
+
+  const colors = impactColors[recommendation.impact] || impactColors.medium;
+
+  return (
+    <div className={`p-4 rounded-xl border ${colors.border} ${colors.bg}`}>
+      <div className="flex items-start justify-between mb-2">
+        <h3 className="font-semibold text-slate-900 flex-1">{recommendation.title}</h3>
+        {recommendation.impact && (
+          <span className={`text-xs px-2 py-1 rounded-full ${colors.badge} font-medium ml-2`}>
+            {recommendation.impact}
           </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <StatCard
-            icon={Users}
-            label="Total Subscribers"
-            value={formatNumber(channel.subscribers || 0)}
-            helpText="People following your channel"
-            color="indigo"
-          />
-          <StatCard
-            icon={Eye}
-            label="Total Views"
-            value={formatNumber(channel.total_views || 0)}
-            helpText="All-time views across your content"
-            color="blue"
-          />
-          <StatCard
-            icon={TrendingUp}
-            label="Engagement Level"
-            value={avgEngagementLevel.label}
-            helpText={`${averages.engagement_rate?.toFixed(2)}% of viewers interact with your content`}
-            color="emerald"
-          />
-        </div>
-      </div>
-
-      {/* Audience Mood & Content Types */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Audience Mood */}
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-          <div className="flex items-center gap-2 text-slate-900 mb-4">
-            <MessageSquare className="w-5 h-5" />
-            <h3 className="text-base font-semibold">How Your Audience Feels</h3>
-          </div>
-          <p className="text-sm text-slate-600 mb-4">
-            Based on comments and reactions from viewers over time
-          </p>
-
-          <div className={`rounded-xl border-2 ${sentimentStatus.bg} p-5 mb-4`}>
-            <div className="flex items-center gap-3 mb-3">
-              {sentimentStatus.icon}
-              <div>
-                <p className={`text-lg font-bold ${sentimentStatus.color}`}>{sentimentStatus.label}</p>
-                <p className="text-sm text-slate-600">{sentimentStatus.description}</p>
-              </div>
-            </div>
-          </div>
-
-          {/* Sentiment Timeline - Simple Line Graph */}
-          {sentiment.timeline && sentiment.timeline.length > 1 && (
-            <div className="mb-4">
-              <h4 className="text-sm font-semibold text-slate-900 mb-2">Audience Sentiment Trend</h4>
-              
-              {/* Simple Line Graph */}
-              <div className="bg-slate-50 rounded-lg p-4 mb-3">
-                <div className="h-32 flex items-end justify-between gap-2">
-                  {sentiment.timeline.map((yearData, idx) => {
-                    const maxScore = Math.max(...sentiment.timeline.map(d => Math.abs(d.sentiment_score)));
-                    const height = ((yearData.sentiment_score + 100) / 200) * 100; // Normalize to 0-100%
-                    
-                    const getBarColor = (score) => {
-                      if (score > 50) return "bg-emerald-500";
-                      if (score > 20) return "bg-green-500";
-                      if (score > -20) return "bg-slate-400";
-                      return "bg-orange-500";
-                    };
-
-                    return (
-                      <div key={yearData.year} className="flex-1 flex flex-col items-center justify-end h-full">
-                        <div className="w-full flex flex-col items-center justify-end h-full pb-2">
-                          <div 
-                            className={`w-full rounded-t transition-all ${getBarColor(yearData.sentiment_score)}`}
-                            style={{ height: `${height}%`, minHeight: '4px' }}
-                          />
-                        </div>
-                        <div className="text-xs font-medium text-slate-700 mt-1">{yearData.year}</div>
-                        <div className="text-xs text-slate-500">{yearData.total}</div>
-                      </div>
-                    );
-                  })}
-                </div>
-                
-                {/* Legend */}
-                <div className="flex items-center justify-center gap-4 mt-3 pt-3 border-t border-slate-200">
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 bg-emerald-500 rounded"></div>
-                    <span className="text-xs text-slate-600">Very Positive</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 bg-green-500 rounded"></div>
-                    <span className="text-xs text-slate-600">Positive</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 bg-slate-400 rounded"></div>
-                    <span className="text-xs text-slate-600">Neutral</span>
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="w-3 h-3 bg-orange-500 rounded"></div>
-                    <span className="text-xs text-slate-600">Negative</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Insights */}
-              <div className="space-y-2">
-                {(() => {
-                  const insights = [];
-                  const timeline = sentiment.timeline;
-                  
-                  // Check if sentiment is improving
-                  if (timeline.length >= 2) {
-                    const recent = timeline[timeline.length - 1];
-                    const previous = timeline[timeline.length - 2];
-                    
-                    if (recent.sentiment_score > previous.sentiment_score + 10) {
-                      insights.push({
-                        icon: <TrendingUp className="w-4 h-4 text-emerald-600" />,
-                        text: `Your content is getting more positive reactions! Sentiment improved from ${previous.year} to ${recent.year}.`,
-                        color: "bg-emerald-50 border-emerald-200 text-emerald-700"
-                      });
-                    } else if (recent.sentiment_score < previous.sentiment_score - 10) {
-                      insights.push({
-                        icon: <AlertCircle className="w-4 h-4 text-orange-600" />,
-                        text: `Audience sentiment has declined recently. Consider reviewing what changed between ${previous.year} and ${recent.year}.`,
-                        color: "bg-orange-50 border-orange-200 text-orange-700"
-                      });
-                    } else {
-                      insights.push({
-                        icon: <CheckCircle2 className="w-4 h-4 text-blue-600" />,
-                        text: `Your audience sentiment has remained consistent from ${previous.year} to ${recent.year}.`,
-                        color: "bg-blue-50 border-blue-200 text-blue-700"
-                      });
-                    }
-                  }
-                  
-                  // Check for most positive year
-                  const mostPositive = timeline.reduce((max, curr) => 
-                    curr.sentiment_score > max.sentiment_score ? curr : max
-                  );
-                  if (mostPositive.sentiment_score > 30) {
-                    insights.push({
-                      icon: <Star className="w-4 h-4 text-amber-600" />,
-                      text: `${mostPositive.year} was your best year with ${mostPositive.positive} positive comments! Try to replicate what worked then.`,
-                      color: "bg-amber-50 border-amber-200 text-amber-700"
-                    });
-                  }
-                  
-                  return insights.map((insight, idx) => (
-                    <div key={idx} className={`flex items-start gap-2 p-3 rounded-lg border ${insight.color}`}>
-                      {insight.icon}
-                      <p className="text-xs font-medium flex-1">{insight.text}</p>
-                    </div>
-                  ));
-                })()}
-              </div>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-3">
-            <div className="rounded-lg bg-emerald-50 border border-emerald-200 p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <ThumbsUp className="w-4 h-4 text-emerald-600" />
-                <span className="text-xs font-semibold text-emerald-700 uppercase">Positive</span>
-              </div>
-              <p className="text-2xl font-bold text-emerald-700">{sentiment.positive_count || 0}</p>
-              <p className="text-xs text-emerald-600 mt-1">Happy comments</p>
-            </div>
-
-            <div className="rounded-lg bg-blue-50 border border-blue-200 p-4">
-              <div className="flex items-center gap-2 mb-1">
-                <MessageSquare className="w-4 h-4 text-blue-600" />
-                <span className="text-xs font-semibold text-blue-700 uppercase">Questions</span>
-              </div>
-              <p className="text-2xl font-bold text-blue-700">{sentiment.question_count || 0}</p>
-              <p className="text-xs text-blue-600 mt-1">People asking</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Top Content Types */}
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-          <div className="flex items-center gap-2 text-slate-900 mb-4">
-            <Star className="w-5 h-5" />
-            <h3 className="text-base font-semibold">Your Best Content Types</h3>
-          </div>
-          <p className="text-sm text-slate-600 mb-4">
-            What formats get the most audience engagement
-          </p>
-
-          {topThemes.length === 0 ? (
-            <div className="text-center py-8">
-              <Star className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-              <p className="text-sm text-slate-500">Not enough data yet</p>
-              <p className="text-xs text-slate-400 mt-1">Keep creating to see patterns!</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {topThemes.map(([theme, data], idx) => (
-                <ContentTypeRow
-                  key={theme}
-                  rank={idx + 1}
-                  theme={theme}
-                  count={data.count}
-                  engagement={data.avg_engagement}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Top Performing Videos */}
-      <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-        <div className="flex items-center gap-2 text-slate-900 mb-4">
-          <Award className="w-5 h-5" />
-          <h3 className="text-base font-semibold">Your Top Performing Videos</h3>
-        </div>
-        <p className="text-sm text-slate-600 mb-4">
-          Videos that got the best response from your audience
-        </p>
-
-        {topPerformers.length === 0 ? (
-          <div className="text-center py-8">
-            <Award className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-            <p className="text-sm text-slate-500">No performance data available yet</p>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {topPerformers.slice(0, 6).map((video, idx) => (
-              <VideoCard key={video.id} video={video} rank={idx + 1} />
-            ))}
-          </div>
         )}
       </div>
-    </section>
+      <p className="text-sm text-slate-700 mb-3">{recommendation.description}</p>
+      <div className="p-3 bg-white rounded-lg border border-slate-200">
+        <p className="text-xs font-medium text-slate-900 mb-1">✅ Action Step:</p>
+        <p className="text-sm text-slate-700">{recommendation.action}</p>
+      </div>
+    </div>
   );
 }
 
-function RetentionPanel({ title, data }) {
-  const retention = data?.retention || {};
-  const highRetention = retention.high_retention_videos || [];
-  const avgScore = retention.avg_retention_score || 0;
-
-  // Convert retention score to understandable level
-  const getRetentionLevel = (score) => {
-    if (score >= 5) return { label: "Exceptional", color: "text-emerald-600", description: "People love watching your entire videos" };
-    if (score >= 3) return { label: "Very Good", color: "text-green-600", description: "Strong viewer retention throughout videos" };
-    if (score >= 1.5) return { label: "Good", color: "text-blue-600", description: "Viewers stay engaged with your content" };
-    if (score >= 0.5) return { label: "Moderate", color: "text-orange-600", description: "Some viewers watch completely" };
-    return { label: "Needs Work", color: "text-slate-600", description: "Focus on keeping viewers engaged longer" };
+function ImprovedRecommendationCard({ recommendation }) {
+  const impactColors = {
+    critical: { 
+      gradient: "from-red-500 to-orange-500",
+      bg: "bg-red-50", 
+      border: "border-red-300",
+      icon: "text-red-600"
+    },
+    high: { 
+      gradient: "from-amber-500 to-yellow-500",
+      bg: "bg-amber-50", 
+      border: "border-amber-300",
+      icon: "text-amber-600"
+    },
+    medium: { 
+      gradient: "from-blue-500 to-indigo-500",
+      bg: "bg-blue-50", 
+      border: "border-blue-300",
+      icon: "text-blue-600"
+    },
+    low: { 
+      gradient: "from-green-500 to-emerald-500",
+      bg: "bg-green-50", 
+      border: "border-green-300",
+      icon: "text-green-600"
+    }
   };
 
-  const retentionLevel = getRetentionLevel(avgScore);
+  const colors = impactColors[recommendation.impact] || impactColors.medium;
 
   return (
-    <section className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-      <div className="flex items-center gap-2 text-slate-900 mb-4">
-        <Heart className="w-6 h-6" />
-        <h2 className="text-xl font-semibold">{title} - Audience Loyalty</h2>
+    <div className={`p-5 rounded-xl border-2 ${colors.border} ${colors.bg} hover:shadow-lg transition-all`}>
+      {/* Impact Badge */}
+      <div className="flex items-start justify-between mb-3">
+        <div className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-gradient-to-r ${colors.gradient} text-white text-xs font-bold`}>
+          <Zap size={12} />
+          {recommendation.impact.toUpperCase()} IMPACT
+        </div>
+        {recommendation.metric_improvement && (
+          <span className="text-xs font-semibold text-slate-600 bg-white px-2 py-1 rounded-full border border-slate-200">
+            {recommendation.metric_improvement}
+          </span>
+        )}
       </div>
-      <p className="text-slate-600 mb-6">
-        How well your videos keep people watching from start to finish
+
+      {/* Title */}
+      <h3 className="font-bold text-slate-900 text-lg mb-2">
+        {recommendation.title}
+      </h3>
+
+      {/* Description */}
+      <p className="text-slate-700 text-sm mb-4 leading-relaxed">
+        {recommendation.description}
       </p>
 
-      <div className="rounded-xl bg-slate-50 border-2 border-slate-200 p-6 mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-sm font-semibold text-slate-700 mb-1">Overall Loyalty Level</p>
-            <p className={`text-2xl font-bold ${retentionLevel.color} mb-2`}>
-              {retentionLevel.label}
+      {/* Action */}
+      <div className="p-4 bg-white rounded-lg border-2 border-slate-200">
+        <div className="flex gap-2">
+          <CheckCircle className={colors.icon} size={20} />
+          <div className="flex-1">
+            <p className="text-xs font-semibold text-slate-700 mb-1">
+              ✅ What to Do:
             </p>
-            <p className="text-sm text-slate-600">{retentionLevel.description}</p>
-          </div>
-          <div className="text-right">
-            <p className="text-4xl font-bold text-slate-900">{avgScore.toFixed(1)}</p>
-            <p className="text-xs text-slate-500">loyalty score</p>
+            <p className="text-sm text-slate-800 font-medium">
+              {recommendation.action}
+            </p>
           </div>
         </div>
       </div>
-
-      {highRetention.length === 0 ? (
-        <div className="rounded-xl bg-slate-50 p-8 text-center">
-          <Heart className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-          <p className="text-sm text-slate-600 font-medium">No high-loyalty videos yet</p>
-          <p className="text-xs text-slate-500 mt-1">
-            Keep creating engaging content that holds viewers' attention!
-          </p>
-        </div>
-      ) : (
-        <div>
-          <h3 className="text-sm font-semibold text-slate-900 mb-3">
-            Videos People Watch Completely ({highRetention.length})
-          </h3>
-          <p className="text-xs text-slate-600 mb-4">
-            These videos successfully kept viewers engaged throughout
-          </p>
-          <div className="space-y-3">
-            {highRetention.slice(0, 5).map((video, idx) => (
-              <div
-                key={video.id}
-                className="rounded-xl bg-slate-50 border border-slate-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
-                onClick={() => {
-                  const ytId = String(video.id).includes(":") ? String(video.id).split(":")[1] : video.id;
-                  window.open(`https://www.youtube.com/watch?v=${ytId}`, "_blank");
-                }}
-              >
-                <div className="flex items-start gap-3">
-                  <div className="flex-shrink-0">
-                    <div className="w-8 h-8 rounded-lg bg-indigo-100 flex items-center justify-center">
-                      <span className="text-sm font-bold text-indigo-700">#{idx + 1}</span>
-                    </div>
-                  </div>
-
-                  <div className="flex-1">
-                    <p className="text-sm font-semibold text-slate-900 line-clamp-2 mb-2">
-                      {video.title}
-                    </p>
-
-                    <div className="flex items-center gap-4 text-xs text-slate-600 mb-2">
-                      <span>{formatNumber(video.views)} views</span>
-                      <span>{formatNumber(video.likes)} likes</span>
-                      <span>{formatNumber(video.comments)} comments</span>
-                    </div>
-
-                    <div className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-50 border border-emerald-200 px-2 py-1">
-                      <Heart className="w-3 h-3 text-emerald-600" />
-                      <span className="text-xs font-semibold text-emerald-700">
-                        High Loyalty: {video.retention_score.toFixed(1)} score
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </section>
+    </div>
   );
 }
 
-function ViralPanel({ title, data }) {
-  const viral = data?.viral_potential || {};
-  const viralCandidates = viral.viral_candidates || [];
+function CompactVideoCard({ video, rank, color = "indigo" }) {
+  const formatNum = (n) => (Number(n) || 0).toLocaleString();
+  
+  const colors = {
+    indigo: { border: "border-indigo-200", bg: "bg-indigo-50", badge: "bg-indigo-600" },
+    green: { border: "border-green-200", bg: "bg-green-50", badge: "bg-green-600" }
+  };
+
+  const c = colors[color];
+
+  if (!video || typeof video !== 'object') {
+    return (
+      <div className={`p-3 rounded-lg border ${c.border} ${c.bg}`}>
+        <div className="text-sm text-slate-500">Video data unavailable</div>
+      </div>
+    );
+  }
+
+  const videoId = video.id || video.video_id || '';
+  const videoTitle = video.title || 'Untitled Video';
+  const videoViews = video.views || 0;
+  const videoLikes = video.likes || 0;
+  const videoEngagement = video.engagement || video.engagement_rate || 0;
+  const videoThumbnail = video.thumbnail || '';
 
   return (
-    <section className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-      <div className="flex items-center gap-2 text-slate-900 mb-4">
-        <Sparkles className="w-6 h-6" />
-        <h2 className="text-xl font-semibold">{title} - Trending Content</h2>
-      </div>
-      <p className="text-slate-600 mb-6">
-        Videos showing strong growth and high sharing potential
-      </p>
-
-      {viralCandidates.length === 0 ? (
-        <div className="rounded-xl bg-slate-50 p-8 text-center">
-          <Sparkles className="w-12 h-12 mx-auto text-slate-300 mb-3" />
-          <p className="text-sm text-slate-600 font-medium">No trending videos detected yet</p>
-          <p className="text-xs text-slate-500 mt-1">
-            Keep creating! Viral moments can happen at any time
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="rounded-xl bg-indigo-50 border-2 border-indigo-200 p-5 mb-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">
-                  Videos with Growth Potential
-                </p>
-                <p className="text-xs text-slate-600 mt-1">
-                  Content showing exceptional audience response
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-3xl font-bold text-indigo-600">
-                  {viralCandidates.length}
-                </p>
-                <p className="text-xs text-slate-500">trending videos</p>
-              </div>
+    <div
+      className={`group p-3 rounded-lg border ${c.border} ${c.bg} hover:shadow-md transition-all cursor-pointer`}
+      onClick={() => {
+        if (videoId) {
+          window.open(`https://www.youtube.com/watch?v=${videoId}`, "_blank");
+        }
+      }}
+    >
+      <div className="flex gap-3">
+        {videoThumbnail && (
+          <div className="relative flex-shrink-0">
+            <img
+              src={videoThumbnail}
+              alt={videoTitle}
+              className="w-24 h-16 object-cover rounded border border-slate-200"
+              onError={(e) => {
+                e.target.style.display = 'none';
+              }}
+            />
+            <span className={`absolute top-1 left-1 text-xs font-bold text-white ${c.badge} px-2 py-0.5 rounded`}>
+              #{rank}
+            </span>
+          </div>
+        )}
+        <div className="flex-1 min-w-0">
+          <h4 className="text-xs font-medium text-slate-900 line-clamp-2 mb-2">{videoTitle}</h4>
+          <div className="flex items-center gap-3 text-xs text-slate-600">
+            <div className="flex items-center gap-1">
+              <Eye size={10} />
+              <span>{formatNum(videoViews)}</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <Heart size={10} />
+              <span>{formatNum(videoLikes)}</span>
+            </div>
+            <div className="flex items-center gap-1 text-green-600 font-medium">
+              <Zap size={10} />
+              <span>{(videoEngagement * 100).toFixed(1)}%</span>
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
 
-          <div className="space-y-4">
-            {viralCandidates.map((video, idx) => {
-              const getViralLevel = (score) => {
-                if (score >= 8) return { label: "Very High", color: "text-emerald-600", bg: "bg-emerald-50", border: "border-emerald-200" };
-                if (score >= 5) return { label: "High", color: "text-green-600", bg: "bg-green-50", border: "border-green-200" };
-                if (score >= 3) return { label: "Moderate", color: "text-blue-600", bg: "bg-blue-50", border: "border-blue-200" };
-                return { label: "Growing", color: "text-indigo-600", bg: "bg-indigo-50", border: "border-indigo-200" };
-              };
+function EmptyState({ icon: Icon, title, description, features }) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-12">
+      <div className="text-center max-w-2xl mx-auto">
+        <Icon className="mx-auto text-slate-300 mb-4" size={64} />
+        <h3 className="text-xl font-semibold text-slate-900 mb-2">{title}</h3>
+        <p className="text-slate-600 mb-6">{description}</p>
 
-              const viralLevel = getViralLevel(video.viral_score);
+        <div className="text-left space-y-3">
+          {features.map((feature, idx) => (
+            <div key={idx} className="flex items-center gap-3">
+              <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                <CheckCircle className="text-indigo-600" size={16} />
+              </div>
+              <p className="text-sm text-slate-700">{feature}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
 
-              return (
-                <div
-                  key={video.id}
-                  className="rounded-xl bg-slate-50 border-2 border-slate-200 p-4 hover:shadow-md transition-shadow cursor-pointer"
-                  onClick={() => {
-                    const ytId = String(video.id).includes(":") ? String(video.id).split(":")[1] : video.id;
-                    window.open(`https://www.youtube.com/watch?v=${ytId}`, "_blank");
-                  }}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0">
-                      <div className="w-10 h-10 rounded-lg bg-indigo-100 flex items-center justify-center">
-                        <span className="text-sm font-bold text-indigo-700">#{idx + 1}</span>
-                      </div>
-                    </div>
-
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-slate-900 line-clamp-2 mb-3">
-                        {video.title}
-                      </p>
-
-                      <div className="grid grid-cols-3 gap-3 text-xs mb-3">
-                        <div>
-                          <p className="text-slate-500 mb-1">Views</p>
-                          <p className="font-semibold text-slate-900">
-                            {formatNumber(video.views)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-slate-500 mb-1">Likes</p>
-                          <p className="font-semibold text-emerald-600">
-                            {formatNumber(video.likes)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-slate-500 mb-1">Comments</p>
-                          <p className="font-semibold text-blue-600">
-                            {formatNumber(video.comments)}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className={`inline-flex items-center gap-1.5 rounded-lg ${viralLevel.bg} border ${viralLevel.border} px-3 py-1.5`}>
-                        <TrendingUp className={`w-3 h-3 ${viralLevel.color}`} />
-                        <span className={`text-xs font-semibold ${viralLevel.color}`}>
-                          {viralLevel.label} Potential
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </>
-      )}
-    </section>
+function LoadingState({ message }) {
+  return (
+    <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-12">
+      <div className="text-center">
+        <div className="w-16 h-16 mx-auto mb-4 border-4 border-indigo-200 border-t-indigo-600 rounded-full animate-spin"></div>
+        <p className="text-slate-600 font-medium">{message}</p>
+      </div>
+    </div>
   );
 }

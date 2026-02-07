@@ -6,6 +6,8 @@ export default function ContactSupport() {
   const { user, token } = useAuth();
   const navigate = useNavigate();
 
+  const isAuthenticated = !!user && !!token;
+
   /* -------------------- STATE -------------------- */
 
   const [view, setView] = useState("new"); // "new" | "responses"
@@ -32,6 +34,13 @@ export default function ContactSupport() {
     }
   }, [user, navigate]);
 
+  // Prevent unregistered users from accessing responses
+  useEffect(() => {
+    if (!isAuthenticated && view === "responses") {
+      setView("new");
+    }
+  }, [isAuthenticated, view]);
+
   // Prefill name & email
   useEffect(() => {
     const defaultName = user
@@ -47,7 +56,7 @@ export default function ContactSupport() {
 
   // Fetch user's support tickets + responses
   useEffect(() => {
-    if (view !== "responses") return;
+    if (view !== "responses" || !isAuthenticated) return;
 
     const fetchTickets = async () => {
       setLoadingTickets(true);
@@ -75,7 +84,7 @@ export default function ContactSupport() {
     };
 
     fetchTickets();
-  }, [view, token]);
+  }, [view, token, isAuthenticated]);
 
   /* -------------------- HANDLERS -------------------- */
 
@@ -114,7 +123,9 @@ export default function ContactSupport() {
 
       setStatus({
         type: "success",
-        message: data.message || "Your request has been submitted.",
+        message:
+          data.message ||
+          "Your request has been submitted successfully.",
       });
 
       setForm((prev) => ({
@@ -139,6 +150,7 @@ export default function ContactSupport() {
         <div className="p-4 font-semibold text-gray-800 border-b border-gray-200">
           Support
         </div>
+
         <nav className="flex flex-col p-2 space-y-2 text-sm">
           <button
             onClick={() => setView("new")}
@@ -150,16 +162,19 @@ export default function ContactSupport() {
           >
             New Request
           </button>
-          <button
-            onClick={() => setView("responses")}
-            className={`px-4 py-2 rounded-lg w-full text-left ${
-              view === "responses"
-                ? "bg-red-600 text-white"
-                : "hover:bg-gray-100 text-gray-700"
-            }`}
-          >
-            View Responses
-          </button>
+
+          {isAuthenticated && (
+            <button
+              onClick={() => setView("responses")}
+              className={`px-4 py-2 rounded-lg w-full text-left ${
+                view === "responses"
+                  ? "bg-red-600 text-white"
+                  : "hover:bg-gray-100 text-gray-700"
+              }`}
+            >
+              View Responses
+            </button>
+          )}
         </nav>
       </aside>
 
@@ -168,11 +183,22 @@ export default function ContactSupport() {
         {/* ---------------- NEW REQUEST ---------------- */}
         {view === "new" && (
           <div className="bg-white shadow-lg rounded-2xl p-10 space-y-6">
-            <h1 className="text-3xl font-bold text-gray-800">Contact Support</h1>
+            <h1 className="text-3xl font-bold text-gray-800">
+              Contact Support
+            </h1>
+
             <p className="text-gray-600">
-              Have a question or issue? Fill out the form below and our support
-              team will get back to you as soon as possible.
+              Have a question or issue? Fill out the form below and our
+              support team will get back to you as soon as possible.
             </p>
+
+            {!isAuthenticated && (
+              <div className="bg-blue-50 border border-blue-200 text-blue-700 rounded-md p-4 text-sm">
+                <strong>Note:</strong> Since you’re not logged in, our
+                support team will respond to your request via the email
+                address you provide.
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="flex flex-col gap-5">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -268,13 +294,15 @@ export default function ContactSupport() {
         )}
 
         {/* ---------------- RESPONSES ---------------- */}
-        {view === "responses" && (
+        {view === "responses" && isAuthenticated && (
           <div className="bg-white shadow-lg rounded-2xl p-8 space-y-6">
             <h1 className="text-3xl font-bold text-gray-800">
               Your Support Responses
             </h1>
+
             <p className="text-gray-600">
-              View the replies from our support team for your previous requests.
+              View the replies from our support team for your previous
+              requests.
             </p>
 
             {loadingTickets && (
@@ -282,7 +310,9 @@ export default function ContactSupport() {
             )}
 
             {!loadingTickets && tickets.length === 0 && (
-              <p className="text-gray-500">No support tickets found.</p>
+              <p className="text-gray-500">
+                No support tickets found.
+              </p>
             )}
 
             {tickets.map((ticket) => (
@@ -317,7 +347,9 @@ export default function ContactSupport() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-sm text-gray-400">No response yet.</p>
+                  <p className="text-sm text-gray-400">
+                    No response yet.
+                  </p>
                 )}
               </div>
             ))}

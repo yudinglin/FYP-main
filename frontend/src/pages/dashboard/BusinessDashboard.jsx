@@ -1,8 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Download, FileChartLine, FileText, SlidersHorizontal, X, TrendingUp, ExternalLink } from "lucide-react";
+import { Download, FileChartLine, FileText, SlidersHorizontal, X, TrendingUp, ExternalLink, Upload, FileImage, Award, Zap } from "lucide-react";
 import ReviewBubble from "../../pages/misc/ReviewBubble.jsx";
 import { useAuth } from "../../core/context/AuthContext";
+
+const API_BASE = "http://127.0.0.1:5000";
 
 export default function BusinessDashboard() {
   const { user } = useAuth();
@@ -62,6 +64,13 @@ export default function BusinessDashboard() {
   const [reportNotes, setReportNotes] = useState("");
   const [exportMessage, setExportMessage] = useState("");
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
+
+  // Thumbnail tester states
+  const [thumbnails, setThumbnails] = useState([]);
+  const [thumbnailPreviews, setThumbnailPreviews] = useState([]);
+  const [thumbnailData, setThumbnailData] = useState(null);
+  const [thumbnailLoading, setThumbnailLoading] = useState(false);
+  const [thumbnailError, setThumbnailError] = useState("");
 
   const navigate = useNavigate();
 
@@ -184,6 +193,67 @@ export default function BusinessDashboard() {
     fetchAll();
   }, [selectedUrls]);
 
+  // Thumbnail upload handling
+  const handleThumbnailUpload = (e) => {
+    const files = Array.from(e.target.files);
+    
+    // Limit to 2 thumbnails for dashboard version
+    if (files.length + thumbnails.length > 2) {
+      setThumbnailError("Maximum 2 thumbnails for quick comparison");
+      return;
+    }
+
+    setThumbnailError("");
+    const newPreviews = [];
+    const newThumbnails = [];
+
+    files.forEach((file) => {
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        newPreviews.push(event.target.result);
+        newThumbnails.push(event.target.result);
+        
+        if (newPreviews.length === files.length) {
+          setThumbnailPreviews([...thumbnailPreviews, ...newPreviews]);
+          setThumbnails([...thumbnails, ...newThumbnails]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeThumbnail = (index) => {
+    setThumbnails(thumbnails.filter((_, i) => i !== index));
+    setThumbnailPreviews(thumbnailPreviews.filter((_, i) => i !== index));
+    setThumbnailData(null);
+  };
+
+  const handleThumbnailAnalysis = async () => {
+    if (thumbnails.length === 0) {
+      setThumbnailError("Please upload at least one thumbnail");
+      return;
+    }
+
+    setThumbnailLoading(true);
+    setThumbnailError("");
+
+    try {
+      const res = await fetch(`${API_BASE}/api/youtube/analyzer.thumbnailAnalyzer`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ thumbnails }),
+      });
+
+      if (!res.ok) throw new Error(await res.text());
+      setThumbnailData(await res.json());
+    } catch (err) {
+      console.error(err);
+      setThumbnailError(err?.message || "Failed to analyze thumbnails");
+    } finally {
+      setThumbnailLoading(false);
+    }
+  };
+
   const reportSummary = useMemo(() => {
     const engagementRate =
       viewCount && viewCount > 0 ? ((Number(totalLikes || 0) + Number(totalComments || 0)) / Number(viewCount)) * 100 : 0;
@@ -289,58 +359,6 @@ export default function BusinessDashboard() {
     setExportMessage("Report downloaded as CSV (openable in Excel).");
   };
 
-  // Calculate engagement rate for display - using average across ALL recent videos
-  const engagementRate = allVideosEngagement;
-
-  // Get engagement rate description
-  const getEngagementDescription = (rate) => {
-    if (rate >= 10) {
-      return {
-        label: "Exceptional",
-        description: "Your audience is highly engaged! Keep up the great work.",
-        color: "text-emerald-600",
-        icon: "🌟"
-      };
-    } else if (rate >= 5) {
-      return {
-        label: "Excellent",
-        description: "Strong engagement! Your content resonates well with viewers.",
-        color: "text-green-600",
-        icon: "🎯"
-      };
-    } else if (rate >= 3) {
-      return {
-        label: "Very Good",
-        description: "Good engagement rate. Your audience is interested in your content.",
-        color: "text-blue-600",
-        icon: "👍"
-      };
-    } else if (rate >= 1) {
-      return {
-        label: "Good",
-        description: "Decent engagement. Consider experimenting with different content styles.",
-        color: "text-indigo-600",
-        icon: "📊"
-      };
-    } else if (rate >= 0.1) {
-      return {
-        label: "Moderate",
-        description: "There's room for improvement. Focus on creating compelling calls-to-action.",
-        color: "text-orange-600",
-        icon: "💡"
-      };
-    } else {
-      return {
-        label: "Needs Improvement",
-        description: "Low engagement detected. Try creating more interactive content to boost viewer participation.",
-        color: "text-red-600",
-        icon: "🎬"
-      };
-    }
-  };
-
-  const engagementInfo = useMemo(() => getEngagementDescription(engagementRate), [engagementRate, allVideosEngagement]);
-
   return (
     <div className="min-h-[calc(100vh-72px)] bg-slate-50">
       <style>{`
@@ -402,14 +420,14 @@ export default function BusinessDashboard() {
                 onClick={() => navigate("/dashboard/business/centrality")}
               />
               <SidebarItem
-                label="Campaign Forecasting"
+                label="Predictive Analysis"
                 onClick={() => navigate("/dashboard/business/forecasting")}
               />
           </nav>
 
           <div className="px-4 py-3 bg-slate-950/40 border-t border-slate-800 text-xs text-slate-400">
             <p className="font-medium text-slate-200">Tip</p>
-            <p className="mt-1">Add channels in Business Profile → Link Channel.</p>
+            <p className="mt-1">Use Quick Thumbnail Test to compare designs before uploading.</p>
           </div>
         </aside>
 
@@ -462,35 +480,10 @@ export default function BusinessDashboard() {
             <StatCard label="Total comments" value={loading ? "Loading..." : formatNum(totalComments)} />
           </section>
 
-          {/* Engagement Rate Card
-          {!loading && viewCount > 0 && (
-            <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-5">
-              <div className="flex items-start justify-between gap-4">
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-2">
-                    <p className="text-xs font-medium text-slate-500">Overall Engagement</p>
-                    <span className="text-lg">{engagementInfo.icon}</span>
-                  </div>
-                  <p className={`text-2xl font-semibold ${engagementInfo.color}`}>
-                    {engagementInfo.label}
-                  </p>
-                  <p className="mt-2 text-sm text-slate-600">
-                    {engagementInfo.description}
-                  </p>
-                  <p className="mt-2 text-xs text-slate-400">
-                    Rate: {engagementRate.toFixed(2)}% • Average across all recent videos
-                  </p>
-                </div>
-                <div className={`flex items-center gap-2 ${engagementInfo.color}`}>
-                  <TrendingUp size={24} />
-                </div>
-              </div>
-            </section>
-          )} */}
-
-          {/* Right side blocks */}
+          {/* Main content grid */}
           <section className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div className="lg:col-span-2 space-y-4">
+              {/* Top Videos */}
               <Panel title="Top Videos by Engagement">
                 {topVideos.length === 0 ? (
                   <p className="text-sm text-slate-500">No engagement data available</p>
@@ -501,6 +494,21 @@ export default function BusinessDashboard() {
                     ))}
                   </ul>
                 )}
+              </Panel>
+
+              {/* Quick Thumbnail Tester */}
+              <Panel title="Quick Thumbnail Test" subtitle="Compare up to 2 designs">
+                <QuickThumbnailTester
+                  thumbnails={thumbnails}
+                  thumbnailPreviews={thumbnailPreviews}
+                  thumbnailData={thumbnailData}
+                  thumbnailLoading={thumbnailLoading}
+                  thumbnailError={thumbnailError}
+                  onUpload={handleThumbnailUpload}
+                  onRemove={removeThumbnail}
+                  onAnalyze={handleThumbnailAnalysis}
+                  onNavigateToFull={() => navigate("/dashboard/business/analyzer")}
+                />
               </Panel>
             </div>
 
@@ -556,6 +564,186 @@ export default function BusinessDashboard() {
   );
 }
 
+// ==================== QUICK THUMBNAIL TESTER COMPONENT ====================
+function QuickThumbnailTester({
+  thumbnails,
+  thumbnailPreviews,
+  thumbnailData,
+  thumbnailLoading,
+  thumbnailError,
+  onUpload,
+  onRemove,
+  onAnalyze,
+  onNavigateToFull
+}) {
+  if (thumbnailData) {
+    return (
+      <div className="space-y-3">
+        {/* Winner announcement */}
+        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border-2 border-green-400 p-3">
+          <div className="flex items-center gap-2 mb-1">
+            <Award className="text-green-600" size={18} />
+            <p className="text-sm font-bold text-slate-900">Winner</p>
+          </div>
+          <p className="text-xs text-green-800">{thumbnailData.recommendation}</p>
+        </div>
+
+        {/* Comparison results */}
+        <div className="grid grid-cols-2 gap-3">
+          {thumbnailData.results?.map((result, idx) => (
+            <CompactThumbnailResult
+              key={idx}
+              result={result}
+              preview={thumbnailPreviews[result.thumbnail_id - 1]}
+              isWinner={result.thumbnail_id === thumbnailData.winner}
+            />
+          ))}
+        </div>
+
+        {/* Actions */}
+        <div className="flex gap-2">
+          <button
+            onClick={() => {
+              onRemove(0);
+              onRemove(0);
+            }}
+            className="flex-1 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition"
+          >
+            Test Again
+          </button>
+          <button
+            onClick={onNavigateToFull}
+            className="flex-1 px-3 py-2 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition"
+          >
+            Full Analyzer →
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {/* Upload area */}
+      <label className="block cursor-pointer">
+        <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:border-indigo-400 transition-colors bg-slate-50">
+          <FileImage className="mx-auto text-slate-400 mb-2" size={32} />
+          <p className="text-xs font-medium text-slate-700">
+            Upload 2 thumbnail options
+          </p>
+          <p className="text-xs text-slate-500 mt-1">
+            JPG, PNG • Max 5MB each
+          </p>
+        </div>
+        <input
+          type="file"
+          accept="image/*"
+          multiple
+          onChange={onUpload}
+          className="hidden"
+        />
+      </label>
+
+      {/* Error message */}
+      {thumbnailError && (
+        <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">
+          {thumbnailError}
+        </div>
+      )}
+
+      {/* Preview thumbnails */}
+      {thumbnailPreviews.length > 0 && (
+        <div className="grid grid-cols-2 gap-2">
+          {thumbnailPreviews.map((preview, idx) => (
+            <div key={idx} className="relative group">
+              <img
+                src={preview}
+                alt={`Option ${idx + 1}`}
+                className="w-full h-20 object-cover rounded border-2 border-slate-200"
+              />
+              <button
+                onClick={() => onRemove(idx)}
+                className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X size={12} />
+              </button>
+              <div className="absolute bottom-1 left-1 bg-indigo-600 text-white text-xs px-1.5 py-0.5 rounded font-semibold">
+                #{idx + 1}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Analyze button */}
+      {thumbnails.length > 0 && (
+        <button
+          onClick={onAnalyze}
+          disabled={thumbnailLoading}
+          className="w-full bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed"
+        >
+          {thumbnailLoading ? "Analyzing..." : `Compare ${thumbnails.length} Thumbnails`}
+        </button>
+      )}
+
+      {/* Link to full analyzer */}
+      {thumbnails.length === 0 && (
+        <button
+          onClick={onNavigateToFull}
+          className="w-full text-xs text-indigo-600 hover:text-indigo-700 font-medium py-2"
+        >
+          Need detailed analysis? Use Full Analyzer →
+        </button>
+      )}
+    </div>
+  );
+}
+
+function CompactThumbnailResult({ result, preview, isWinner }) {
+  if (result.error) {
+    return (
+      <div className="bg-red-50 rounded-lg border border-red-200 p-2">
+        <p className="text-xs text-red-700">Analysis error</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`rounded-lg border-2 p-2 ${isWinner ? "border-green-500 bg-green-50" : "border-slate-200 bg-white"}`}>
+      {isWinner && (
+        <div className="mb-1">
+          <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold inline-flex items-center gap-1">
+            <Award size={10} /> Best
+          </span>
+        </div>
+      )}
+
+      <img
+        src={preview}
+        alt={`Option ${result.thumbnail_id}`}
+        className="w-full h-16 object-cover rounded mb-2 border border-slate-200"
+      />
+
+      <div className="space-y-1">
+        <div className="flex items-center justify-between">
+          <span className="text-xs text-slate-600">Score</span>
+          <span className={`text-lg font-bold ${isWinner ? "text-green-600" : "text-indigo-600"}`}>
+            {result.overall_score}
+          </span>
+        </div>
+        <div className="w-full bg-slate-200 rounded-full h-1.5">
+          <div
+            className={`h-1.5 rounded-full ${isWinner ? "bg-green-600" : "bg-indigo-600"}`}
+            style={{ width: `${result.overall_score}%` }}
+          />
+        </div>
+        <p className="text-xs text-slate-600 mt-1">CTR: {result.ctr_prediction}</p>
+      </div>
+    </div>
+  );
+}
+
+// ==================== EXISTING COMPONENTS ====================
 function SidebarItem({ label, active = false, onClick }) {
   return (
     <button
@@ -593,7 +781,6 @@ function VideoCard({ video, rank }) {
     window.open(`https://www.youtube.com/watch?v=${video.videoId}`, '_blank');
   };
 
-  // Get engagement description for individual videos
   const getVideoEngagementLabel = (score) => {
     const percentage = score * 100;
     if (percentage >= 10) return { label: "Exceptional", color: "text-emerald-700", bg: "bg-emerald-50" };
@@ -657,11 +844,14 @@ function CommentCard({ comment }) {
   );
 }
 
-function Panel({ title, children }) {
+function Panel({ title, subtitle, children }) {
   return (
     <div className="rounded-2xl bg-white p-4 shadow-sm border border-slate-100">
       <div className="flex items-center justify-between mb-3">
-        <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">{title}</h2>
+          {subtitle && <p className="text-xs text-slate-500 mt-0.5">{subtitle}</p>}
+        </div>
       </div>
       {children}
     </div>
