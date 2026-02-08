@@ -11,15 +11,16 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  LabelList,
 } from "recharts";
 import { useAuth } from "../../core/context/AuthContext";
-import { 
-  BarChart3, 
-  Network, 
-  AlertCircle, 
-  Lightbulb, 
-  CheckCircle, 
-  TrendingUp, 
+import {
+  BarChart3,
+  Network,
+  AlertCircle,
+  Lightbulb,
+  CheckCircle,
+  TrendingUp,
   TrendingDown,
   Rocket,
   ThumbsUp,
@@ -33,7 +34,7 @@ import {
   Star,
   Sprout,
   Trophy,
-  ArrowUp
+  ArrowUp,
 } from "lucide-react";
 
 const API_BASE = "http://127.0.0.1:5000";
@@ -94,6 +95,7 @@ export default function NetworkGraphBusiness() {
   const [performanceError, setPerformanceError] = useState("");
 
   const fgRef = useRef();
+  const lastAutoFetchKeyRef = useRef("");
   const containerRef = useRef();
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
 
@@ -101,20 +103,69 @@ export default function NetworkGraphBusiness() {
   const [centerInput, setCenterInput] = useState("");
   const [centerVideoId, setCenterVideoId] = useState("");
 
+  const [hasAnalyzed, setHasAnalyzed] = useState(false);
 
-  // --------- resize graph container ---------
+  // Video catalog for center-video selection (pre-analysis)
+  const [videoCatalog, setVideoCatalog] = useState([]);
+  const [catalogLoading, setCatalogLoading] = useState(false);
+  const [catalogError, setCatalogError] = useState("");
+
+  // Similarity network (used only in Network Graph view)
+  const [similarityGraphData, setSimilarityGraphData] = useState({
+    nodes: [],
+    links: [],
+    rawMetrics: [],
+  });
+
+  // --------- resize graph container (ROBUST) ---------
   useEffect(() => {
+    if (activeView !== "graph") return;
+    if (!containerRef.current) return;
+
+    const el = containerRef.current;
+    let raf = 0;
+    let retryTimer = 0;
+
+    const measure = () => {
+      const w = el.clientWidth || 0;
+      const h = el.clientHeight || 0;
+
+      if (w >= 300 && h >= 300) {
+        setContainerSize((prev) => {
+          if (prev.width === w && prev.height === h) return prev;
+          return { width: w, height: h };
+        });
+        return true;
+      }
+      return false;
+    };
+
     const updateSize = () => {
-      if (!containerRef.current) return;
-      setContainerSize({
-        width: containerRef.current.clientWidth,
-        height: containerRef.current.clientHeight,
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const ok = measure();
+        if (!ok) {
+          clearTimeout(retryTimer);
+          retryTimer = window.setTimeout(() => {
+            requestAnimationFrame(() => measure());
+          }, 60);
+        }
       });
     };
+
     updateSize();
+
+    const ro = new ResizeObserver(updateSize);
+    ro.observe(el);
+
     window.addEventListener("resize", updateSize);
-    return () => window.removeEventListener("resize", updateSize);
-  }, []);
+    return () => {
+      cancelAnimationFrame(raf);
+      clearTimeout(retryTimer);
+      window.removeEventListener("resize", updateSize);
+      ro.disconnect();
+    };
+  }, [activeView]);
 
   // --------- fetch performance comparison data ---------
   const handleFetchPerformanceComparison = async (urls, maxVideosCount) => {
@@ -132,7 +183,9 @@ export default function NetworkGraphBusiness() {
       const parsed = Math.max(5, Math.min(80, Number(maxVideosCount) || maxVideos || 25));
 
       const res = await fetch(
-        `${API_BASE}/api/youtube/videos.performanceComparison?urls=${encodeURIComponent(urlsParam)}&maxVideos=${parsed}`
+        `${API_BASE}/api/youtube/videos.performanceComparison?urls=${encodeURIComponent(
+          urlsParam
+        )}&maxVideos=${parsed}`
       );
 
       if (!res.ok) {
@@ -253,7 +306,7 @@ export default function NetworkGraphBusiness() {
 
       setGraphData(merged);
 
-      // fit view
+      // fit view (only meaningful if graph is visible)
       setTimeout(() => {
         fgRef.current?.zoomToFit?.(400, 50);
       }, 200);
@@ -270,34 +323,174 @@ export default function NetworkGraphBusiness() {
     }
   };
 
-  // --------- force layout tuning (Graph tab only) ---------
-  useEffect(() => {
-    if (!fgRef.current) return;
-    const fg = fgRef.current;
+  const resetGraphOnly = () => {
+    setHasAnalyzed(false);
+    setError("");
+    setLoading(false);
 
-    fg.d3Force("charge").strength(-550);
+    setGraphData({ nodes: [], links: [], rawMetrics: [] });
+    setPerChannelGraphs([]);
 
-    fg.d3Force("link").distance((link) => {
-      const baseDistance = 250;
-      const weight = link.weight || 0;
-      return baseDistance - weight * 80;
-    });
+    setPerformanceData(null);
+    setPerformanceError("");
+    setPerformanceLoading(false);
 
-    const collideForce = fg.d3Force("collide");
-    if (collideForce) {
-      collideForce
-        .radius((node) => {
-          const baseRadius = 8;
-          const viewRadius = Math.sqrt(node.views || 0) / 3000;
-          return baseRadius + viewRadius;
+    setSimilarityGraphData({ nodes: [], links: [], rawMetrics: [] });
+
+    setCenterInput("");
+    setCenterVideoId("");
+  };
+
+  const extractRawVideoId = (maybePrefixed) => {
+    const s = String(maybePrefixed || "");
+    const parts = s.split(":");
+    return parts[parts.length - 1] || "";
+  };
+
+  const fetchVideoCatalog = async () => {
+    setCatalogLoading(true);
+    setCatalogError("");
+
+    try {
+      if (!selectedUrls.length) {
+        setVideoCatalog([]);
+        setCatalogError("No channel selected");
+        return;
+      }
+
+      const results = await Promise.all(
+        selectedUrls.map(async (url, idx) => {
+          const q = encodeURIComponent(url);
+          const res = await fetch(`${API_BASE}/api/youtube/videos.catalog?url=${q}&maxResults=2000`);
+          if (!res.ok) {
+            const t = await res.text();
+            throw new Error(t || `Failed to fetch video catalog for channel ${idx + 1}`);
+          }
+          const data = await res.json();
+          const vids = Array.isArray(data.videos) ? data.videos : [];
+          return { url, idx, vids };
         })
-        .strength(0.7);
+      );
+
+      const merged = [];
+      results.forEach(({ url, idx, vids }) => {
+        vids.forEach((v) => {
+          const rawId = v?.id || "";
+          if (!rawId) return;
+          merged.push({
+            ...v,
+            id: `${idx}:${rawId}`,
+            _rawId: rawId,
+            _channelUrl: url,
+          });
+        });
+      });
+
+      setVideoCatalog(merged);
+
+      if (!centerVideoId && merged.length > 0) {
+        setCenterVideoId(merged[0].id);
+        setCenterInput(`${merged[0].title} — ${merged[0].id}`);
+      }
+    } catch (e) {
+      console.error(e);
+      setCatalogError(e?.message || "Failed to fetch video catalog");
+      setVideoCatalog([]);
+    } finally {
+      setCatalogLoading(false);
     }
+  };
 
-    fg.d3Force("center").x(containerSize.width / 2).y(containerSize.height / 2);
+  const resolveCenterVideoId = (value) => {
+    if (!value) return "";
+    // try match "... — <id>" or last 11-char youtube id or prefixed "<idx>:<id>"
+    const m = String(value).match(/([0-9]+:[A-Za-z0-9_-]{11}|[A-Za-z0-9_-]{11})\s*$/);
+    return m ? m[1] : "";
+  };
 
-    if (graphData.nodes.length > 0) fg.d3ReheatSimulation();
-  }, [graphData, containerSize]);
+  const handleFetchSimilarityGraph = async (prefixedCenterId) => {
+    setLoading(true);
+    setError("");
+
+    try {
+      const centerIdToUse = prefixedCenterId || centerVideoId || resolveCenterVideoId(centerInput);
+      if (!centerIdToUse) {
+        setError("Please select a center video first.");
+        return;
+      }
+
+      const rawId = extractRawVideoId(centerIdToUse);
+
+      let channelUrl = "";
+      const found = (videoCatalog || []).find((v) => v.id === centerIdToUse);
+      if (found?._channelUrl) channelUrl = found._channelUrl;
+      else channelUrl = selectedUrls[0] || "";
+
+      if (!channelUrl) {
+        setError("No channel URL found for the selected center video.");
+        return;
+      }
+
+      const q = encodeURIComponent(channelUrl);
+      const vid = encodeURIComponent(rawId);
+      const topK = Math.max(1, Math.min(500, Number(maxVideos) || 25));
+
+      const res = await fetch(
+        `${API_BASE}/api/youtube/videos.similarityNetwork?url=${q}&videoId=${vid}&topK=${topK}&poolMax=2000`
+      );
+
+      if (!res.ok) {
+        const t = await res.text();
+        throw new Error(t || "Similarity network request failed");
+      }
+
+      const data = await res.json();
+
+      const nodes = (data.nodes || []).map((n) => ({
+        ...n,
+        id: n.id,
+        _rawId: n.id,
+        title: n.title || n.id,
+        name: n.title || n.id,
+        engagementRate: n.views > 0 ? ((n.likes || 0) + (n.comments || 0)) / n.views : 0,
+        isCenter: Boolean(n.isCenter),
+        _channelUrl: channelUrl,
+      }));
+
+      const links = (data.edges || []).map((e) => ({ ...e }));
+
+      setSimilarityGraphData({
+        nodes,
+        links,
+        rawMetrics:
+          data.rawMetrics ||
+          nodes.map((n) => ({
+            views: n.views || 0,
+            likes: n.likes || 0,
+            comments: n.comments || 0,
+            thumbnail: n.thumbnail,
+            title: n.title || n.id,
+            id: n.id,
+            _rawId: n.id,
+            _channelUrl: channelUrl,
+          })),
+      });
+    } catch (e) {
+      console.error(e);
+      setError(e?.message || "Failed to fetch similarity network");
+      setSimilarityGraphData({ nodes: [], links: [], rawMetrics: [] });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAnalyzeClick = async () => {
+    setHasAnalyzed(true);
+    await handleFetchGraph();
+    if (activeView === "graph") {
+      await handleFetchSimilarityGraph();
+    }
+  };
 
   // --------- helpers ---------
   const truncate = (str, len = 45) => {
@@ -337,19 +530,10 @@ export default function NetworkGraphBusiness() {
     return Math.min(10, 2.6 + Math.log10(v + 1) * 1.05);
   };
 
-
-  const resolveCenterVideoId = (value) => {
-    if (!value) return "";
-    // try match "... — <id>" or last 11-char youtube id or prefixed "<idx>:<id>"
-    const m = String(value).match(/([0-9]+:[A-Za-z0-9_-]{11}|[A-Za-z0-9_-]{11})\s*$/);
-    return m ? m[1] : "";
-  };
-
   const getChannelLabelByUrl = (url) => {
     const c = channels.find((x) => x.url === url);
     return c?.name || "Channel";
   };
-
 
   const nodeTooltip = (node) => {
     const title = node.title || node.name || node.id;
@@ -373,6 +557,12 @@ export default function NetworkGraphBusiness() {
     window.open(`https://www.youtube.com/watch?v=${vid}`, "_blank");
   };
 
+  const buildFetchKey = () => {
+    const urlsKey = (selectedUrls || []).join("|");
+    const n = Math.max(5, Math.min(80, Number(videoInput) || 25));
+    return `${selectedKey}__${urlsKey}__${n}`;
+  };
+
   // --------- charts data ---------
   const scatterData = useMemo(() => {
     return (graphData.rawMetrics || []).map((v) => ({
@@ -392,72 +582,97 @@ export default function NetworkGraphBusiness() {
   }, [scatterData, barMetric]);
 
   const displayGraphData = useMemo(() => {
-  // Only rewrite graph when in "graph" view
-  if (activeView !== "graph") return { nodes: graphData.nodes, links: graphData.links };
+    if (activeView !== "graph") return { nodes: graphData.nodes, links: graphData.links };
+    return { nodes: similarityGraphData.nodes, links: similarityGraphData.links };
+  }, [
+    activeView,
+    graphData.nodes,
+    graphData.links,
+    similarityGraphData.nodes,
+    similarityGraphData.links,
+  ]);
 
-  const metrics = graphData.rawMetrics || [];
-  if (metrics.length === 0) return { nodes: [], links: [] };
+  // IMPORTANT: clone data before passing to ForceGraph to avoid it mutating React state objects
+  const fgData = useMemo(() => {
+    const src = displayGraphData || { nodes: [], links: [] };
+    return {
+      nodes: (src.nodes || []).map((n) => ({ ...n })),
+      links: (src.links || []).map((l) => ({ ...l })),
+    };
+  }, [displayGraphData]);
 
-  // pick center
-  const centerId = centerVideoId || resolveCenterVideoId(centerInput) || metrics[0]?.id;
-  const center = metrics.find((m) => m.id === centerId) || metrics[0];
-  if (!center) return { nodes: [], links: [] };
+  // --------- force layout tuning (Graph tab only) ---------
+  // Apply forces and reheat ONLY when data changes (not when resizing)
+  useEffect(() => {
+    if (activeView !== "graph") return;
+    if (!fgRef.current) return;
 
-  const vec = (m) => {
-    const v = Math.log1p(Number(m.views) || 0);
-    const l = Math.log1p(Number(m.likes) || 0);
-    const c = Math.log1p(Number(m.comments) || 0);
-    const norm = Math.sqrt(v * v + l * l + c * c) || 1;
-    return [v / norm, l / norm, c / norm];
-  };
+    const fg = fgRef.current;
 
-  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+    fg.d3Force("charge").strength(-550);
 
-  const centerVec = vec(center);
+    fg.d3Force("link").distance((link) => {
+      const baseDistance = 250;
+      const weight = link.weight || 0;
+      return baseDistance - weight * 80;
+    });
 
-  // score all candidates (exclude center)
-  const scored = metrics
-    .filter((m) => m.id !== center.id)
-    .map((m) => ({ m, sim: dot(centerVec, vec(m)) }))
-    .sort((a, b) => b.sim - a.sim);
+    const collideForce = fg.d3Force("collide");
+    if (collideForce) {
+      collideForce
+        .radius((node) => {
+          const baseRadius = 8;
+          const viewRadius = Math.sqrt(node.views || 0) / 3000;
+          return baseRadius + viewRadius;
+        })
+        .strength(0.7);
+    }
 
-  const k = Math.max(1, Math.min(500, Number(maxVideos) || 25)); // you already clamp input elsewhere
-  const top = scored.slice(0, k);
+    if ((fgData.nodes || []).length > 0) fg.d3ReheatSimulation();
+  }, [activeView, fgData.nodes.length, fgData.links.length]);
 
-  // nodes for ForceGraph2D should include views/likes/comments/title/engagementRate etc.
-  const toNode = (m, isCenter = false) => ({
-    id: m.id,
-    _rawId: m._rawId ?? m.id,
-    _channelUrl: m._channelUrl,
-    title: m.title || m._rawId || m.id,
-    name: m.title || m._rawId || m.id,
-    thumbnail: m.thumbnail,
-    views: Number(m.views) || 0,
-    likes: Number(m.likes) || 0,
-    comments: Number(m.comments) || 0,
-    engagementRate:
-      (Number(m.views) || 0) > 0
-        ? (Number(m.likes) + Number(m.comments)) / Number(m.views)
-        : 0,
-    isCenter,
-  });
+  // Resize behavior: do NOT reheat; just re-center and (optionally) fit
+  useEffect(() => {
+    if (activeView !== "graph") return;
+    if (!fgRef.current) return;
 
-  const nodes = [toNode(center, true), ...top.map((x) => toNode(x.m, false))];
+    const t = setTimeout(() => {
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          fgRef.current?.centerAt?.(0, 0, 0);
+          if (hasAnalyzed && (fgData.nodes || []).length > 0) {
+            fgRef.current?.zoomToFit?.(300, 60);
+          }
+          fgRef.current?.refresh?.();
+        });
+      });
+    }, 80);
 
-  const links = top.map((x) => ({
-    source: center.id,
-    target: x.m.id,
-    weight: x.sim,
-  }));
+    return () => clearTimeout(t);
+  }, [activeView, containerSize.width, containerSize.height, hasAnalyzed, fgData.nodes.length]);
 
-  // keep center input synced (optional but makes UI feel “selected”)
-  if (!centerVideoId) {
-    // don't set state here (avoid setState in memo). you can sync in useEffect if you want.
-  }
 
-  return { nodes, links };
-}, [activeView, graphData, centerVideoId, centerInput, maxVideos]);
+  useEffect(() => {
+    if (activeView !== "graph") return;
 
+    const key = selectedUrls.join("|");
+    if (!key) {
+      setVideoCatalog([]);
+      return;
+    }
+
+    fetchVideoCatalog();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView, selectedUrls.join("|")]);
+
+  useEffect(() => {
+    if (activeView !== "graph") return;
+    if (!hasAnalyzed) return;
+    if (!centerVideoId) return;
+
+    handleFetchSimilarityGraph(centerVideoId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeView, hasAnalyzed, centerVideoId]);
 
   // --------- render ---------
   return (
@@ -465,11 +680,10 @@ export default function NetworkGraphBusiness() {
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <h1 className="text-3xl font-bold text-slate-900 mb-2">
-            Industry Network Graph
-          </h1>
+          <h1 className="text-3xl font-bold text-slate-900 mb-2">Industry Network Graph</h1>
           <p className="text-slate-600">
-            Visualize how videos relate based on correlation of metrics. Business user supports up to 3 linked channels.
+            Visualize how videos relate based on correlation of metrics. Business user supports up
+            to 3 linked channels.
           </p>
         </div>
 
@@ -478,9 +692,7 @@ export default function NetworkGraphBusiness() {
           <div className="w-64 flex flex-col gap-4">
             {/* Navigation */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
-              <h2 className="text-sm font-semibold text-slate-700 px-4 py-2 mb-2">
-                Views
-              </h2>
+              <h2 className="text-sm font-semibold text-slate-700 px-4 py-2 mb-2">Views</h2>
               <div className="space-y-1">
                 <MenuItem icon={BarChart3} label="Summary" view="summary" badge="Default" />
                 <MenuItem icon={Network} label="Network Graph" view="graph" badge="Start Here" />
@@ -491,20 +703,19 @@ export default function NetworkGraphBusiness() {
 
             {/* Analysis Settings */}
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-              <h3 className="text-sm font-semibold text-slate-700 mb-3">
-                Analysis Settings
-              </h3>
-              
+              <h3 className="text-sm font-semibold text-slate-700 mb-3">Analysis Settings</h3>
+
               <div className="space-y-4">
                 {/* Channel Selector */}
                 <div>
-                  <label className="text-sm text-slate-600 block mb-2">
-                    Channel
-                  </label>
+                  <label className="text-sm text-slate-600 block mb-2">Channel</label>
                   <select
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                     value={selectedKey}
-                    onChange={(e) => setSelectedKey(e.target.value)}
+                    onChange={(e) => {
+                      resetGraphOnly();
+                      setSelectedKey(e.target.value);
+                    }}
                   >
                     {options.map((o) => (
                       <option key={o.key} value={o.key}>
@@ -532,21 +743,23 @@ export default function NetworkGraphBusiness() {
                       const id = resolveCenterVideoId(centerInput);
                       if (id) setCenterVideoId(id);
                     }}
-                    disabled={activeView !== "graph" || graphData.rawMetrics.length === 0}
+                    disabled={activeView !== "graph" || catalogLoading || videoCatalog.length === 0}
                     className="w-full px-3 py-2 rounded-lg border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent disabled:bg-slate-100 disabled:cursor-not-allowed"
                     placeholder={
-                      graphData.rawMetrics.length === 0
-                        ? "Run Analyze Videos first"
+                      activeView !== "graph"
+                        ? "Center video available in Network Graph"
+                        : catalogLoading
+                        ? "Loading videos..."
+                        : videoCatalog.length === 0
+                        ? "No videos found"
                         : "Search video title..."
                     }
                   />
 
                   <datalist id="business-center-video-list">
-                    {(graphData.rawMetrics || []).map((v) => {
-                      const ch = v._channelUrl ? getChannelLabelByUrl(v._channelUrl) : "";
-                      const label = ch ? `[${ch}] ${v.title || v._rawId || v.id}` : (v.title || v._rawId || v.id);
-                      return <option key={v.id} value={`${label} — ${v.id}`} />;
-                    })}
+                    {videoCatalog.map((v) => (
+                      <option key={v.id} value={`${v.title} — ${v.id}`} />
+                    ))}
                   </datalist>
 
                   <p className="text-xs text-slate-500 mt-1">
@@ -555,7 +768,6 @@ export default function NetworkGraphBusiness() {
                       : "Pick a video; it will be the center node (ALL channels supported)."}
                   </p>
                 </div>
-
 
                 {/* Video Count Input */}
                 <div>
@@ -594,7 +806,7 @@ export default function NetworkGraphBusiness() {
                 </div>
 
                 <button
-                  onClick={handleFetchGraph}
+                  onClick={handleAnalyzeClick}
                   disabled={loading}
                   className="w-full bg-indigo-600 text-white px-4 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-60 disabled:cursor-not-allowed"
                 >
@@ -617,7 +829,10 @@ export default function NetworkGraphBusiness() {
                   <div className="flex justify-between items-center">
                     <span className="text-indigo-200 text-sm">Avg. Views</span>
                     <span className="font-semibold">
-                      {Math.round(graphData.rawMetrics.reduce((s, v) => s + (v.views || 0), 0) / graphData.rawMetrics.length).toLocaleString()}
+                      {Math.round(
+                        graphData.rawMetrics.reduce((s, v) => s + (v.views || 0), 0) /
+                          graphData.rawMetrics.length
+                      ).toLocaleString()}
                     </span>
                   </div>
                   <div className="flex justify-between items-center">
@@ -631,81 +846,86 @@ export default function NetworkGraphBusiness() {
 
           {/* Main Content */}
           <div className="flex-1">
-        {error ? (
-          <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-            <div className="flex items-start gap-3">
-              <AlertCircle className="text-rose-500 mt-0.5" size={18} />
-              <div>
-                <p className="text-sm font-semibold text-slate-900">Error</p>
-                <p className="text-sm text-rose-600 mt-1">{error}</p>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        {/* Summary */}
-        {activeView === "summary" && (
-          <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-            {displayGraphData.nodes.length === 0 ? (
-              <div className="flex items-center justify-center h-72">
-                <div className="text-center text-slate-600">
-                  <Network className="mx-auto text-slate-300 mb-4" size={64} />
-                  <div className="font-medium">No data yet</div>
-                  <div className="text-sm text-slate-500 mt-1">
-                    Click “Analyze Videos” to generate the network.
+            {error ? (
+              <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
+                <div className="flex items-start gap-3">
+                  <AlertCircle className="text-rose-500 mt-0.5" size={18} />
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Error</p>
+                    <p className="text-sm text-rose-600 mt-1">{error}</p>
                   </div>
                 </div>
               </div>
-            ) : selectedKey === "__ALL__" ? (
-              // ALL: 1~3 cards, each card has its own small graph
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                {perChannelGraphs.map((ch, idx) => (
-                  <ChannelGraphCard
-                    key={ch.url || idx}
-                    title={ch.label}
-                    nodes={ch.nodes}
-                    links={ch.links}
-                  />
-                ))}
-              </div>
-            ) : (
-              // Single channel: simple summary cards
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <MiniCard label="Nodes (videos)" value={graphData.nodes.length} />
-                <MiniCard label="Edges (connections)" value={graphData.links.length} />
-                <MiniCard label="Max videos" value={maxVideos} />
-              </div>
+            ) : null}
+
+            {/* Summary */}
+            {activeView === "summary" && (
+              <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
+                {displayGraphData.nodes.length === 0 ? (
+                  <div className="flex items-center justify-center h-72">
+                    <div className="text-center text-slate-600">
+                      <Network className="mx-auto text-slate-300 mb-4" size={64} />
+                      <div className="font-medium">No data yet</div>
+                      <div className="text-sm text-slate-500 mt-1">
+                        Click “Analyze Videos” to generate the network.
+                      </div>
+                    </div>
+                  </div>
+                ) : selectedKey === "__ALL__" ? (
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+                    {perChannelGraphs.map((ch, idx) => (
+                      <ChannelGraphCard
+                        key={ch.url || idx}
+                        title={ch.label}
+                        nodes={ch.nodes}
+                        links={ch.links}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <MiniCard label="Nodes (videos)" value={graphData.nodes.length} />
+                    <MiniCard label="Edges (connections)" value={graphData.links.length} />
+                    <MiniCard label="Max videos" value={maxVideos} />
+                  </div>
+                )}
+              </section>
             )}
-          </section>
-        )}
 
             {activeView === "graph" && (
               <div className="space-y-6">
                 <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                   <h2 className="text-xl font-semibold text-slate-900 mb-2">Video Network Graph</h2>
                   <p className="text-sm text-slate-500 mb-4">
-                    Explore which videos behave similarly based on views, likes, and comments.
-                    Node size = views, color = engagement rate. Click a node to open the video.
+                    Explore which videos behave similarly based on views, likes, and comments. Node
+                    size = views, color = engagement rate. Click a node to open the video.
                     {graphData.nodes.length > 50 && " Drag to pan, scroll to zoom."}
                   </p>
 
                   <div ref={containerRef} className="h-[600px] relative">
-                    {graphData.nodes.length === 0 && !loading ? (
+                    {(!hasAnalyzed || similarityGraphData.nodes.length === 0) && !loading ? (
                       <div className="h-full flex items-center justify-center text-sm text-slate-400">
                         <div className="text-center">
                           <Network className="mx-auto text-slate-300 mb-4" size={64} />
-                          <div className="text-slate-600 mb-2">No network data yet</div>
-                          <div className="text-sm text-slate-500">Click "Analyze Videos" to generate the network</div>
+                          <div className="text-slate-600 mb-2">No data available yet</div>
+                          <div className="text-sm text-slate-500">
+                            Click "Analyze Videos" to get started
+                          </div>
+                          {catalogError ? (
+                            <div className="text-xs text-rose-600 mt-2">{catalogError}</div>
+                          ) : null}
                         </div>
                       </div>
-                    ) : graphData.nodes.length > 0 && displayGraphData.links.length === 0 ? (
+                    ) : similarityGraphData.nodes.length > 0 && similarityGraphData.links.length === 0 ? (
                       <div className="h-full flex items-center justify-center bg-amber-50 rounded-lg border border-amber-200">
                         <div className="text-center max-w-md p-6">
                           <AlertCircle className="mx-auto text-amber-600 mb-4" size={48} />
-                          <h3 className="font-semibold text-lg mb-2 text-slate-900">No Strong Connections Found</h3>
+                          <h3 className="font-semibold text-lg mb-2 text-slate-900">
+                            No Strong Connections Found
+                          </h3>
                           <p className="text-slate-600 text-sm mb-4">
-                            Your videos have unique performance patterns. This means each video appeals to different audiences, 
-                            which can be a good sign of content diversity!
+                            Your videos have unique performance patterns. This means each video
+                            appeals to different audiences.
                           </p>
                         </div>
                       </div>
@@ -725,25 +945,14 @@ export default function NetworkGraphBusiness() {
                           </div>
                         </div>
 
-                        {/* Graph Controls */}
-                        <div className="absolute top-4 left-4 bg-white p-3 rounded shadow border text-sm z-10">
-                          <div className="font-semibold mb-2">Controls</div>
-                          <div className="space-y-1 text-xs text-slate-600">
-                            <div>• Click node → Open video</div>
-                            <div>• Drag node → Move it</div>
-                            <div>• Scroll → Zoom in/out</div>
-                            <div>• Drag background → Pan</div>
-                          </div>
-                        </div>
-
                         <ForceGraph2D
                           ref={fgRef}
-                          graphData={displayGraphData}
+                          graphData={fgData}
                           width={containerSize.width}
                           height={containerSize.height}
                           nodeLabel={nodeTooltip}
                           onNodeClick={handleNodeClick}
-                          nodeCanvasObjectMode={() => "before"}
+                          nodeCanvasObjectMode={() => "replace"}
                           nodeCanvasObject={(node, ctx, globalScale) => {
                             const size = getNodeSize(node.views);
                             ctx.beginPath();
@@ -754,8 +963,8 @@ export default function NetworkGraphBusiness() {
                             ctx.lineWidth = 1.5;
                             ctx.stroke();
 
-                            if (globalScale > 1.2 || size > 10) {
-                              const fontSize = Math.max(9, 11 / globalScale);
+                            if (globalScale > 2.2) {
+                              const fontSize = Math.min(14, Math.max(9, 12 / globalScale));
                               ctx.font = `${fontSize}px Sans-Serif`;
                               ctx.fillStyle = "#1e293b";
                               ctx.textAlign = "center";
@@ -769,14 +978,9 @@ export default function NetworkGraphBusiness() {
                             }
                           }}
                           linkColor={() => "rgba(99, 102, 241, 0.25)"}
-                          linkWidth={(link) => Math.max(1, (link.weight || 0) * 2)}
-                          linkDirectionalParticles={1}
-                          linkDirectionalParticleWidth={2}
-                          cooldownTicks={100}
-                          onEngineStop={() => fgRef.current?.zoomToFit(400, 50)}
-                          enableNodeDrag={true}
-                          enableZoomInteraction={true}
-                          enablePanInteraction={true}
+                          linkWidth={(link) => Math.max(0.8, (link.weight || 0.2) * 2)}
+                          linkDirectionalParticles={0}
+                          linkCurvature={0.1}
                         />
                       </>
                     )}
@@ -800,13 +1004,20 @@ export default function NetworkGraphBusiness() {
                   <>
                     {/* Scatter Charts - Competitive Analysis */}
                     <div>
-                      <h2 className="text-xl font-semibold text-slate-900 mb-4">Performance Comparison: You vs Competition</h2>
-                      <div className={`grid grid-cols-1 ${perChannelGraphs.length === 2 ? "lg:grid-cols-2" : "lg:grid-cols-3"} gap-6`}>
+                      <h2 className="text-xl font-semibold text-slate-900 mb-4">
+                        Performance Comparison: You vs Competition
+                      </h2>
+                      <div
+                        className={`grid grid-cols-1 ${
+                          perChannelGraphs.length === 2 ? "lg:grid-cols-2" : "lg:grid-cols-3"
+                        } gap-6`}
+                      >
                         {perChannelGraphs.map((ch, idx) => {
-                          const channelInfo = channels.find(c => c.url === ch.url);
+                          const channelInfo = channels.find((c) => c.url === ch.url);
                           const isPrimary = channelInfo?.is_primary || idx === 0;
-                          const channelName = channelInfo?.name || ch.label || `Channel ${idx + 1}`;
-                          
+                          const channelName =
+                            channelInfo?.name || ch.label || `Channel ${idx + 1}`;
+
                           const channelScatterData = (ch.rawMetrics || []).map((v) => ({
                             id: v.id,
                             title: v.title || v.name || v._rawId || v.id,
@@ -814,16 +1025,16 @@ export default function NetworkGraphBusiness() {
                             likes: Number(v.likes) || 0,
                             comments: Number(v.comments) || 0,
                             engagementRate:
-                              (Number(v.views) || 0) > 0 ? (Number(v.likes) + Number(v.comments)) / Number(v.views) : 0,
+                              (Number(v.views) || 0) > 0
+                                ? (Number(v.likes) + Number(v.comments)) / Number(v.views)
+                                : 0,
                           }));
 
                           return (
                             <div
                               key={idx}
                               className={`rounded-xl bg-white border shadow-sm p-6 ${
-                                isPrimary
-                                  ? "border-indigo-300 bg-indigo-50/30"
-                                  : "border-slate-200"
+                                isPrimary ? "border-indigo-300 bg-indigo-50/30" : "border-slate-200"
                               }`}
                             >
                               <div className="flex items-center justify-between mb-4">
@@ -857,7 +1068,10 @@ export default function NetworkGraphBusiness() {
                                       }}
                                       labelFormatter={(_, payload) => payload?.[0]?.payload?.title || ""}
                                     />
-                                    <Scatter data={channelScatterData} fill={isPrimary ? "#4f46e5" : "#10b981"} />
+                                    <Scatter
+                                      data={channelScatterData}
+                                      fill={isPrimary ? "#4f46e5" : "#10b981"}
+                                    />
                                   </ScatterChart>
                                 </ResponsiveContainer>
                               </div>
@@ -870,7 +1084,9 @@ export default function NetworkGraphBusiness() {
                     {/* Bar Charts - Competitive Analysis */}
                     <div>
                       <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-xl font-semibold text-slate-900">Top Performing Content: You vs Competition</h2>
+                        <h2 className="text-xl font-semibold text-slate-900">
+                          Top Performing Content: You vs Competition
+                        </h2>
                         <select
                           className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
                           value={barMetric}
@@ -881,12 +1097,18 @@ export default function NetworkGraphBusiness() {
                           <option value="comments">Comments</option>
                         </select>
                       </div>
-                      <div className={`grid grid-cols-1 ${perChannelGraphs.length === 2 ? "lg:grid-cols-2" : "lg:grid-cols-3"} gap-6`}>
+
+                      <div
+                        className={`grid grid-cols-1 ${
+                          perChannelGraphs.length === 2 ? "lg:grid-cols-2" : "lg:grid-cols-3"
+                        } gap-6`}
+                      >
                         {perChannelGraphs.map((ch, idx) => {
-                          const channelInfo = channels.find(c => c.url === ch.url);
+                          const channelInfo = channels.find((c) => c.url === ch.url);
                           const isPrimary = channelInfo?.is_primary || idx === 0;
-                          const channelName = channelInfo?.name || ch.label || `Channel ${idx + 1}`;
-                          
+                          const channelName =
+                            channelInfo?.name || ch.label || `Channel ${idx + 1}`;
+
                           const channelScatterData = (ch.rawMetrics || []).map((v) => ({
                             id: v.id,
                             title: v.title || v.name || v._rawId || v.id,
@@ -894,7 +1116,9 @@ export default function NetworkGraphBusiness() {
                             likes: Number(v.likes) || 0,
                             comments: Number(v.comments) || 0,
                             engagementRate:
-                              (Number(v.views) || 0) > 0 ? (Number(v.likes) + Number(v.comments)) / Number(v.views) : 0,
+                              (Number(v.views) || 0) > 0
+                                ? (Number(v.likes) + Number(v.comments)) / Number(v.views)
+                                : 0,
                           }));
 
                           const channelBarData = [...channelScatterData]
@@ -905,9 +1129,7 @@ export default function NetworkGraphBusiness() {
                             <div
                               key={idx}
                               className={`rounded-xl bg-white border shadow-sm p-6 ${
-                                isPrimary
-                                  ? "border-indigo-300 bg-indigo-50/30"
-                                  : "border-slate-200"
+                                isPrimary ? "border-indigo-300 bg-indigo-50/30" : "border-slate-200"
                               }`}
                             >
                               <div className="flex items-center gap-2 mb-4">
@@ -921,20 +1143,32 @@ export default function NetworkGraphBusiness() {
 
                               <div className="h-[420px]">
                                 <ResponsiveContainer width="100%" height="100%">
-                                  <BarChart data={channelBarData} margin={{ top: 10, right: 20, bottom: 120, left: 10 }}>
+                                  <BarChart data={channelBarData} margin={{ top: 10, right: 20, bottom: 90, left: 10 }}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis
                                       dataKey="title"
-                                      tick={{ fontSize: 10 }}
-                                      interval={0}
+                                      tick={{ fontSize: 11 }}
+                                      interval="preserveStartEnd"
+                                      minTickGap={10}
                                       angle={-45}
                                       textAnchor="end"
-                                      height={100}
-                                      tickFormatter={(value) => truncate(value, 16)}
+                                      height={110}
+                                      tickFormatter={(t) => (t && t.length > 16 ? `${t.slice(0, 16)}…` : t)}
                                     />
                                     <YAxis tick={{ fontSize: 12 }} />
                                     <Tooltip formatter={(value) => formatNum(value)} labelFormatter={(label) => label} />
-                                    <Bar dataKey={barMetric} fill={isPrimary ? "#4f46e5" : "#10b981"} radius={[8, 8, 0, 0]} />
+                                    <Bar
+                                      dataKey={barMetric}
+                                      fill={isPrimary ? "#4f46e5" : "#10b981"}
+                                      radius={[8, 8, 0, 0]}
+                                    >
+                                      <LabelList
+                                        dataKey={barMetric}
+                                        position="top"
+                                        formatter={(v) => formatNum(v)}
+                                        style={{ fontSize: 10 }}
+                                      />
+                                    </Bar>
                                   </BarChart>
                                 </ResponsiveContainer>
                               </div>
@@ -947,7 +1181,6 @@ export default function NetworkGraphBusiness() {
                 ) : (
                   <>
                     {/* Single Channel Charts (when not ALL mode) */}
-                    {/* Scatter */}
                     <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
                       <div className="flex items-center justify-between">
                         <h2 className="text-sm font-semibold text-slate-900">Engagement rate vs Views</h2>
@@ -967,8 +1200,7 @@ export default function NetworkGraphBusiness() {
                             />
                             <Tooltip
                               formatter={(value, name) => {
-                                if (name === "engagementRate")
-                                  return `${(Number(value) * 100).toFixed(2)}%`;
+                                if (name === "engagementRate") return `${(Number(value) * 100).toFixed(2)}%`;
                                 return formatNum(value);
                               }}
                               labelFormatter={(_, payload) => payload?.[0]?.payload?.title || ""}
@@ -979,7 +1211,6 @@ export default function NetworkGraphBusiness() {
                       </div>
                     </section>
 
-                    {/* Bar */}
                     <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
                       <div className="flex items-center justify-between gap-3">
                         <h2 className="text-sm font-semibold text-slate-900">Top 10 videos</h2>
@@ -996,20 +1227,21 @@ export default function NetworkGraphBusiness() {
 
                       <div className="h-[420px] mt-4">
                         <ResponsiveContainer width="100%" height="100%">
-                          <BarChart data={barData} margin={{ top: 10, right: 20, bottom: 120, left: 10 }}>
+                          <BarChart data={barData} margin={{ top: 10, right: 20, bottom: 20, left: 10 }}>
                             <CartesianGrid strokeDasharray="3 3" />
                             <XAxis
                               dataKey="title"
-                              tick={{ fontSize: 10 }}
+                              tick={{ fontSize: 11 }}
                               interval={0}
-                              angle={-45}
+                              angle={-15}
                               textAnchor="end"
-                              height={100}
-                              tickFormatter={(value) => truncate(value, 16)}
+                              height={80}
                             />
                             <YAxis tick={{ fontSize: 12 }} />
                             <Tooltip formatter={(value) => formatNum(value)} labelFormatter={(label) => label} />
-                            <Bar dataKey={barMetric} fill="#10b981" radius={[8, 8, 0, 0]} />
+                            <Bar dataKey={barMetric} fill="#10b981" radius={[8, 8, 0, 0]}>
+                              <LabelList dataKey={barMetric} position="top" formatter={(v) => formatNum(v)} />
+                            </Bar>
                           </BarChart>
                         </ResponsiveContainer>
                       </div>
@@ -1022,421 +1254,533 @@ export default function NetworkGraphBusiness() {
             {/* Performance Insights */}
             {activeView === "insights" && (
               <div className="space-y-6">
-            {performanceLoading ? (
-              <div className="flex items-center justify-center h-96 bg-white rounded-2xl border border-slate-100 shadow-sm">
-                <div className="text-center">
-                  <div className="text-slate-600 mb-2">Analyzing performance...</div>
-                  <div className="text-sm text-slate-500">Comparing your channels against industry benchmarks</div>
-                </div>
-              </div>
-            ) : performanceError ? (
-              <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-                <div className="flex items-start gap-3">
-                  <AlertCircle className="text-rose-500 mt-0.5" size={18} />
-                  <div>
-                    <p className="text-sm font-semibold text-slate-900">Error</p>
-                    <p className="text-sm text-rose-600 mt-1">{performanceError}</p>
+                {performanceLoading ? (
+                  <div className="flex items-center justify-center h-96 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="text-center">
+                      <div className="text-slate-600 mb-2">Analyzing performance...</div>
+                      <div className="text-sm text-slate-500">
+                        Comparing your channels against industry benchmarks
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            ) : !performanceData ? (
-              <div className="flex items-center justify-center h-96 bg-white rounded-2xl border border-slate-100 shadow-sm">
-                <div className="text-center text-slate-600">
-                  <BarChart3 className="mx-auto text-slate-300 mb-4" size={64} />
-                  <div className="font-medium">No performance data yet</div>
-                  <div className="text-sm text-slate-500 mt-1">
-                    Click "Analyze Videos" to generate performance insights
+                ) : performanceError ? (
+                  <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
+                    <div className="flex items-start gap-3">
+                      <AlertCircle className="text-rose-500 mt-0.5" size={18} />
+                      <div>
+                        <p className="text-sm font-semibold text-slate-900">Error</p>
+                        <p className="text-sm text-rose-600 mt-1">{performanceError}</p>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
-            ) : (
-              <>
-                {/* Business-Friendly Summary */}
-                {(() => {
-                  const primaryChannel = channels.find(c => c.is_primary) || channels[0];
-                  const primaryChannelMetrics = performanceData.channel_metrics?.find(
-                    cm => cm.channel_url === primaryChannel?.url
-                  ) || performanceData.channel_metrics?.[0];
-                  const primaryChannelName = primaryChannel?.name || "your channel";
-
-                  if (!primaryChannelMetrics) return null;
-
-                  const engagementPercentile = primaryChannelMetrics.percentiles?.engagement_rate || 0;
-                  const viewsPercentile = primaryChannelMetrics.percentiles?.avg_views || 0;
-                  const likesPercentile = primaryChannelMetrics.percentiles?.likes_per_1k || 0;
-                  
-                  // Simplified performance assessment
-                  const getPerformanceLevel = (percentile) => {
-                    if (percentile >= 75) return { level: "Excellent", color: "green", icon: Rocket };
-                    if (percentile >= 50) return { level: "Good", color: "blue", icon: ThumbsUp };
-                    if (percentile >= 25) return { level: "Fair", color: "amber", icon: Zap };
-                    return { level: "Needs Work", color: "rose", icon: Target };
-                  };
-
-                  const reachLevel = getPerformanceLevel(viewsPercentile);
-                  const engagementLevel = getPerformanceLevel(engagementPercentile);
-                  const likabilityLevel = getPerformanceLevel(likesPercentile);
-
-                  return (
-                    <section className="rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 p-6 mb-6">
-                      <div className="mb-6">
-                        <h2 className="text-xl font-bold text-slate-900 mb-2">How is {primaryChannelName} performing?</h2>
-                        <p className="text-slate-600">Here's what your numbers tell us about your channel's health</p>
+                ) : !performanceData ? (
+                  <div className="flex items-center justify-center h-96 bg-white rounded-2xl border border-slate-100 shadow-sm">
+                    <div className="text-center text-slate-600">
+                      <BarChart3 className="mx-auto text-slate-300 mb-4" size={64} />
+                      <div className="font-medium">No performance data yet</div>
+                      <div className="text-sm text-slate-500 mt-1">
+                        Click "Analyze Videos" to generate performance insights
                       </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {/* Business-Friendly Summary */}
+                    {(() => {
+                      const primaryChannel = channels.find((c) => c.is_primary) || channels[0];
+                      const primaryChannelMetrics =
+                        performanceData.channel_metrics?.find(
+                          (cm) => cm.channel_url === primaryChannel?.url
+                        ) || performanceData.channel_metrics?.[0];
+                      const primaryChannelName = primaryChannel?.name || "your channel";
 
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {/* Reach */}
-                        <div className="bg-white rounded-xl p-5 border border-slate-200">
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                              reachLevel.color === 'green' ? 'bg-green-100' : 
-                              reachLevel.color === 'blue' ? 'bg-blue-100' : 
-                              reachLevel.color === 'amber' ? 'bg-amber-100' : 'bg-rose-100'
-                            }`}>
-                              <reachLevel.icon className={`${
-                                reachLevel.color === 'green' ? 'text-green-600' : 
-                                reachLevel.color === 'blue' ? 'text-blue-600' : 
-                                reachLevel.color === 'amber' ? 'text-amber-600' : 'text-rose-600'
-                              }`} size={20} />
-                            </div>
-                            <div>
-                              <h3 className="font-semibold text-slate-900">Audience Reach</h3>
-                              <p className="text-xs text-slate-500">How many people see your videos</p>
-                            </div>
+                      if (!primaryChannelMetrics) return null;
+
+                      const engagementPercentile = primaryChannelMetrics.percentiles?.engagement_rate || 0;
+                      const viewsPercentile = primaryChannelMetrics.percentiles?.avg_views || 0;
+                      const likesPercentile = primaryChannelMetrics.percentiles?.likes_per_1k || 0;
+
+                      const getPerformanceLevel = (percentile) => {
+                        if (percentile >= 75) return { level: "Excellent", color: "green", icon: Rocket };
+                        if (percentile >= 50) return { level: "Good", color: "blue", icon: ThumbsUp };
+                        if (percentile >= 25) return { level: "Fair", color: "amber", icon: Zap };
+                        return { level: "Needs Work", color: "rose", icon: Target };
+                      };
+
+                      const reachLevel = getPerformanceLevel(viewsPercentile);
+                      const engagementLevel = getPerformanceLevel(engagementPercentile);
+                      const likabilityLevel = getPerformanceLevel(likesPercentile);
+
+                      return (
+                        <section className="rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 p-6 mb-6">
+                          <div className="mb-6">
+                            <h2 className="text-xl font-bold text-slate-900 mb-2">
+                              How is {primaryChannelName} performing?
+                            </h2>
+                            <p className="text-slate-600">
+                              Here's what your numbers tell us about your channel's health
+                            </p>
                           </div>
-                          <div className={`text-lg font-bold mb-2 ${
-                            reachLevel.color === 'green' ? 'text-green-600' : 
-                            reachLevel.color === 'blue' ? 'text-blue-600' : 
-                            reachLevel.color === 'amber' ? 'text-amber-600' : 'text-rose-600'
-                          }`}>
-                            {reachLevel.level}
-                          </div>
-                          <p className="text-sm text-slate-600">
-                            {reachLevel.level === "Excellent" ? "Your videos are reaching lots of people! Keep it up." :
-                             reachLevel.level === "Good" ? "You're reaching a decent audience. Room to grow." :
-                             reachLevel.level === "Fair" ? "Your reach is okay, but there's potential for more." :
-                             "Your videos need more visibility. Let's work on that."}
-                          </p>
-                        </div>
 
-                        {/* Engagement */}
-                        <div className="bg-white rounded-xl p-5 border border-slate-200">
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                              engagementLevel.color === 'green' ? 'bg-green-100' : 
-                              engagementLevel.color === 'blue' ? 'bg-blue-100' : 
-                              engagementLevel.color === 'amber' ? 'bg-amber-100' : 'bg-rose-100'
-                            }`}>
-                              <engagementLevel.icon className={`${
-                                engagementLevel.color === 'green' ? 'text-green-600' : 
-                                engagementLevel.color === 'blue' ? 'text-blue-600' : 
-                                engagementLevel.color === 'amber' ? 'text-amber-600' : 'text-rose-600'
-                              }`} size={20} />
-                            </div>
-                            <div>
-                              <h3 className="font-semibold text-slate-900">Viewer Interest</h3>
-                              <p className="text-xs text-slate-500">How much people interact with your content</p>
-                            </div>
-                          </div>
-                          <div className={`text-lg font-bold mb-2 ${
-                            engagementLevel.color === 'green' ? 'text-green-600' : 
-                            engagementLevel.color === 'blue' ? 'text-blue-600' : 
-                            engagementLevel.color === 'amber' ? 'text-amber-600' : 'text-rose-600'
-                          }`}>
-                            {engagementLevel.level}
-                          </div>
-                          <p className="text-sm text-slate-600">
-                            {engagementLevel.level === "Excellent" ? "People love interacting with your content!" :
-                             engagementLevel.level === "Good" ? "Viewers are engaging well with your videos." :
-                             engagementLevel.level === "Fair" ? "Some interaction, but could be more engaging." :
-                             "Viewers aren't interacting much. Let's make content more engaging."}
-                          </p>
-                        </div>
-
-                        {/* Content Quality */}
-                        <div className="bg-white rounded-xl p-5 border border-slate-200">
-                          <div className="flex items-center gap-3 mb-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                              likabilityLevel.color === 'green' ? 'bg-green-100' : 
-                              likabilityLevel.color === 'blue' ? 'bg-blue-100' : 
-                              likabilityLevel.color === 'amber' ? 'bg-amber-100' : 'bg-rose-100'
-                            }`}>
-                              <likabilityLevel.icon className={`${
-                                likabilityLevel.color === 'green' ? 'text-green-600' : 
-                                likabilityLevel.color === 'blue' ? 'text-blue-600' : 
-                                likabilityLevel.color === 'amber' ? 'text-amber-600' : 'text-rose-600'
-                              }`} size={20} />
-                            </div>
-                            <div>
-                              <h3 className="font-semibold text-slate-900">Content Appeal</h3>
-                              <p className="text-xs text-slate-500">How much people like what you create</p>
-                            </div>
-                          </div>
-                          <div className={`text-lg font-bold mb-2 ${
-                            likabilityLevel.color === 'green' ? 'text-green-600' : 
-                            likabilityLevel.color === 'blue' ? 'text-blue-600' : 
-                            likabilityLevel.color === 'amber' ? 'text-amber-600' : 'text-rose-600'
-                          }`}>
-                            {likabilityLevel.level}
-                          </div>
-                          <p className="text-sm text-slate-600">
-                            {likabilityLevel.level === "Excellent" ? "Your content really resonates with viewers!" :
-                             likabilityLevel.level === "Good" ? "People generally like your content." :
-                             likabilityLevel.level === "Fair" ? "Your content gets some positive response." :
-                             "Your content needs to connect better with viewers."}
-                          </p>
-                        </div>
-                      </div>
-                    </section>
-                  );
-                })()}
-
-                {/* Simple Key Insights */}
-                {(() => {
-                  const primaryChannel = channels.find(c => c.is_primary) || channels[0];
-                  const primaryChannelMetrics = performanceData.channel_metrics?.find(
-                    cm => cm.channel_url === primaryChannel?.url
-                  ) || performanceData.channel_metrics?.[0];
-                  const primaryChannelName = primaryChannel?.name || "your channel";
-
-                  if (!primaryChannelMetrics) return null;
-
-                  const avgViews = primaryChannelMetrics.avg_views || 0;
-                  const totalVideos = primaryChannelMetrics.num_videos || 0;
-
-                  return (
-                    <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6 mb-6">
-                      <h2 className="text-lg font-semibold text-slate-900 mb-4">Quick Stats</h2>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                            <Video className="text-blue-600" size={24} />
-                          </div>
-                          <div>
-                            <div className="text-2xl font-bold text-slate-900">{totalVideos}</div>
-                            <div className="text-sm text-slate-600">videos analyzed</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                            <Eye className="text-green-600" size={24} />
-                          </div>
-                          <div>
-                            <div className="text-2xl font-bold text-slate-900">{formatNum(avgViews)}</div>
-                            <div className="text-sm text-slate-600">average views per video</div>
-                          </div>
-                        </div>
-                      </div>
-                    </section>
-                  );
-                })()}
-
-                {/* What This Means for Your Business */}
-                {(() => {
-                  const primaryChannel = channels.find(c => c.is_primary) || channels[0];
-                  const primaryChannelMetrics = performanceData.channel_metrics?.find(
-                    cm => cm.channel_url === primaryChannel?.url
-                  ) || performanceData.channel_metrics?.[0];
-                  const primaryChannelName = primaryChannel?.name || "your channel";
-
-                  if (!primaryChannelMetrics) return null;
-
-                  const insights = generateBusinessFriendlyInsights(primaryChannelMetrics, primaryChannelName);
-
-                  return (
-                    <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-                      <div className="flex items-center gap-2 mb-6">
-                        <Lightbulb className="text-amber-500" size={20} />
-                        <h2 className="text-lg font-semibold text-slate-900">What This Means for Your Business</h2>
-                      </div>
-                      
-                      <div className="space-y-6">
-                        {insights.map((insight, idx) => (
-                          <div key={idx} className={`p-4 rounded-xl border-l-4 ${insight.borderColor} ${insight.bgColor}`}>
-                            <div className="flex items-start gap-3">
-                              <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                                insight.bgColor === 'bg-green-50' ? 'bg-green-100' :
-                                insight.bgColor === 'bg-blue-50' ? 'bg-blue-100' :
-                                insight.bgColor === 'bg-amber-50' ? 'bg-amber-100' :
-                                'bg-orange-100'
-                              }`}>
-                                <insight.icon className={`${
-                                  insight.bgColor === 'bg-green-50' ? 'text-green-600' :
-                                  insight.bgColor === 'bg-blue-50' ? 'text-blue-600' :
-                                  insight.bgColor === 'bg-amber-50' ? 'text-amber-600' :
-                                  'text-orange-600'
-                                }`} size={20} />
-                              </div>
-                              <div className="flex-1">
-                                <h3 className="font-semibold text-slate-900 mb-2">{insight.title}</h3>
-                                <p className="text-slate-700 mb-3 leading-relaxed">{insight.explanation}</p>
-                                <div className="bg-white p-3 rounded-lg border border-slate-200">
-                                  <p className="text-sm font-medium text-slate-900 mb-1 flex items-center gap-1">
-                                    <CheckCircle size={14} className="text-blue-600" />
-                                    What you should do:
-                                  </p>
-                                  <p className="text-sm text-slate-700">{insight.action}</p>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-
-                      {/* Simple Action Plan */}
-                      <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
-                        <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                          <Target className="text-blue-600" size={16} />
-                          Your Next 3 Steps
-                        </h3>
-                        <div className="space-y-2">
-                          {insights.slice(0, 3).map((insight, idx) => (
-                            <div key={idx} className="flex items-start gap-3">
-                              <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
-                                {idx + 1}
-                              </div>
-                              <p className="text-sm text-slate-700">{insight.simpleAction}</p>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </section>
-                  );
-                })()}
-
-                {/* Multi-Channel Comparison (if multiple channels) */}
-                {performanceData.channel_metrics && performanceData.channel_metrics.length > 1 && (
-                  <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-                    <h2 className="text-lg font-semibold text-slate-900 mb-4">How You Compare to Others</h2>
-                    <p className="text-sm text-slate-600 mb-4">
-                      See how your channel stacks up against similar channels in your space
-                    </p>
-                    
-                    <div className="space-y-3">
-                      {performanceData.channel_metrics.map((channel, idx) => {
-                        const channelInfo = channels.find(c => c.url === channel.channel_url);
-                        const isPrimary = channelInfo?.is_primary || idx === 0;
-                        const channelName = isPrimary ? (channelInfo?.name || "Your Channel") : `Competitor ${idx}`;
-                        
-                        // Simple performance assessment
-                        const engagementPercentile = channel.percentiles?.engagement_rate || 0;
-                        const viewsPercentile = channel.percentiles?.avg_views || 0;
-                        const overallPerformance = (engagementPercentile + viewsPercentile) / 2;
-                        
-                        const getPerformanceEmoji = (score) => {
-                          if (score >= 75) return Rocket;
-                          if (score >= 50) return ThumbsUp;
-                          if (score >= 25) return Zap;
-                          return Target;
-                        };
-
-                        const getPerformanceText = (score) => {
-                          if (score >= 75) return "Doing great!";
-                          if (score >= 50) return "Good performance";
-                          if (score >= 25) return "Room to improve";
-                          return "Needs attention";
-                        };
-                        
-                        return (
-                          <div key={idx} className={`p-4 rounded-xl border ${isPrimary ? "border-indigo-300 bg-indigo-50/30" : "border-slate-200 bg-slate-50"}`}>
-                            <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-3">
-                                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                                  overallPerformance >= 75 ? 'bg-green-100' :
-                                  overallPerformance >= 50 ? 'bg-blue-100' :
-                                  overallPerformance >= 25 ? 'bg-amber-100' : 'bg-rose-100'
-                                }`}>
-                                  {(() => {
-                                    const IconComponent = getPerformanceEmoji(overallPerformance);
-                                    return <IconComponent className={`${
-                                      overallPerformance >= 75 ? 'text-green-600' :
-                                      overallPerformance >= 50 ? 'text-blue-600' :
-                                      overallPerformance >= 25 ? 'text-amber-600' : 'text-rose-600'
-                                    }`} size={20} />;
-                                  })()}
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="bg-white rounded-xl p-5 border border-slate-200">
+                              <div className="flex items-center gap-3 mb-3">
+                                <div
+                                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                    reachLevel.color === "green"
+                                      ? "bg-green-100"
+                                      : reachLevel.color === "blue"
+                                      ? "bg-blue-100"
+                                      : reachLevel.color === "amber"
+                                      ? "bg-amber-100"
+                                      : "bg-rose-100"
+                                  }`}
+                                >
+                                  <reachLevel.icon
+                                    className={`${
+                                      reachLevel.color === "green"
+                                        ? "text-green-600"
+                                        : reachLevel.color === "blue"
+                                        ? "text-blue-600"
+                                        : reachLevel.color === "amber"
+                                        ? "text-amber-600"
+                                        : "text-rose-600"
+                                    }`}
+                                    size={20}
+                                  />
                                 </div>
                                 <div>
-                                  <div className="flex items-center gap-2">
-                                    <span className="font-medium text-slate-900">{channelName}</span>
-                                    {isPrimary && (
-                                      <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold">
-                                        Your Channel
-                                      </span>
-                                    )}
-                                  </div>
-                                  <div className="text-sm text-slate-600">{getPerformanceText(overallPerformance)}</div>
+                                  <h3 className="font-semibold text-slate-900">Audience Reach</h3>
+                                  <p className="text-xs text-slate-500">How many people see your videos</p>
                                 </div>
                               </div>
-                              <div className="text-right text-sm text-slate-600">
-                                <div>{formatNum(channel.avg_views)} avg views</div>
-                                <div>{channel.num_videos} videos</div>
+                              <div
+                                className={`text-lg font-bold mb-2 ${
+                                  reachLevel.color === "green"
+                                    ? "text-green-600"
+                                    : reachLevel.color === "blue"
+                                    ? "text-blue-600"
+                                    : reachLevel.color === "amber"
+                                    ? "text-amber-600"
+                                    : "text-rose-600"
+                                }`}
+                              >
+                                {reachLevel.level}
+                              </div>
+                              <p className="text-sm text-slate-600">
+                                {reachLevel.level === "Excellent"
+                                  ? "Your videos are reaching lots of people! Keep it up."
+                                  : reachLevel.level === "Good"
+                                  ? "You're reaching a decent audience. Room to grow."
+                                  : reachLevel.level === "Fair"
+                                  ? "Your reach is okay, but there's potential for more."
+                                  : "Your videos need more visibility. Let's work on that."}
+                              </p>
+                            </div>
+
+                            <div className="bg-white rounded-xl p-5 border border-slate-200">
+                              <div className="flex items-center gap-3 mb-3">
+                                <div
+                                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                    engagementLevel.color === "green"
+                                      ? "bg-green-100"
+                                      : engagementLevel.color === "blue"
+                                      ? "bg-blue-100"
+                                      : engagementLevel.color === "amber"
+                                      ? "bg-amber-100"
+                                      : "bg-rose-100"
+                                  }`}
+                                >
+                                  <engagementLevel.icon
+                                    className={`${
+                                      engagementLevel.color === "green"
+                                        ? "text-green-600"
+                                        : engagementLevel.color === "blue"
+                                        ? "text-blue-600"
+                                        : engagementLevel.color === "amber"
+                                        ? "text-amber-600"
+                                        : "text-rose-600"
+                                    }`}
+                                    size={20}
+                                  />
+                                </div>
+                                <div>
+                                  <h3 className="font-semibold text-slate-900">Viewer Interest</h3>
+                                  <p className="text-xs text-slate-500">How much people interact with your content</p>
+                                </div>
+                              </div>
+                              <div
+                                className={`text-lg font-bold mb-2 ${
+                                  engagementLevel.color === "green"
+                                    ? "text-green-600"
+                                    : engagementLevel.color === "blue"
+                                    ? "text-blue-600"
+                                    : engagementLevel.color === "amber"
+                                    ? "text-amber-600"
+                                    : "text-rose-600"
+                                }`}
+                              >
+                                {engagementLevel.level}
+                              </div>
+                              <p className="text-sm text-slate-600">
+                                {engagementLevel.level === "Excellent"
+                                  ? "People love interacting with your content!"
+                                  : engagementLevel.level === "Good"
+                                  ? "Viewers are engaging well with your videos."
+                                  : engagementLevel.level === "Fair"
+                                  ? "Some interaction, but could be more engaging."
+                                  : "Viewers aren't interacting much. Let's make content more engaging."}
+                              </p>
+                            </div>
+
+                            <div className="bg-white rounded-xl p-5 border border-slate-200">
+                              <div className="flex items-center gap-3 mb-3">
+                                <div
+                                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                    likabilityLevel.color === "green"
+                                      ? "bg-green-100"
+                                      : likabilityLevel.color === "blue"
+                                      ? "bg-blue-100"
+                                      : likabilityLevel.color === "amber"
+                                      ? "bg-amber-100"
+                                      : "bg-rose-100"
+                                  }`}
+                                >
+                                  <likabilityLevel.icon
+                                    className={`${
+                                      likabilityLevel.color === "green"
+                                        ? "text-green-600"
+                                        : likabilityLevel.color === "blue"
+                                        ? "text-blue-600"
+                                        : likabilityLevel.color === "amber"
+                                        ? "text-amber-600"
+                                        : "text-rose-600"
+                                    }`}
+                                    size={20}
+                                  />
+                                </div>
+                                <div>
+                                  <h3 className="font-semibold text-slate-900">Content Appeal</h3>
+                                  <p className="text-xs text-slate-500">How much people like what you create</p>
+                                </div>
+                              </div>
+                              <div
+                                className={`text-lg font-bold mb-2 ${
+                                  likabilityLevel.color === "green"
+                                    ? "text-green-600"
+                                    : likabilityLevel.color === "blue"
+                                    ? "text-blue-600"
+                                    : likabilityLevel.color === "amber"
+                                    ? "text-amber-600"
+                                    : "text-rose-600"
+                                }`}
+                              >
+                                {likabilityLevel.level}
+                              </div>
+                              <p className="text-sm text-slate-600">
+                                {likabilityLevel.level === "Excellent"
+                                  ? "Your content really resonates with viewers!"
+                                  : likabilityLevel.level === "Good"
+                                  ? "People generally like your content."
+                                  : likabilityLevel.level === "Fair"
+                                  ? "Your content gets some positive response."
+                                  : "Your content needs to connect better with viewers."}
+                              </p>
+                            </div>
+                          </div>
+                        </section>
+                      );
+                    })()}
+
+                    {/* Simple Key Insights */}
+                    {(() => {
+                      const primaryChannel = channels.find((c) => c.is_primary) || channels[0];
+                      const primaryChannelMetrics =
+                        performanceData.channel_metrics?.find(
+                          (cm) => cm.channel_url === primaryChannel?.url
+                        ) || performanceData.channel_metrics?.[0];
+
+                      if (!primaryChannelMetrics) return null;
+
+                      const avgViews = primaryChannelMetrics.avg_views || 0;
+                      const totalVideos = primaryChannelMetrics.num_videos || 0;
+
+                      return (
+                        <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6 mb-6">
+                          <h2 className="text-lg font-semibold text-slate-900 mb-4">Quick Stats</h2>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                                <Video className="text-blue-600" size={24} />
+                              </div>
+                              <div>
+                                <div className="text-2xl font-bold text-slate-900">{totalVideos}</div>
+                                <div className="text-sm text-slate-600">videos analyzed</div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                                <Eye className="text-green-600" size={24} />
+                              </div>
+                              <div>
+                                <div className="text-2xl font-bold text-slate-900">{formatNum(avgViews)}</div>
+                                <div className="text-sm text-slate-600">average views per video</div>
                               </div>
                             </div>
                           </div>
-                        );
-                      })}
-                    </div>
+                        </section>
+                      );
+                    })()}
 
-                    {/* Competitive Analysis Insight */}
-                    <div className="mt-4 p-4 bg-slate-50 rounded-xl">
-                      <h3 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
-                        <Lightbulb className="text-amber-500" size={16} />
-                        Competitive Analysis
-                      </h3>
-                      {(() => {
-                        const userChannel = performanceData.channel_metrics.find(channel => {
-                          const channelInfo = channels.find(c => c.url === channel.channel_url);
-                          return channelInfo?.is_primary;
-                        }) || performanceData.channel_metrics[0];
-                        
-                        const competitors = performanceData.channel_metrics.filter(channel => {
-                          const channelInfo = channels.find(c => c.url === channel.channel_url);
-                          return !channelInfo?.is_primary && channel !== performanceData.channel_metrics[0];
-                        });
-                        
-                        if (competitors.length === 0) {
-                          return (
-                            <p className="text-sm text-slate-700">
-                              Add competitor channels to see how you stack up against similar creators in your space.
-                            </p>
-                          );
-                        }
+                    {/* What This Means for Your Business */}
+                    {(() => {
+                      const primaryChannel = channels.find((c) => c.is_primary) || channels[0];
+                      const primaryChannelMetrics =
+                        performanceData.channel_metrics?.find(
+                          (cm) => cm.channel_url === primaryChannel?.url
+                        ) || performanceData.channel_metrics?.[0];
+                      const primaryChannelName = primaryChannel?.name || "your channel";
 
-                        const userScore = (userChannel.percentiles?.engagement_rate || 0) + (userChannel.percentiles?.avg_views || 0);
-                        const betterThanCount = competitors.filter(comp => {
-                          const compScore = (comp.percentiles?.engagement_rate || 0) + (comp.percentiles?.avg_views || 0);
-                          return userScore > compScore;
-                        }).length;
-                        
-                        if (betterThanCount === competitors.length) {
-                          return (
-                            <p className="text-sm text-slate-700">
-                              <span className="font-medium text-green-600">Great news!</span> Your channel is outperforming 
-                              all the competitor channels you're tracking. Keep up the excellent work!
-                            </p>
-                          );
-                        } else if (betterThanCount > competitors.length / 2) {
-                          return (
-                            <p className="text-sm text-slate-700">
-                              <span className="font-medium text-blue-600">You're doing well!</span> Your channel is performing 
-                              better than {betterThanCount} out of {competitors.length} competitors you're tracking.
-                            </p>
-                          );
-                        } else {
-                          return (
-                            <p className="text-sm text-slate-700">
-                              <span className="font-medium text-amber-600">Room for growth:</span> You're currently behind 
-                              some competitors, but this gives you clear targets to aim for. Focus on the strategies that work for the top performers.
-                            </p>
-                          );
-                        }
-                      })()}
-                    </div>
-                  </section>
+                      if (!primaryChannelMetrics) return null;
+
+                      const insights = generateBusinessFriendlyInsights(primaryChannelMetrics, primaryChannelName);
+
+                      return (
+                        <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
+                          <div className="flex items-center gap-2 mb-6">
+                            <Lightbulb className="text-amber-500" size={20} />
+                            <h2 className="text-lg font-semibold text-slate-900">
+                              What This Means for Your Business
+                            </h2>
+                          </div>
+
+                          <div className="space-y-6">
+                            {insights.map((insight, idx) => (
+                              <div
+                                key={idx}
+                                className={`p-4 rounded-xl border-l-4 ${insight.borderColor} ${insight.bgColor}`}
+                              >
+                                <div className="flex items-start gap-3">
+                                  <div
+                                    className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                      insight.bgColor === "bg-green-50"
+                                        ? "bg-green-100"
+                                        : insight.bgColor === "bg-blue-50"
+                                        ? "bg-blue-100"
+                                        : insight.bgColor === "bg-amber-50"
+                                        ? "bg-amber-100"
+                                        : "bg-orange-100"
+                                    }`}
+                                  >
+                                    <insight.icon
+                                      className={`${
+                                        insight.bgColor === "bg-green-50"
+                                          ? "text-green-600"
+                                          : insight.bgColor === "bg-blue-50"
+                                          ? "text-blue-600"
+                                          : insight.bgColor === "bg-amber-50"
+                                          ? "text-amber-600"
+                                          : "text-orange-600"
+                                      }`}
+                                      size={20}
+                                    />
+                                  </div>
+                                  <div className="flex-1">
+                                    <h3 className="font-semibold text-slate-900 mb-2">{insight.title}</h3>
+                                    <p className="text-slate-700 mb-3 leading-relaxed">{insight.explanation}</p>
+                                    <div className="bg-white p-3 rounded-lg border border-slate-200">
+                                      <p className="text-sm font-medium text-slate-900 mb-1 flex items-center gap-1">
+                                        <CheckCircle size={14} className="text-blue-600" />
+                                        What you should do:
+                                      </p>
+                                      <p className="text-sm text-slate-700">{insight.action}</p>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
+                            <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
+                              <Target className="text-blue-600" size={16} />
+                              Your Next 3 Steps
+                            </h3>
+                            <div className="space-y-2">
+                              {insights.slice(0, 3).map((insight, idx) => (
+                                <div key={idx} className="flex items-start gap-3">
+                                  <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                                    {idx + 1}
+                                  </div>
+                                  <p className="text-sm text-slate-700">{insight.simpleAction}</p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </section>
+                      );
+                    })()}
+
+                    {/* Multi-Channel Comparison (if multiple channels) */}
+                    {performanceData.channel_metrics && performanceData.channel_metrics.length > 1 && (
+                      <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
+                        <h2 className="text-lg font-semibold text-slate-900 mb-4">
+                          How You Compare to Others
+                        </h2>
+                        <p className="text-sm text-slate-600 mb-4">
+                          See how your channel stacks up against similar channels in your space
+                        </p>
+
+                        <div className="space-y-3">
+                          {performanceData.channel_metrics.map((channel, idx) => {
+                            const channelInfo = channels.find((c) => c.url === channel.channel_url);
+                            const isPrimary = channelInfo?.is_primary || idx === 0;
+                            const channelName = isPrimary ? channelInfo?.name || "Your Channel" : `Competitor ${idx}`;
+
+                            const engagementPercentile = channel.percentiles?.engagement_rate || 0;
+                            const viewsPercentile = channel.percentiles?.avg_views || 0;
+                            const overallPerformance = (engagementPercentile + viewsPercentile) / 2;
+
+                            const getPerformanceEmoji = (score) => {
+                              if (score >= 75) return Rocket;
+                              if (score >= 50) return ThumbsUp;
+                              if (score >= 25) return Zap;
+                              return Target;
+                            };
+
+                            const getPerformanceText = (score) => {
+                              if (score >= 75) return "Doing great!";
+                              if (score >= 50) return "Good performance";
+                              if (score >= 25) return "Room to improve";
+                              return "Needs attention";
+                            };
+
+                            return (
+                              <div
+                                key={idx}
+                                className={`p-4 rounded-xl border ${
+                                  isPrimary
+                                    ? "border-indigo-300 bg-indigo-50/30"
+                                    : "border-slate-200 bg-slate-50"
+                                }`}
+                              >
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-3">
+                                    <div
+                                      className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                        overallPerformance >= 75
+                                          ? "bg-green-100"
+                                          : overallPerformance >= 50
+                                          ? "bg-blue-100"
+                                          : overallPerformance >= 25
+                                          ? "bg-amber-100"
+                                          : "bg-rose-100"
+                                      }`}
+                                    >
+                                      {(() => {
+                                        const IconComponent = getPerformanceEmoji(overallPerformance);
+                                        return (
+                                          <IconComponent
+                                            className={`${
+                                              overallPerformance >= 75
+                                                ? "text-green-600"
+                                                : overallPerformance >= 50
+                                                ? "text-blue-600"
+                                                : overallPerformance >= 25
+                                                ? "text-amber-600"
+                                                : "text-rose-600"
+                                            }`}
+                                            size={20}
+                                          />
+                                        );
+                                      })()}
+                                    </div>
+                                    <div>
+                                      <div className="flex items-center gap-2">
+                                        <span className="font-medium text-slate-900">{channelName}</span>
+                                        {isPrimary && (
+                                          <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold">
+                                            Your Channel
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="text-sm text-slate-600">{getPerformanceText(overallPerformance)}</div>
+                                    </div>
+                                  </div>
+                                  <div className="text-right text-sm text-slate-600">
+                                    <div>{formatNum(channel.avg_views)} avg views</div>
+                                    <div>{channel.num_videos} videos</div>
+                                  </div>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        <div className="mt-4 p-4 bg-slate-50 rounded-xl">
+                          <h3 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
+                            <Lightbulb className="text-amber-500" size={16} />
+                            Competitive Analysis
+                          </h3>
+                          {(() => {
+                            const userChannel =
+                              performanceData.channel_metrics.find((channel) => {
+                                const channelInfo = channels.find((c) => c.url === channel.channel_url);
+                                return channelInfo?.is_primary;
+                              }) || performanceData.channel_metrics[0];
+
+                            const competitors = performanceData.channel_metrics.filter((channel) => {
+                              const channelInfo = channels.find((c) => c.url === channel.channel_url);
+                              return !channelInfo?.is_primary && channel !== performanceData.channel_metrics[0];
+                            });
+
+                            if (competitors.length === 0) {
+                              return (
+                                <p className="text-sm text-slate-700">
+                                  Add competitor channels to see how you stack up against similar creators in your space.
+                                </p>
+                              );
+                            }
+
+                            const userScore =
+                              (userChannel.percentiles?.engagement_rate || 0) +
+                              (userChannel.percentiles?.avg_views || 0);
+                            const betterThanCount = competitors.filter((comp) => {
+                              const compScore =
+                                (comp.percentiles?.engagement_rate || 0) +
+                                (comp.percentiles?.avg_views || 0);
+                              return userScore > compScore;
+                            }).length;
+
+                            if (betterThanCount === competitors.length) {
+                              return (
+                                <p className="text-sm text-slate-700">
+                                  <span className="font-medium text-green-600">Great news!</span> Your channel is outperforming
+                                  all the competitor channels you're tracking. Keep up the excellent work!
+                                </p>
+                              );
+                            } else if (betterThanCount > competitors.length / 2) {
+                              return (
+                                <p className="text-sm text-slate-700">
+                                  <span className="font-medium text-blue-600">You're doing well!</span> Your channel is performing
+                                  better than {betterThanCount} out of {competitors.length} competitors you're tracking.
+                                </p>
+                              );
+                            } else {
+                              return (
+                                <p className="text-sm text-slate-700">
+                                  <span className="font-medium text-amber-600">Room for growth:</span> You're currently behind
+                                  some competitors, but this gives you clear targets to aim for. Focus on the strategies that work for the top performers.
+                                </p>
+                              );
+                            }
+                          })()}
+                        </div>
+                      </section>
+                    )}
+                  </>
                 )}
-              </>
-            )}
-          </div>
+              </div>
             )}
           </div>
         </div>
@@ -1445,16 +1789,10 @@ export default function NetworkGraphBusiness() {
   );
 }
 
-function ChannelGraphCard({
-    title,
-    nodes = [],
-    links = [],
-    isPrimary = false,
-    benchmarkStats = null,
-  }) {
-
+function ChannelGraphCard({ title, nodes = [], links = [], isPrimary = false, benchmarkStats = null }) {
   // Measure the real container size to avoid 0-width canvas issues
   const graphBoxRef = useRef(null);
+  const fgMiniRef = useRef(null);
   const [boxSize, setBoxSize] = useState({ w: 360, h: 260 });
 
   useEffect(() => {
@@ -1470,29 +1808,23 @@ function ChannelGraphCard({
 
     update();
 
-    // Use ResizeObserver so the graph always has a correct width inside grid/flex layouts
     const ro = new ResizeObserver(() => update());
     ro.observe(el);
 
     return () => ro.disconnect();
   }, []);
 
-  // Pick the most popular video as the center (max views)
   const centerNode = useMemo(() => {
     if (!nodes.length) return null;
     return [...nodes].sort((a, b) => (b.views || 0) - (a.views || 0))[0];
   }, [nodes]);
 
-  // Build a star graph: center node + top-N similar nodes around it
   const { starNodes, starLinks } = useMemo(() => {
     if (!centerNode) return { starNodes: [], starLinks: [] };
 
     const centerId = centerNode.id;
-
-    // nodeId -> node
     const nodeMap = new Map(nodes.map((n) => [n.id, n]));
 
-    // Find all edges connected to the center node (treat as undirected)
     const neighborEdges = (links || [])
       .map((e) => {
         const s = typeof e.source === "object" ? e.source.id : e.source;
@@ -1502,7 +1834,6 @@ function ChannelGraphCard({
       .filter((e) => e._s === centerId || e._t === centerId)
       .sort((a, b) => (b.weight || 0) - (a.weight || 0));
 
-    // Pick top N unique neighbors by weight
     const N = Math.min(12, nodes.length - 1);
     const neighborIds = [];
     for (const e of neighborEdges) {
@@ -1513,7 +1844,6 @@ function ChannelGraphCard({
       if (neighborIds.length >= N) break;
     }
 
-    // Fallback: if no edges exist, select other popular videos by views
     if (neighborIds.length === 0) {
       const fallback = [...nodes]
         .filter((n) => n.id !== centerId)
@@ -1524,9 +1854,7 @@ function ChannelGraphCard({
     }
 
     const aroundNodes = neighborIds.map((id) => nodeMap.get(id)).filter(Boolean);
-
     const starNodes = [centerNode, ...aroundNodes];
-
     const starLinks = aroundNodes.map((n) => ({
       source: centerId,
       target: n.id,
@@ -1539,7 +1867,6 @@ function ChannelGraphCard({
   const mostPopularTitle = centerNode?.title || centerNode?.name || "";
   const mostPopularViews = centerNode?.views || 0;
 
-  // Create a stable map so we can place nodes in a neat circle ourselves (no physics needed)
   const layoutMap = useMemo(() => {
     const map = new Map();
     if (!centerNode) return map;
@@ -1562,15 +1889,40 @@ function ChannelGraphCard({
     return map;
   }, [starNodes, centerNode, boxSize]);
 
+  const fixedGraphData = useMemo(() => {
+    const fixedNodes = (starNodes || []).map((n) => {
+      const p = layoutMap.get(n.id);
+      if (!p) return n;
+      return {
+        ...n,
+        x: p.x,
+        y: p.y,
+        fx: p.x,
+        fy: p.y,
+      };
+    });
+
+    const fixedLinks = (starLinks || []).map((l) => ({
+      ...l,
+      source: typeof l.source === "object" ? l.source.id : l.source,
+      target: typeof l.target === "object" ? l.target.id : l.target,
+    }));
+
+    return { nodes: fixedNodes, links: fixedLinks };
+  }, [starNodes, starLinks, layoutMap]);
+
+  useEffect(() => {
+    if (!fgMiniRef.current) return;
+    fgMiniRef.current.centerAt(boxSize.w / 2, boxSize.h / 2, 0);
+    fgMiniRef.current.zoom(1, 0);
+  }, [boxSize.w, boxSize.h, fixedGraphData.nodes.length]);
+
   return (
     <div
-        className={`rounded-2xl p-4 ${
-          isPrimary
-            ? "border-2 border-indigo-500 bg-indigo-50/40"
-            : "border border-slate-100 bg-white"
-        }`}
-      >
-  
+      className={`rounded-2xl p-4 ${
+        isPrimary ? "border-2 border-indigo-500 bg-indigo-50/40" : "border border-slate-100 bg-white"
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-sm font-semibold text-slate-900 line-clamp-1">{title}</p>
@@ -1579,9 +1931,7 @@ function ChannelGraphCard({
             <p className="mt-1 text-xs text-slate-600 line-clamp-2">
               <span className="font-semibold text-slate-700">Most popular:</span>{" "}
               {mostPopularTitle}{" "}
-              <span className="text-slate-500">
-                ({Number(mostPopularViews).toLocaleString()} views)
-              </span>
+              <span className="text-slate-500">({Number(mostPopularViews).toLocaleString()} views)</span>
             </p>
           ) : (
             <p className="mt-1 text-xs text-slate-500">No videos</p>
@@ -1598,11 +1948,14 @@ function ChannelGraphCard({
         className="mt-3 h-[260px] rounded-xl border border-slate-200 bg-slate-50 overflow-hidden"
       >
         <ForceGraph2D
-          graphData={{ nodes: starNodes, links: starLinks }}
+          ref={fgMiniRef}
+          graphData={fixedGraphData}
           width={boxSize.w}
           height={boxSize.h}
-          enableNodeDrag={false}
-          cooldownTicks={1}
+          enableNodeDrag={true}
+          enableZoomInteraction={true}
+          enablePanInteraction={true}
+          cooldownTicks={0}
           d3VelocityDecay={1}
           nodeLabel={(n) => n.title || n.name || n.id}
           onNodeClick={(n) => {
@@ -1611,22 +1964,18 @@ function ChannelGraphCard({
             const vid = String(rawId).includes(":") ? String(rawId).split(":")[1] : rawId;
             window.open(`https://www.youtube.com/watch?v=${vid}`, "_blank");
           }}
-          // Replace default node drawing with our own drawing
           nodeCanvasObjectMode={() => "replace"}
           nodeCanvasObject={(node, ctx) => {
-            const p = layoutMap.get(node.id);
-            if (!p) return;
+            const x = node.x ?? 0;
+            const y = node.y ?? 0;
 
             const isCenter = centerNode && node.id === centerNode.id;
-            const base = isCenter ? 10 : 6;
+            const base = isCenter ? 7 : 4;
             const size = base + Math.log10((node.views || 0) + 1);
 
-            // Draw node circle
             ctx.beginPath();
-            ctx.arc(p.x, p.y, size, 0, 2 * Math.PI, false);
-            ctx.fillStyle = isCenter
-              ? "rgba(16, 185, 129, 0.95)"
-              : "rgba(79, 70, 229, 0.85)";
+            ctx.arc(x, y, size, 0, 2 * Math.PI);
+            ctx.fillStyle = isCenter ? "rgba(16, 185, 129, 0.95)" : "rgba(79, 70, 229, 0.85)";
             ctx.fill();
 
             if (isCenter) {
@@ -1635,29 +1984,20 @@ function ChannelGraphCard({
               ctx.stroke();
             }
 
-            // Draw node label (video title)
-            // We hide center label because it is already shown in "Most popular"
             if (!isCenter) {
-              const rawTitle = node.title || node.name || "";
-              const label = truncateText(rawTitle, 18);
-
+              const label = truncateText(node.title || node.name || "", 18);
               ctx.font = "11px sans-serif";
-              ctx.fillStyle = "rgba(15, 23, 42, 0.90)";
+              ctx.fillStyle = "rgba(15, 23, 42, 0.9)";
               ctx.textAlign = "center";
               ctx.textBaseline = "top";
-
-              // Place text under the node
-              ctx.fillText(label, p.x, p.y + size + 6);
+              ctx.fillText(label, x, y + size + 6);
             }
           }}
-          // Make default links transparent (we draw links ourselves)
           linkColor={() => "rgba(0,0,0,0)"}
           linkCanvasObjectMode={() => "replace"}
           linkCanvasObject={(link, ctx) => {
-            const sId = typeof link.source === "object" ? link.source.id : link.source;
-            const tId = typeof link.target === "object" ? link.target.id : link.target;
-            const s = layoutMap.get(sId);
-            const t = layoutMap.get(tId);
+            const s = typeof link.source === "object" ? link.source : null;
+            const t = typeof link.target === "object" ? link.target : null;
             if (!s || !t) return;
 
             ctx.beginPath();
@@ -1684,14 +2024,12 @@ function MiniCard({ label, value }) {
   );
 }
 
-// Truncate long text to keep labels readable in small graphs
 function truncateText(str, maxLen = 18) {
   const s = String(str || "");
   if (s.length <= maxLen) return s;
   return s.slice(0, maxLen - 1) + "…";
 }
 
-// Escape HTML in tooltip to avoid breaking the tooltip container
 function escapeHtml(str) {
   return String(str || "")
     .replaceAll("&", "&amp;")
@@ -1730,7 +2068,13 @@ function MetricCard({ label, value, percentile, industryAvg }) {
       <div className="mt-3 w-full bg-slate-200 rounded-full h-1.5">
         <div
           className={`h-1.5 rounded-full ${
-            percentile >= 75 ? "bg-green-500" : percentile >= 50 ? "bg-blue-500" : percentile >= 25 ? "bg-amber-500" : "bg-rose-500"
+            percentile >= 75
+              ? "bg-green-500"
+              : percentile >= 50
+              ? "bg-blue-500"
+              : percentile >= 25
+              ? "bg-amber-500"
+              : "bg-rose-500"
           }`}
           style={{ width: `${Math.min(percentile, 100)}%` }}
         />
@@ -1739,7 +2083,6 @@ function MetricCard({ label, value, percentile, industryAvg }) {
   );
 }
 
-// Enhanced metric card with explanations and trends
 function EnhancedMetricCard({ label, value, percentile, industryAvg, explanation, trend = "stable" }) {
   const getPercentileColor = (p) => {
     if (p >= 75) return "text-green-600";
@@ -1756,9 +2099,9 @@ function EnhancedMetricCard({ label, value, percentile, industryAvg, explanation
     return "Needs Improvement";
   };
 
-  const getTrendIcon = (trend) => {
-    if (trend === "up") return <TrendingUp className="text-green-600" size={14} />;
-    if (trend === "down") return <TrendingDown className="text-rose-600" size={14} />;
+  const getTrendIcon = (t) => {
+    if (t === "up") return <TrendingUp className="text-green-600" size={14} />;
+    if (t === "down") return <TrendingDown className="text-rose-600" size={14} />;
     return null;
   };
 
@@ -1779,7 +2122,13 @@ function EnhancedMetricCard({ label, value, percentile, industryAvg, explanation
       <div className="w-full bg-slate-200 rounded-full h-1.5">
         <div
           className={`h-1.5 rounded-full transition-all duration-500 ${
-            percentile >= 75 ? "bg-green-500" : percentile >= 50 ? "bg-blue-500" : percentile >= 25 ? "bg-amber-500" : "bg-rose-500"
+            percentile >= 75
+              ? "bg-green-500"
+              : percentile >= 50
+              ? "bg-blue-500"
+              : percentile >= 25
+              ? "bg-amber-500"
+              : "bg-rose-500"
           }`}
           style={{ width: `${Math.min(percentile, 100)}%` }}
         />
@@ -1788,167 +2137,172 @@ function EnhancedMetricCard({ label, value, percentile, industryAvg, explanation
   );
 }
 
-// Business-friendly insights generator (simplified for non-technical users)
 function generateBusinessFriendlyInsights(channelMetrics, channelName) {
   const insights = [];
-  
+
   const engagementPercentile = channelMetrics.percentiles?.engagement_rate || 0;
   const viewsPercentile = channelMetrics.percentiles?.avg_views || 0;
   const likesPercentile = channelMetrics.percentiles?.likes_per_1k || 0;
   const avgViews = channelMetrics.avg_views || 0;
 
-  // Reach insights (simplified)
   if (viewsPercentile >= 75) {
     insights.push({
       icon: Rocket,
       title: "Your videos are getting great visibility!",
-      explanation: `Your videos are reaching more people than most other channels. This means your content is being discovered well and your audience is growing.`,
+      explanation:
+        "Your videos are reaching more people than most other channels. This means your content is being discovered well and your audience is growing.",
       action: "Keep doing what you're doing! Consider posting more frequently to reach even more people.",
       simpleAction: "Post videos more regularly to keep the momentum going",
       bgColor: "bg-green-50",
-      borderColor: "border-l-green-500"
+      borderColor: "border-l-green-500",
     });
   } else if (viewsPercentile < 30) {
     insights.push({
       icon: ArrowUp,
       title: "Let's get more eyes on your content",
-      explanation: `Your videos aren't reaching as many people as they could. This usually means we need to work on making your content more discoverable.`,
+      explanation:
+        "Your videos aren't reaching as many people as they could. This usually means we need to work on making your content more discoverable.",
       action: "Focus on better video titles, eye-catching thumbnails, and sharing your videos on social media to reach more people.",
       simpleAction: "Improve your video titles and thumbnails to attract more viewers",
       bgColor: "bg-blue-50",
-      borderColor: "border-l-blue-500"
+      borderColor: "border-l-blue-500",
     });
   }
 
-  // Engagement insights (simplified)
   if (engagementPercentile >= 70) {
     insights.push({
       icon: Heart,
       title: "People love interacting with your content!",
-      explanation: `Your viewers are actively liking and commenting on your videos, which is fantastic! This shows they're really connecting with what you create.`,
+      explanation:
+        "Your viewers are actively liking and commenting on your videos, which is fantastic! This shows they're really connecting with what you create.",
       action: "Keep creating content that sparks conversation. Reply to comments to build an even stronger community.",
       simpleAction: "Respond to more comments to build a stronger community",
       bgColor: "bg-green-50",
-      borderColor: "border-l-green-500"
+      borderColor: "border-l-green-500",
     });
   } else if (engagementPercentile < 40) {
     insights.push({
       icon: MessageCircle,
       title: "Let's get people more involved",
-      explanation: `Your viewers aren't interacting with your videos as much as they could. This might mean they're watching but not feeling compelled to engage.`,
+      explanation:
+        "Your viewers aren't interacting with your videos as much as they could. This might mean they're watching but not feeling compelled to engage.",
       action: "Ask questions in your videos, encourage viewers to comment, and create content that invites discussion.",
       simpleAction: "Ask viewers questions in your videos to encourage comments",
       bgColor: "bg-amber-50",
-      borderColor: "border-l-amber-500"
+      borderColor: "border-l-amber-500",
     });
   }
 
-  // Content quality insights (simplified)
   if (likesPercentile >= 70) {
     insights.push({
       icon: Star,
       title: "Your content quality is impressive!",
-      explanation: `People are hitting the like button on your videos more than average, which means they genuinely enjoy what you're creating.`,
+      explanation:
+        "People are hitting the like button on your videos more than average, which means they genuinely enjoy what you're creating.",
       action: "Analyze your most-liked videos to understand what resonates with your audience, then create more similar content.",
       simpleAction: "Look at your most popular videos and make more content like that",
       bgColor: "bg-green-50",
-      borderColor: "border-l-green-500"
+      borderColor: "border-l-green-500",
     });
   } else if (likesPercentile < 35) {
     insights.push({
       icon: Target,
       title: "There's room to improve content appeal",
-      explanation: `Your videos might not be connecting with viewers as strongly as they could. This could be about content style, topics, or presentation.`,
+      explanation:
+        "Your videos might not be connecting with viewers as strongly as they could. This could be about content style, topics, or presentation.",
       action: "Try different content formats, focus on topics your audience cares about, and pay attention to what gets the best response.",
       simpleAction: "Experiment with different video topics and styles to see what works best",
       bgColor: "bg-orange-50",
-      borderColor: "border-l-orange-500"
+      borderColor: "border-l-orange-500",
     });
   }
 
-  // Growth opportunity insights
   if (avgViews < 1000) {
     insights.push({
       icon: Sprout,
       title: "You're in the growth phase",
-      explanation: `Every successful channel starts somewhere! You're building your foundation, and with the right strategies, you can grow your audience significantly.`,
+      explanation:
+        "Every successful channel starts somewhere! You're building your foundation, and with the right strategies, you can grow your audience significantly.",
       action: "Focus on consistency - post regularly, engage with your audience, and be patient. Growth takes time but it will come.",
       simpleAction: "Stay consistent with posting and be patient - growth takes time",
       bgColor: "bg-blue-50",
-      borderColor: "border-l-blue-500"
+      borderColor: "border-l-blue-500",
     });
   } else if (avgViews > 10000) {
     insights.push({
       icon: Trophy,
       title: "You've built a solid audience!",
-      explanation: `Getting over 10,000 views per video is a significant achievement. You've proven there's demand for your content.`,
+      explanation:
+        "Getting over 10,000 views per video is a significant achievement. You've proven there's demand for your content.",
       action: "Consider monetization opportunities, collaborations with other creators, or expanding your content topics to grow even further.",
       simpleAction: "Explore ways to monetize your success and collaborate with other creators",
       bgColor: "bg-green-50",
-      borderColor: "border-l-green-500"
+      borderColor: "border-l-green-500",
     });
   }
 
-  // If no specific insights, provide general encouragement
   if (insights.length === 0) {
     insights.push({
       icon: ThumbsUp,
       title: "You're on the right track!",
-      explanation: `Your channel is performing steadily. Every creator's journey is unique, and consistent effort is the key to long-term success.`,
+      explanation:
+        "Your channel is performing steadily. Every creator's journey is unique, and consistent effort is the key to long-term success.",
       action: "Keep creating content you're passionate about, stay consistent with your posting schedule, and engage with your audience.",
       simpleAction: "Keep creating consistently and engaging with your audience",
       bgColor: "bg-blue-50",
-      borderColor: "border-l-blue-500"
+      borderColor: "border-l-blue-500",
     });
   }
 
-  return insights.slice(0, 4); // Limit to 4 insights max
+  return insights.slice(0, 4);
 }
 
-// Smart insights generator
 function generateSmartInsights(channelMetrics, channelName, performanceData) {
   const insights = [];
-  
+
   const engagementRate = channelMetrics.engagement_rate || 0;
   const avgViews = channelMetrics.avg_views || 0;
   const likesPerK = channelMetrics.likes_per_1k_views || 0;
   const commentsPerK = channelMetrics.comments_per_1k_views || 0;
-  
+
   const engagementPercentile = channelMetrics.percentiles?.engagement_rate || 0;
   const viewsPercentile = channelMetrics.percentiles?.avg_views || 0;
   const likesPercentile = channelMetrics.percentiles?.likes_per_1k || 0;
 
-  // Industry benchmarks
   const industryEngagement = performanceData.comparison?.engagement_rate?.industry_avg || 0.015;
   const industryViews = performanceData.comparison?.avg_views?.industry_avg || 5000;
   const industryLikes = performanceData.comparison?.likes_per_1k?.industry_avg || 15;
 
-  // Engagement insights
   if (engagementPercentile >= 80) {
     insights.push({
       type: "success",
       priority: "high",
       title: "Outstanding Audience Engagement",
-      description: `Your ${(engagementRate * 100).toFixed(2)}% engagement rate puts you in the top 20% of creators. Your audience is highly active and invested in your content.`,
-      recommendation: "Leverage this strong engagement by creating more interactive content, hosting live sessions, or launching community polls to maintain this momentum.",
+      description: `Your ${(engagementRate * 100).toFixed(
+        2
+      )}% engagement rate puts you in the top 20% of creators. Your audience is highly active and invested in your content.`,
+      recommendation:
+        "Leverage this strong engagement by creating more interactive content, hosting live sessions, or launching community polls to maintain this momentum.",
       action: "Create more interactive content like Q&As, polls, or community posts to maintain high engagement",
       actionable: true,
-      icon: "trophy"
+      icon: "trophy",
     });
   } else if (engagementPercentile < 25) {
     insights.push({
       type: "warning",
       priority: "high",
       title: "Engagement Needs Attention",
-      description: `Your ${(engagementRate * 100).toFixed(2)}% engagement rate is below industry standards. This suggests viewers aren't actively interacting with your content.`,
-      recommendation: "Focus on creating more compelling calls-to-action, ask questions throughout your videos, and respond to comments to encourage interaction.",
+      description: `Your ${(engagementRate * 100).toFixed(
+        2
+      )}% engagement rate is below industry standards. This suggests viewers aren't actively interacting with your content.`,
+      recommendation:
+        "Focus on creating more compelling calls-to-action, ask questions throughout your videos, and respond to comments to encourage interaction.",
       action: "Add clear calls-to-action in your videos asking viewers to like, comment, and subscribe",
       actionable: true,
-      icon: "alert"
+      icon: "alert",
     });
   }
 
-  // Views insights
   if (viewsPercentile >= 75) {
     insights.push({
       type: "success",
@@ -1958,7 +2312,7 @@ function generateSmartInsights(channelMetrics, channelName, performanceData) {
       recommendation: "Consider increasing your upload frequency or expanding to related topics to capitalize on your strong reach.",
       action: "Maintain consistent upload schedule and consider expanding content topics",
       actionable: true,
-      icon: "trending-up"
+      icon: "trending-up",
     });
   } else if (viewsPercentile < 30) {
     insights.push({
@@ -1966,68 +2320,71 @@ function generateSmartInsights(channelMetrics, channelName, performanceData) {
       priority: "high",
       title: "Opportunity to Expand Reach",
       description: `Your average of ${avgViews.toLocaleString()} views per video suggests there's significant room to grow your audience.`,
-      recommendation: "Optimize your video titles and thumbnails for better click-through rates, and consider promoting your content on other social platforms.",
+      recommendation:
+        "Optimize your video titles and thumbnails for better click-through rates, and consider promoting your content on other social platforms.",
       action: "Improve video titles, thumbnails, and cross-promote on other social media platforms",
       actionable: true,
-      icon: "target"
+      icon: "target",
     });
   }
 
-  // Content quality insights
   if (likesPercentile >= 70 && engagementPercentile >= 60) {
     insights.push({
       type: "success",
       priority: "medium",
       title: "High-Quality Content Recognition",
-      description: `Your ${likesPerK.toFixed(1)} likes per 1K views indicates viewers genuinely appreciate your content quality.`,
-      recommendation: "Document what makes your most-liked videos successful and apply those elements to future content.",
+      description: `Your ${likesPerK.toFixed(
+        1
+      )} likes per 1K views indicates viewers genuinely appreciate your content quality.`,
+      recommendation:
+        "Document what makes your most-liked videos successful and apply those elements to future content.",
       action: "Analyze your top-performing videos and replicate their successful elements",
       actionable: true,
-      icon: "heart"
+      icon: "heart",
     });
   }
 
-  // Growth opportunity insights
   if (commentsPerK >= 5) {
     insights.push({
       type: "success",
       priority: "low",
       title: "Strong Community Building",
       description: `Your ${commentsPerK.toFixed(1)} comments per 1K views shows you're building an engaged community that wants to interact.`,
-      recommendation: "Continue fostering this community by responding to comments and creating content that sparks discussion.",
+      recommendation:
+        "Continue fostering this community by responding to comments and creating content that sparks discussion.",
       action: "Respond to more comments and create discussion-focused content",
       actionable: true,
-      icon: "users"
+      icon: "users",
     });
   }
 
-  // Comparative insights for multi-channel
   if (performanceData.channel_metrics && performanceData.channel_metrics.length > 1) {
-    const otherChannels = performanceData.channel_metrics.filter(c => c.channel_url !== channelMetrics.channel_url);
-    const avgOtherEngagement = otherChannels.reduce((sum, c) => sum + (c.engagement_rate || 0), 0) / otherChannels.length;
-    
+    const otherChannels = performanceData.channel_metrics.filter(
+      (c) => c.channel_url !== channelMetrics.channel_url
+    );
+    const avgOtherEngagement =
+      otherChannels.reduce((sum, c) => sum + (c.engagement_rate || 0), 0) / otherChannels.length;
+
     if (engagementRate > avgOtherEngagement * 1.2) {
       insights.push({
         type: "insight",
         priority: "medium",
         title: "Cross-Channel Strategy Opportunity",
-        description: `This channel significantly outperforms your others in engagement. Consider applying its successful strategies across your channel network.`,
-        recommendation: "Analyze what content types and posting strategies work best here, then adapt them for your other channels.",
+        description:
+          "This channel significantly outperforms your others in engagement. Consider applying its successful strategies across your channel network.",
+        recommendation:
+          "Analyze what content types and posting strategies work best here, then adapt them for your other channels.",
         action: "Apply successful strategies from this channel to your other channels",
         actionable: true,
-        icon: "lightbulb"
+        icon: "lightbulb",
       });
     }
   }
 
-  // Sort by priority and limit to most important insights
   const priorityOrder = { high: 3, medium: 2, low: 1 };
-  return insights
-    .sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority])
-    .slice(0, 5);
+  return insights.sort((a, b) => priorityOrder[b.priority] - priorityOrder[a.priority]).slice(0, 5);
 }
 
-// Insight card component
 function InsightCard({ insight }) {
   const getInsightStyle = (type) => {
     switch (type) {
@@ -2068,14 +2425,12 @@ function InsightCard({ insight }) {
   return (
     <div className={`p-4 rounded-xl border ${getInsightStyle(insight.type)}`}>
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 mt-0.5">
-          {getIcon(insight.icon)}
-        </div>
+        <div className="flex-shrink-0 mt-0.5">{getIcon(insight.icon)}</div>
         <div className="flex-1">
           <h3 className="font-semibold text-slate-900 mb-1">{insight.title}</h3>
           <p className="text-sm text-slate-700 mb-3 leading-relaxed">{insight.description}</p>
           <div className="p-3 bg-white rounded-lg border border-slate-200">
-            <p className="text-xs font-medium text-slate-600 mb-1">💡 Recommendation:</p>
+            <p className="text-xs font-medium text-slate-600 mb-1">Recommendation:</p>
             <p className="text-sm text-slate-700">{insight.recommendation}</p>
           </div>
         </div>
