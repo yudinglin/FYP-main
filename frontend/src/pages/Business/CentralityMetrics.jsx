@@ -1051,6 +1051,7 @@ function QualityMetricsBar({ metrics }) {
         {metricData.map((metric) => {
           const Icon = metric.icon;
           const percentage = (metric.value / metric.max) * 100;
+          
           return (
             <div key={metric.name}>
               <div className="flex items-center justify-between mb-2">
@@ -1256,6 +1257,7 @@ function RetentionHeatmapView({ data, loading }) {
   );
 }
 
+// IMPROVED: Better explanation of retention patterns
 function RetentionHeatmapSection({ heatmap }) {
   const getZoneColor = (retention) => {
     if (retention >= 70) return "#10b981";

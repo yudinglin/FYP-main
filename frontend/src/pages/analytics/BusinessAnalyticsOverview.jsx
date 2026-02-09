@@ -34,18 +34,18 @@ export default function BusinessAnalyticsOverview() {
         <AnalyticsCard
           label="Audience Analysis"
           title="Content Performance Insights"
-          badge="Know your audience"
+          badge="Deep dive"
           description={
             <>
-              Discover what content resonates with your audience. See which videos drive loyalty, engagement, and have viral potential. Get clear recommendations on what to create next.
+              Analyze comment quality, viewer retention patterns, and competitive positioning. Understand where viewers drop off and discover content gaps in your market.
             </>
           }
           highlights={[
-            "Identify your best performing videos at a glance",
-            "Find videos with high viewer loyalty (watched completely)",
-            "Spot trending content with viral potential",
-            "Understand audience sentiment over time",
-            "See which content types get the best response",
+            "Measure comment depth and conversation quality beyond sentiment",
+            "See exactly where viewers drop off with retention heatmaps",
+            "Find your optimal video length for maximum retention",
+            "Discover content opportunities competitors are missing",
+            "Identify areas where you dominate your competition",
           ]}
           link="/dashboard/business/centrality"
           visualType="performance"
@@ -55,18 +55,18 @@ export default function BusinessAnalyticsOverview() {
         <AnalyticsCard
           label="Market Intelligence"
           title="Network & Competitive Analysis"
-          badge="Track competitors"
+          badge="Visual insights"
           description={
             <>
-              See how your videos relate to each other and compare your performance against competitors. Identify patterns, find content gaps, and understand where you stand in your industry.
+              Visualize how your videos relate based on performance metrics. Discover which videos behave similarly and find content clusters using interactive network graphs.
             </>
           }
           highlights={[
-            "Visualize how your videos cluster by performance",
-            "Compare your channel metrics against up to 2 competitors",
-            "Track engagement, views, and quality scores side-by-side",
-            "Get business-friendly insights about your market position",
-            "See which metrics you're winning and where to improve",
+            "Interactive network graph showing video correlations",
+            "Visualize video similarity based on views, likes, and comments",
+            "Compare performance across up to 3 linked channels",
+            "Identify content clusters and performance patterns",
+            "See which videos are connected by similar audience behavior",
           ]}
           link="/dashboard/business/network"
           visualType="network"
@@ -75,19 +75,19 @@ export default function BusinessAnalyticsOverview() {
         {/* 3. Growth Prediction & Planning */}
         <AnalyticsCard
           label="Strategic Planning"
-          title="Channel Performance Analysis"
+          title="Growth Forecast & Analysis"
           badge="Plan for growth"
           description={
             <>
-              Forecast your channel growth, understand your competitive position, and get clear action plans. See projected subscriber counts and learn exactly what to do to reach your goals.
+              Forecast subscriber growth for the next 3, 6, and 12 months. Compare your growth trajectory with competitors and track engagement trends over time.
             </>
           }
           highlights={[
-            "Forecast subscriber growth for the next 6-12 months",
-            "Track audience quality and engagement trends",
-            "Compare growth momentum with competitors",
-            "Get specific, actionable recommendations",
-            "Understand your rank in key performance areas",
+            "Predict subscriber counts for 3, 6, and 12 months ahead",
+            "See when you'll catch up to competitors based on current growth",
+            "Track engagement rate trends and predictions",
+            "Compare growth momentum with competitor channels",
+            "Get confidence ratings based on your performance data",
           ]}
           link="/dashboard/business/forecasting"
           visualType="growth"
