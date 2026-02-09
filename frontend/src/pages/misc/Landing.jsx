@@ -100,7 +100,8 @@ export default function Landing() {
               <span className="font-semibold text-gray-900">
                 Product demo —
               </span>{" "}
-              Explore creator networks, centrality metrics, and predictive insights in real time.
+              Learn how to use YouAnalyze to uncover YouTube network insights
+              effortlessly.
             </div>
           </div>
         </div>

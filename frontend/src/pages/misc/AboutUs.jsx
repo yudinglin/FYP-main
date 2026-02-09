@@ -136,11 +136,6 @@ export default function AboutUs() {
             </div>
             
             <div className="space-y-6">
-              <div className="inline-flex items-center gap-3 bg-white px-6 py-4 rounded-xl border border-gray-200">
-                <Mail className="w-5 h-5 text-red-600" />
-                <span className="text-gray-900 font-medium">support@youanalyze.com</span>
-              </div>
-              
               <a
                 href="/contact-support"
                 className="inline-flex items-center gap-2 bg-gradient-to-r from-red-600 to-orange-500 text-white px-8 py-4 rounded-xl font-semibold hover:shadow-xl hover:scale-105 transition-all duration-300 group"
