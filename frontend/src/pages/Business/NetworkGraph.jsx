@@ -1287,12 +1287,30 @@ export default function NetworkGraphBusiness() {
                   <>
                     {/* Business-Friendly Summary */}
                     {(() => {
-                      const primaryChannel = channels.find((c) => c.is_primary) || channels[0];
-                      const primaryChannelMetrics =
-                        performanceData.channel_metrics?.find(
-                          (cm) => cm.channel_url === primaryChannel?.url
-                        ) || performanceData.channel_metrics?.[0];
-                      const primaryChannelName = primaryChannel?.name || "your channel";
+                      // Determine which channel to display based on selection
+                      let displayChannel, displayChannelMetrics, displayChannelName;
+                      
+                      if (selectedKey === "__ALL__") {
+                        // Show primary channel when "All channels" is selected
+                        displayChannel = channels.find((c) => c.is_primary) || channels[0];
+                        displayChannelMetrics =
+                          performanceData.channel_metrics?.find(
+                            (cm) => cm.channel_url === displayChannel?.url
+                          ) || performanceData.channel_metrics?.[0];
+                        displayChannelName = displayChannel?.name || "your channel";
+                      } else {
+                        // Show the selected channel
+                        const selectedOption = options.find((o) => o.key === selectedKey);
+                        const selectedUrl = selectedOption?.url;
+                        displayChannel = channels.find((c) => c.url === selectedUrl);
+                        displayChannelMetrics = performanceData.channel_metrics?.find(
+                          (cm) => cm.channel_url === selectedUrl
+                        );
+                        displayChannelName = displayChannel?.name || selectedOption?.label || "this channel";
+                      }
+                      
+                      const primaryChannelMetrics = displayChannelMetrics;
+                      const primaryChannelName = displayChannelName;
 
                       if (!primaryChannelMetrics) return null;
 
@@ -1312,62 +1330,58 @@ export default function NetworkGraphBusiness() {
                       const likabilityLevel = getPerformanceLevel(likesPercentile);
 
                       return (
-                        <section className="rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50 border border-indigo-200 p-6 mb-6">
+                        <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6 mb-6">
                           <div className="mb-6">
-                            <h2 className="text-xl font-bold text-slate-900 mb-2">
+                            <p className="text-[11px] font-medium uppercase tracking-wide text-indigo-500 mb-2">
+                              Performance Overview
+                            </p>
+                            <h2 className="text-xl font-semibold text-slate-900">
                               How is {primaryChannelName} performing?
                             </h2>
-                            <p className="text-slate-600">
+                            <p className="text-sm text-slate-500 mt-1">
                               Here's what your numbers tell us about your channel's health
                             </p>
                           </div>
 
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                            <div className="bg-white rounded-xl p-5 border border-slate-200">
-                              <div className="flex items-center gap-3 mb-3">
-                                <div
-                                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                            <div className="bg-slate-50 rounded-xl p-5 border border-slate-100">
+                              <div className="flex items-center gap-3 mb-4">
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                                     reachLevel.color === "green"
-                                      ? "bg-green-100"
+                                      ? "bg-emerald-100"
                                       : reachLevel.color === "blue"
                                       ? "bg-blue-100"
                                       : reachLevel.color === "amber"
-                                      ? "bg-amber-100"
-                                      : "bg-rose-100"
-                                  }`}
-                                >
-                                  <reachLevel.icon
-                                    className={`${
+                                      ? "bg-indigo-100"
+                                      : "bg-slate-200"
+                                  }`}>
+                                  <reachLevel.icon className={`${
                                       reachLevel.color === "green"
-                                        ? "text-green-600"
+                                        ? "text-emerald-600"
                                         : reachLevel.color === "blue"
                                         ? "text-blue-600"
                                         : reachLevel.color === "amber"
-                                        ? "text-amber-600"
-                                        : "text-rose-600"
-                                    }`}
-                                    size={20}
-                                  />
+                                        ? "text-indigo-600"
+                                        : "text-slate-600"
+                                    }`} size={20} />
                                 </div>
-                                <div>
-                                  <h3 className="font-semibold text-slate-900">Audience Reach</h3>
+                                <div className="flex-1">
+                                  <h3 className="font-semibold text-slate-900 text-sm">Audience Reach</h3>
                                   <p className="text-xs text-slate-500">How many people see your videos</p>
                                 </div>
                               </div>
-                              <div
-                                className={`text-lg font-bold mb-2 ${
+                              <div className={`text-xl font-bold mb-2 ${
                                   reachLevel.color === "green"
-                                    ? "text-green-600"
+                                    ? "text-emerald-600"
                                     : reachLevel.color === "blue"
                                     ? "text-blue-600"
                                     : reachLevel.color === "amber"
-                                    ? "text-amber-600"
-                                    : "text-rose-600"
-                                }`}
-                              >
+                                    ? "text-indigo-600"
+                                    : "text-slate-600"
+                                }`}>
                                 {reachLevel.level}
                               </div>
-                              <p className="text-sm text-slate-600">
+                              <p className="text-sm text-slate-600 leading-relaxed">
                                 {reachLevel.level === "Excellent"
                                   ? "Your videos are reaching lots of people! Keep it up."
                                   : reachLevel.level === "Good"
@@ -1378,51 +1392,44 @@ export default function NetworkGraphBusiness() {
                               </p>
                             </div>
 
-                            <div className="bg-white rounded-xl p-5 border border-slate-200">
-                              <div className="flex items-center gap-3 mb-3">
-                                <div
-                                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                            <div className="bg-slate-50 rounded-xl p-5 border border-slate-100">
+                              <div className="flex items-center gap-3 mb-4">
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                                     engagementLevel.color === "green"
-                                      ? "bg-green-100"
+                                      ? "bg-emerald-100"
                                       : engagementLevel.color === "blue"
                                       ? "bg-blue-100"
                                       : engagementLevel.color === "amber"
-                                      ? "bg-amber-100"
-                                      : "bg-rose-100"
-                                  }`}
-                                >
-                                  <engagementLevel.icon
-                                    className={`${
+                                      ? "bg-indigo-100"
+                                      : "bg-slate-200"
+                                  }`}>
+                                  <engagementLevel.icon className={`${
                                       engagementLevel.color === "green"
-                                        ? "text-green-600"
+                                        ? "text-emerald-600"
                                         : engagementLevel.color === "blue"
                                         ? "text-blue-600"
                                         : engagementLevel.color === "amber"
-                                        ? "text-amber-600"
-                                        : "text-rose-600"
-                                    }`}
-                                    size={20}
-                                  />
+                                        ? "text-indigo-600"
+                                        : "text-slate-600"
+                                    }`} size={20} />
                                 </div>
-                                <div>
-                                  <h3 className="font-semibold text-slate-900">Viewer Interest</h3>
-                                  <p className="text-xs text-slate-500">How much people interact with your content</p>
+                                <div className="flex-1">
+                                  <h3 className="font-semibold text-slate-900 text-sm">Viewer Interest</h3>
+                                  <p className="text-xs text-slate-500">How much people interact</p>
                                 </div>
                               </div>
-                              <div
-                                className={`text-lg font-bold mb-2 ${
+                              <div className={`text-xl font-bold mb-2 ${
                                   engagementLevel.color === "green"
-                                    ? "text-green-600"
+                                    ? "text-emerald-600"
                                     : engagementLevel.color === "blue"
                                     ? "text-blue-600"
                                     : engagementLevel.color === "amber"
-                                    ? "text-amber-600"
-                                    : "text-rose-600"
-                                }`}
-                              >
+                                    ? "text-indigo-600"
+                                    : "text-slate-600"
+                                }`}>
                                 {engagementLevel.level}
                               </div>
-                              <p className="text-sm text-slate-600">
+                              <p className="text-sm text-slate-600 leading-relaxed">
                                 {engagementLevel.level === "Excellent"
                                   ? "People love interacting with your content!"
                                   : engagementLevel.level === "Good"
@@ -1433,51 +1440,44 @@ export default function NetworkGraphBusiness() {
                               </p>
                             </div>
 
-                            <div className="bg-white rounded-xl p-5 border border-slate-200">
-                              <div className="flex items-center gap-3 mb-3">
-                                <div
-                                  className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                            <div className="bg-slate-50 rounded-xl p-5 border border-slate-100">
+                              <div className="flex items-center gap-3 mb-4">
+                                <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                                     likabilityLevel.color === "green"
-                                      ? "bg-green-100"
+                                      ? "bg-emerald-100"
                                       : likabilityLevel.color === "blue"
                                       ? "bg-blue-100"
                                       : likabilityLevel.color === "amber"
-                                      ? "bg-amber-100"
-                                      : "bg-rose-100"
-                                  }`}
-                                >
-                                  <likabilityLevel.icon
-                                    className={`${
+                                      ? "bg-indigo-100"
+                                      : "bg-slate-200"
+                                  }`}>
+                                  <likabilityLevel.icon className={`${
                                       likabilityLevel.color === "green"
-                                        ? "text-green-600"
+                                        ? "text-emerald-600"
                                         : likabilityLevel.color === "blue"
                                         ? "text-blue-600"
                                         : likabilityLevel.color === "amber"
-                                        ? "text-amber-600"
-                                        : "text-rose-600"
-                                    }`}
-                                    size={20}
-                                  />
+                                        ? "text-indigo-600"
+                                        : "text-slate-600"
+                                    }`} size={20} />
                                 </div>
-                                <div>
-                                  <h3 className="font-semibold text-slate-900">Content Appeal</h3>
-                                  <p className="text-xs text-slate-500">How much people like what you create</p>
+                                <div className="flex-1">
+                                  <h3 className="font-semibold text-slate-900 text-sm">Content Appeal</h3>
+                                  <p className="text-xs text-slate-500">How much people like it</p>
                                 </div>
                               </div>
-                              <div
-                                className={`text-lg font-bold mb-2 ${
+                              <div className={`text-xl font-bold mb-2 ${
                                   likabilityLevel.color === "green"
-                                    ? "text-green-600"
+                                    ? "text-emerald-600"
                                     : likabilityLevel.color === "blue"
                                     ? "text-blue-600"
                                     : likabilityLevel.color === "amber"
-                                    ? "text-amber-600"
-                                    : "text-rose-600"
-                                }`}
-                              >
+                                    ? "text-indigo-600"
+                                    : "text-slate-600"
+                                }`}>
                                 {likabilityLevel.level}
                               </div>
-                              <p className="text-sm text-slate-600">
+                              <p className="text-sm text-slate-600 leading-relaxed">
                                 {likabilityLevel.level === "Excellent"
                                   ? "Your content really resonates with viewers!"
                                   : likabilityLevel.level === "Good"
@@ -1507,24 +1507,27 @@ export default function NetworkGraphBusiness() {
 
                       return (
                         <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6 mb-6">
-                          <h2 className="text-lg font-semibold text-slate-900 mb-4">Quick Stats</h2>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                                <Video className="text-blue-600" size={24} />
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-indigo-500 mb-2">
+                            Channel Statistics
+                          </p>
+                          <h2 className="text-base font-semibold text-slate-900 mb-4">Quick Stats</h2>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
+                              <div className="w-12 h-12 bg-indigo-100 rounded-lg flex items-center justify-center">
+                                <Video className="text-indigo-600" size={22} />
                               </div>
                               <div>
                                 <div className="text-2xl font-bold text-slate-900">{totalVideos}</div>
-                                <div className="text-sm text-slate-600">videos analyzed</div>
+                                <div className="text-sm text-slate-500">videos analyzed</div>
                               </div>
                             </div>
-                            <div className="flex items-center gap-4">
-                              <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                                <Eye className="text-green-600" size={24} />
+                            <div className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 border border-slate-100">
+                              <div className="w-12 h-12 bg-emerald-100 rounded-lg flex items-center justify-center">
+                                <Eye className="text-emerald-600" size={22} />
                               </div>
                               <div>
                                 <div className="text-2xl font-bold text-slate-900">{formatNum(avgViews)}</div>
-                                <div className="text-sm text-slate-600">average views per video</div>
+                                <div className="text-sm text-slate-500">average views per video</div>
                               </div>
                             </div>
                           </div>
@@ -1534,12 +1537,28 @@ export default function NetworkGraphBusiness() {
 
                     {/* What This Means for Your Business */}
                     {(() => {
-                      const primaryChannel = channels.find((c) => c.is_primary) || channels[0];
-                      const primaryChannelMetrics =
-                        performanceData.channel_metrics?.find(
-                          (cm) => cm.channel_url === primaryChannel?.url
-                        ) || performanceData.channel_metrics?.[0];
-                      const primaryChannelName = primaryChannel?.name || "your channel";
+                      // Determine which channel to display based on selection
+                      let displayChannel, displayChannelMetrics, displayChannelName;
+                      
+                      if (selectedKey === "__ALL__") {
+                        displayChannel = channels.find((c) => c.is_primary) || channels[0];
+                        displayChannelMetrics =
+                          performanceData.channel_metrics?.find(
+                            (cm) => cm.channel_url === displayChannel?.url
+                          ) || performanceData.channel_metrics?.[0];
+                        displayChannelName = displayChannel?.name || "your channel";
+                      } else {
+                        const selectedOption = options.find((o) => o.key === selectedKey);
+                        const selectedUrl = selectedOption?.url;
+                        displayChannel = channels.find((c) => c.url === selectedUrl);
+                        displayChannelMetrics = performanceData.channel_metrics?.find(
+                          (cm) => cm.channel_url === selectedUrl
+                        );
+                        displayChannelName = displayChannel?.name || selectedOption?.label || "this channel";
+                      }
+                      
+                      const primaryChannelMetrics = displayChannelMetrics;
+                      const primaryChannelName = displayChannelName;
 
                       if (!primaryChannelMetrics) return null;
 
@@ -1547,53 +1566,48 @@ export default function NetworkGraphBusiness() {
 
                       return (
                         <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-                          <div className="flex items-center gap-2 mb-6">
-                            <Lightbulb className="text-amber-500" size={20} />
-                            <h2 className="text-lg font-semibold text-slate-900">
-                              What This Means for Your Business
-                            </h2>
-                          </div>
+                          <p className="text-[11px] font-medium uppercase tracking-wide text-indigo-500 mb-2">
+                            Actionable Insights
+                          </p>
+                          <h2 className="text-base font-semibold text-slate-900 mb-4">
+                            What This Means for Your Business
+                          </h2>
 
-                          <div className="space-y-6">
+                          <div className="space-y-4">
                             {insights.map((insight, idx) => (
                               <div
                                 key={idx}
-                                className={`p-4 rounded-xl border-l-4 ${insight.borderColor} ${insight.bgColor}`}
+                                className={`p-4 rounded-xl border ${insight.borderColor} ${insight.bgColor}`}
                               >
                                 <div className="flex items-start gap-3">
-                                  <div
-                                    className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                                       insight.bgColor === "bg-green-50"
-                                        ? "bg-green-100"
+                                        ? "bg-emerald-100"
                                         : insight.bgColor === "bg-blue-50"
                                         ? "bg-blue-100"
                                         : insight.bgColor === "bg-amber-50"
-                                        ? "bg-amber-100"
-                                        : "bg-orange-100"
-                                    }`}
-                                  >
-                                    <insight.icon
-                                      className={`${
+                                        ? "bg-indigo-100"
+                                        : "bg-slate-200"
+                                    }`}>
+                                    <insight.icon className={`${
                                         insight.bgColor === "bg-green-50"
-                                          ? "text-green-600"
+                                          ? "text-emerald-600"
                                           : insight.bgColor === "bg-blue-50"
                                           ? "text-blue-600"
                                           : insight.bgColor === "bg-amber-50"
-                                          ? "text-amber-600"
-                                          : "text-orange-600"
-                                      }`}
-                                      size={20}
-                                    />
+                                          ? "text-indigo-600"
+                                          : "text-slate-600"
+                                      }`} size={18} />
                                   </div>
                                   <div className="flex-1">
-                                    <h3 className="font-semibold text-slate-900 mb-2">{insight.title}</h3>
-                                    <p className="text-slate-700 mb-3 leading-relaxed">{insight.explanation}</p>
+                                    <h3 className="font-semibold text-slate-900 mb-2 text-sm">{insight.title}</h3>
+                                    <p className="text-slate-600 mb-3 leading-relaxed text-sm">{insight.explanation}</p>
                                     <div className="bg-white p-3 rounded-lg border border-slate-200">
-                                      <p className="text-sm font-medium text-slate-900 mb-1 flex items-center gap-1">
-                                        <CheckCircle size={14} className="text-blue-600" />
+                                      <p className="text-xs font-medium text-slate-700 mb-1 flex items-center gap-1.5">
+                                        <CheckCircle size={14} className="text-indigo-600" />
                                         What you should do:
                                       </p>
-                                      <p className="text-sm text-slate-700">{insight.action}</p>
+                                      <p className="text-sm text-slate-600 leading-relaxed">{insight.action}</p>
                                     </div>
                                   </div>
                                 </div>
@@ -1601,18 +1615,18 @@ export default function NetworkGraphBusiness() {
                             ))}
                           </div>
 
-                          <div className="mt-6 p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl border border-blue-200">
-                            <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2">
-                              <Target className="text-blue-600" size={16} />
+                          <div className="mt-5 p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                            <h3 className="font-semibold text-slate-900 mb-3 flex items-center gap-2 text-sm">
+                              <Target className="text-indigo-600" size={16} />
                               Your Next 3 Steps
                             </h3>
                             <div className="space-y-2">
                               {insights.slice(0, 3).map((insight, idx) => (
                                 <div key={idx} className="flex items-start gap-3">
-                                  <div className="w-6 h-6 bg-blue-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
+                                  <div className="w-6 h-6 bg-indigo-600 text-white rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 mt-0.5">
                                     {idx + 1}
                                   </div>
-                                  <p className="text-sm text-slate-700">{insight.simpleAction}</p>
+                                  <p className="text-sm text-slate-700 leading-relaxed flex-1">{insight.simpleAction}</p>
                                 </div>
                               ))}
                             </div>
@@ -1624,10 +1638,13 @@ export default function NetworkGraphBusiness() {
                     {/* Multi-Channel Comparison (if multiple channels) */}
                     {performanceData.channel_metrics && performanceData.channel_metrics.length > 1 && (
                       <section className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
-                        <h2 className="text-lg font-semibold text-slate-900 mb-4">
+                        <p className="text-[11px] font-medium uppercase tracking-wide text-indigo-500 mb-2">
+                          Competitive Analysis
+                        </p>
+                        <h2 className="text-base font-semibold text-slate-900 mb-1">
                           How You Compare to Others
                         </h2>
-                        <p className="text-sm text-slate-600 mb-4">
+                        <p className="text-sm text-slate-500 mb-5">
                           See how your channel stacks up against similar channels in your space
                         </p>
 
@@ -1660,56 +1677,50 @@ export default function NetworkGraphBusiness() {
                                 key={idx}
                                 className={`p-4 rounded-xl border ${
                                   isPrimary
-                                    ? "border-indigo-300 bg-indigo-50/30"
+                                    ? "border-indigo-200 bg-indigo-50"
                                     : "border-slate-200 bg-slate-50"
                                 }`}
                               >
                                 <div className="flex items-center justify-between">
                                   <div className="flex items-center gap-3">
-                                    <div
-                                      className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                                    <div className={`w-10 h-10 rounded-lg flex items-center justify-center ${
                                         overallPerformance >= 75
-                                          ? "bg-green-100"
+                                          ? "bg-emerald-100"
                                           : overallPerformance >= 50
                                           ? "bg-blue-100"
                                           : overallPerformance >= 25
-                                          ? "bg-amber-100"
-                                          : "bg-rose-100"
-                                      }`}
-                                    >
+                                          ? "bg-indigo-100"
+                                          : "bg-slate-200"
+                                      }`}>
                                       {(() => {
                                         const IconComponent = getPerformanceEmoji(overallPerformance);
-                                        return (
-                                          <IconComponent
-                                            className={`${
-                                              overallPerformance >= 75
-                                                ? "text-green-600"
-                                                : overallPerformance >= 50
-                                                ? "text-blue-600"
-                                                : overallPerformance >= 25
-                                                ? "text-amber-600"
-                                                : "text-rose-600"
-                                            }`}
-                                            size={20}
-                                          />
-                                        );
+                                        return <IconComponent className={`${
+                                            overallPerformance >= 75
+                                              ? "text-emerald-600"
+                                              : overallPerformance >= 50
+                                              ? "text-blue-600"
+                                              : overallPerformance >= 25
+                                              ? "text-indigo-600"
+                                              : "text-slate-600"
+                                          }`} size={20} />;
                                       })()}
                                     </div>
                                     <div>
-                                      <div className="flex items-center gap-2">
-                                        <span className="font-medium text-slate-900">{channelName}</span>
+                                      <div className="flex items-center gap-2 mb-0.5">
+                                        <span className="font-semibold text-slate-900 text-sm">{channelName}</span>
                                         {isPrimary && (
-                                          <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-semibold">
+                                          <span className="text-xs px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 font-medium border border-indigo-200">
                                             Your Channel
                                           </span>
                                         )}
                                       </div>
-                                      <div className="text-sm text-slate-600">{getPerformanceText(overallPerformance)}</div>
+                                      <div className="text-xs text-slate-500">{getPerformanceText(overallPerformance)}</div>
                                     </div>
                                   </div>
-                                  <div className="text-right text-sm text-slate-600">
-                                    <div>{formatNum(channel.avg_views)} avg views</div>
-                                    <div>{channel.num_videos} videos</div>
+                                  <div className="text-right text-sm">
+                                    <div className="font-semibold text-slate-900">{formatNum(channel.avg_views)}</div>
+                                    <div className="text-xs text-slate-500">avg views</div>
+                                    <div className="text-xs text-slate-400 mt-0.5">{channel.num_videos} videos</div>
                                   </div>
                                 </div>
                               </div>
@@ -1717,9 +1728,9 @@ export default function NetworkGraphBusiness() {
                           })}
                         </div>
 
-                        <div className="mt-4 p-4 bg-slate-50 rounded-xl">
+                        <div className="mt-4 p-4 bg-slate-50 rounded-xl border border-slate-100">
                           <h3 className="text-sm font-semibold text-slate-900 mb-2 flex items-center gap-2">
-                            <Lightbulb className="text-amber-500" size={16} />
+                            <Lightbulb className="text-indigo-600" size={16} />
                             Competitive Analysis
                           </h3>
                           {(() => {
@@ -1769,7 +1780,7 @@ export default function NetworkGraphBusiness() {
                             } else {
                               return (
                                 <p className="text-sm text-slate-700">
-                                  <span className="font-medium text-amber-600">Room for growth:</span> You're currently behind
+                                  <span className="font-medium text-indigo-600">Room for growth:</span> You're currently behind
                                   some competitors, but this gives you clear targets to aim for. Focus on the strategies that work for the top performers.
                                 </p>
                               );
