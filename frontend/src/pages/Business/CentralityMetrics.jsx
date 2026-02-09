@@ -634,6 +634,11 @@ function EngagementQualityView({ data, loading }) {
         <ComparisonInsightsSection insights={comparisonInsights} />
       )}
 
+      {/* Sentiment Comparison Chart */}
+      {hasComparison && channels.length > 1 && (
+        <SentimentComparisonChart channels={channels} />
+      )}
+
       {/* Channel Selector */}
       {channels.length > 1 && (
         <ChannelSelector
@@ -1826,6 +1831,166 @@ function TabButton({ icon: Icon, label, tab, activeTab, onClick }) {
   );
 }
 
+function SentimentComparisonChart({ channels }) {
+  const primaryChannel = channels.find(c => c.is_primary);
+  const competitorChannels = channels.filter(c => !c.is_primary);
+
+  if (!primaryChannel || competitorChannels.length === 0) {
+    return null;
+  }
+
+  const primarySentiment = primaryChannel.sentiment_distribution || {};
+
+  return (
+    <div className="space-y-6">
+      {competitorChannels.map((competitor, idx) => {
+        const competitorSentiment = competitor.sentiment_distribution || {};
+        
+        const comparisonData = [
+          {
+            category: "Positive",
+            yours: primarySentiment.positive || 0,
+            competitor: competitorSentiment.positive || 0,
+            color: "#10b981"
+          },
+          {
+            category: "Neutral",
+            yours: primarySentiment.neutral || 0,
+            competitor: competitorSentiment.neutral || 0,
+            color: "#64748b"
+          },
+          {
+            category: "Negative",
+            yours: primarySentiment.negative || 0,
+            competitor: competitorSentiment.negative || 0,
+            color: "#ef4444"
+          }
+        ];
+
+        const positiveDiff = (primarySentiment.positive || 0) - (competitorSentiment.positive || 0);
+        const negativeDiff = (primarySentiment.negative || 0) - (competitorSentiment.negative || 0);
+
+        let insightText = "";
+        let insightType = "neutral";
+
+        if (positiveDiff > 5) {
+          insightText = `Your content generates ${positiveDiff.toFixed(1)}% more positive sentiment than ${competitor.channel_name}. Viewers respond more favorably to your content style and messaging.`;
+          insightType = "positive";
+        } else if (positiveDiff < -5) {
+          insightText = `${competitor.channel_name} generates ${Math.abs(positiveDiff).toFixed(1)}% more positive sentiment. Consider analyzing their content approach and audience engagement strategies.`;
+          insightType = "warning";
+        } else if (negativeDiff > 5) {
+          insightText = `Your content has ${negativeDiff.toFixed(1)}% more negative sentiment than ${competitor.channel_name}. Review recent videos to identify potential issues or controversial topics.`;
+          insightType = "warning";
+        } else if (negativeDiff < -5) {
+          insightText = `You maintain ${Math.abs(negativeDiff).toFixed(1)}% less negative sentiment than ${competitor.channel_name}. Your content resonates well with your audience.`;
+          insightType = "positive";
+        } else {
+          insightText = `Your sentiment distribution is similar to ${competitor.channel_name}. Focus on other quality metrics to differentiate your content.`;
+          insightType = "neutral";
+        }
+
+        const insightStyles = {
+          positive: { bg: "bg-green-50", border: "border-green-200", icon: TrendingUp, iconColor: "text-green-600" },
+          warning: { bg: "bg-amber-50", border: "border-amber-200", icon: Info, iconColor: "text-amber-600" },
+          neutral: { bg: "bg-blue-50", border: "border-blue-200", icon: Info, iconColor: "text-blue-600" }
+        };
+
+        const style = insightStyles[insightType];
+        const InsightIcon = style.icon;
+
+        return (
+          <section key={idx} className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-4">
+              <Activity className="text-purple-600" size={24} />
+              <h2 className="text-xl font-bold text-slate-900">
+                Sentiment Comparison: You vs {competitor.channel_name}
+              </h2>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700 mb-4">Sentiment Distribution</h3>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={comparisonData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+                    <XAxis dataKey="category" tick={{ fill: '#64748b', fontSize: 12 }} />
+                    <YAxis tick={{ fill: '#64748b', fontSize: 12 }} label={{ value: 'Percentage', angle: -90, position: 'insideLeft', style: { fill: '#64748b', fontSize: 12 } }} />
+                    <Tooltip 
+                      formatter={(value) => `${value.toFixed(1)}%`}
+                      contentStyle={{ backgroundColor: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px' }}
+                    />
+                    <Legend />
+                    <Bar dataKey="yours" fill="#6366f1" name="Your Channel" radius={[8, 8, 0, 0]} />
+                    <Bar dataKey="competitor" fill="#94a3b8" name={competitor.channel_name} radius={[8, 8, 0, 0]} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+
+              <div>
+                <h3 className="text-sm font-semibold text-slate-700 mb-4">Key Insights</h3>
+                
+                <div className={`p-4 rounded-xl border ${style.border} ${style.bg} mb-4`}>
+                  <div className="flex items-start gap-3">
+                    <InsightIcon className={`${style.iconColor} flex-shrink-0 mt-0.5`} size={20} />
+                    <p className="text-sm text-slate-700">{insightText}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-slate-600">Positive Sentiment</span>
+                      <span className={`text-xs font-bold ${positiveDiff > 0 ? 'text-green-600' : positiveDiff < 0 ? 'text-red-600' : 'text-slate-600'}`}>
+                        {positiveDiff > 0 ? '+' : ''}{positiveDiff.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="flex gap-2 text-xs">
+                      <span className="text-slate-600">You: <span className="font-semibold text-slate-900">{primarySentiment.positive?.toFixed(1)}%</span></span>
+                      <span className="text-slate-400">|</span>
+                      <span className="text-slate-600">{competitor.channel_name}: <span className="font-semibold text-slate-900">{competitorSentiment.positive?.toFixed(1)}%</span></span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs font-medium text-slate-600">Negative Sentiment</span>
+                      <span className={`text-xs font-bold ${negativeDiff < 0 ? 'text-green-600' : negativeDiff > 0 ? 'text-red-600' : 'text-slate-600'}`}>
+                        {negativeDiff > 0 ? '+' : ''}{negativeDiff.toFixed(1)}%
+                      </span>
+                    </div>
+                    <div className="flex gap-2 text-xs">
+                      <span className="text-slate-600">You: <span className="font-semibold text-slate-900">{primarySentiment.negative?.toFixed(1)}%</span></span>
+                      <span className="text-slate-400">|</span>
+                      <span className="text-slate-600">{competitor.channel_name}: <span className="font-semibold text-slate-900">{competitorSentiment.negative?.toFixed(1)}%</span></span>
+                    </div>
+                  </div>
+
+                  <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+                    <div className="flex items-start gap-2">
+                      <Target className="text-indigo-600 flex-shrink-0 mt-0.5" size={16} />
+                      <div>
+                        <p className="text-xs font-semibold text-indigo-900 mb-1">Action Step</p>
+                        <p className="text-xs text-indigo-800">
+                          {insightType === 'positive' 
+                            ? 'Continue your current content strategy. Your audience sentiment is strong compared to this competitor.'
+                            : insightType === 'warning'
+                            ? `Review ${competitor.channel_name}'s content to understand what drives positive sentiment. Consider adjusting your content tone or topics.`
+                            : 'Maintain consistency while exploring new content angles to improve sentiment metrics.'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 function ComparisonInsightsSection({ insights }) {
   return (
     <section className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border-2 border-blue-300 p-6">
@@ -1835,9 +2000,11 @@ function ComparisonInsightsSection({ insights }) {
       </div>
 
       <div className="space-y-3">
-        {insights.map((insight, idx) => (
-          <ComparisonInsightCard key={idx} insight={insight} />
-        ))}
+        {insights
+          .filter(insight => insight.type !== 'action_gap' && insight.type !== 'action_leader')
+          .map((insight, idx) => (
+            <ComparisonInsightCard key={idx} insight={insight} />
+          ))}
       </div>
     </section>
   );

@@ -213,7 +213,7 @@ def engagement_quality():
         if not basic:
             continue
 
-        channel_name = basic.get("title", f"Channel {idx + 1}")
+        channel_name = basic.get("channelName", f"Channel {idx + 1}")
         playlist_id = basic["uploadsPlaylistId"]
         
         # Use standardized count for all channels
@@ -598,7 +598,7 @@ def retention_heatmap():
         if not basic:
             continue
 
-        channel_name = basic.get("title", f"Channel {idx + 1}")
+        channel_name = basic.get("channelName", f"Channel {idx + 1}")
         playlist_id = basic["uploadsPlaylistId"]
         video_ids = fetch_video_ids(playlist_id, standardized_video_count)
         
@@ -863,7 +863,7 @@ def competitor_gaps():
         if not basic:
             continue
 
-        channel_name = basic.get("title", f"Channel {idx + 1}")
+        channel_name = basic.get("channelName", f"Channel {idx + 1}")
         playlist_id = basic["uploadsPlaylistId"]
         
         # Use standardized count
