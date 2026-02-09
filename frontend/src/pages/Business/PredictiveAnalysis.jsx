@@ -53,6 +53,47 @@ function formatNumber(n) {
   return num.toLocaleString();
 }
 
+// Add this component definition - ActionItemCard for displaying actionable items
+function ActionItemCard({ item }) {
+  const getPriorityColor = (priority) => {
+    if (priority === "high") return { bg: "bg-red-50", border: "border-red-300", text: "text-red-700", badge: "bg-red-100 text-red-700" };
+    if (priority === "medium") return { bg: "bg-yellow-50", border: "border-yellow-300", text: "text-yellow-700", badge: "bg-yellow-100 text-yellow-700" };
+    return { bg: "bg-blue-50", border: "border-blue-300", text: "text-blue-700", badge: "bg-blue-100 text-blue-700" };
+  };
+
+  const colors = getPriorityColor(item.priority);
+
+  return (
+    <div className={`${colors.bg} border-2 ${colors.border} rounded-xl p-5`}>
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <h4 className="font-bold text-slate-900">{item.title}</h4>
+            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${colors.badge}`}>
+              {item.priority.toUpperCase()}
+            </span>
+          </div>
+          <p className="text-sm text-slate-700 mb-3">{item.description}</p>
+        </div>
+      </div>
+      
+      {item.actions && item.actions.length > 0 && (
+        <div className="mt-3 pt-3 border-t-2 border-white/50">
+          <div className="text-xs font-semibold text-slate-700 mb-2">Action Steps:</div>
+          <ul className="space-y-2">
+            {item.actions.map((action, idx) => (
+              <li key={idx} className="flex items-start gap-2 text-sm text-slate-700">
+                <ChevronRight size={16} className={`mt-0.5 flex-shrink-0 ${colors.text}`} />
+                <span>{action}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Helper function to get user-friendly quality description
 function getQualityDescription(score) {
   if (score >= 80) {
@@ -1024,6 +1065,7 @@ function CompetitiveTimelineView({ data, primaryName }) {
 }
 
 // Engagement Prediction View - WITH LINE CHART
+// Engagement Prediction View - SIMPLIFIED and USER-FRIENDLY
 function EngagementPredictionView({ data, primaryName }) {
   const primary = data.primary_channel;
   const engagementPred = primary.engagement_predictions;
@@ -1033,28 +1075,49 @@ function EngagementPredictionView({ data, primaryName }) {
   const currentInsight = getEngagementInsight(engagementPred.current_engagement_rate);
   const predictedInsight = getEngagementInsight(engagementPred.predicted_6m_engagement);
 
-  // Create engagement trend data for line chart
+  // Create engagement trend data with user-friendly ratings instead of percentages
   const engagementChartData = [
     {
       month: "Now",
-      [primaryName || "You"]: (engagementPred.current_engagement_rate * 100).toFixed(2),
+      [primaryName || "You"]: getEngagementRating(engagementPred.current_engagement_rate),
       ...competitors.reduce((acc, comp) => {
-        acc[comp.channel_name] = (comp.engagement_predictions.current_engagement_rate * 100).toFixed(2);
+        acc[comp.channel_name] = getEngagementRating(comp.engagement_predictions.current_engagement_rate);
         return acc;
       }, {})
     },
     {
       month: "6 Months",
-      [primaryName || "You"]: (engagementPred.predicted_6m_engagement * 100).toFixed(2),
+      [primaryName || "You"]: getEngagementRating(engagementPred.predicted_6m_engagement),
       ...competitors.reduce((acc, comp) => {
-        acc[comp.channel_name] = (comp.engagement_predictions.predicted_6m_engagement * 100).toFixed(2);
+        acc[comp.channel_name] = getEngagementRating(comp.engagement_predictions.predicted_6m_engagement);
         return acc;
       }, {})
     }
   ];
 
+  // Helper to convert engagement rate to a simple 1-10 rating
+  function getEngagementRating(rate) {
+    const percentage = rate * 100;
+    if (percentage >= 5) return 10;      // Excellent
+    if (percentage >= 3.5) return 8;     // Very Good
+    if (percentage >= 2) return 6;       // Good
+    if (percentage >= 1) return 4;       // Fair
+    if (percentage >= 0.5) return 2;     // Low
+    return 1;                            // Very Low
+  }
+
   // Colors for different channels
   const channelColors = ["#4f46e5", "#06b6d4", "#10b981", "#f59e0b", "#ef4444"];
+
+  // Get rating description
+  function getRatingDescription(rating) {
+    if (rating >= 9) return "Excellent Engagement";
+    if (rating >= 7) return "Very Good Engagement";
+    if (rating >= 5) return "Good Engagement";
+    if (rating >= 3) return "Fair Engagement";
+    if (rating >= 2) return "Low Engagement";
+    return "Very Low Engagement";
+  }
 
   return (
     <div className="space-y-6">
@@ -1067,18 +1130,18 @@ function EngagementPredictionView({ data, primaryName }) {
           <div className="flex-1">
             <h2 className="text-2xl font-bold text-slate-900 mb-2">Engagement Trends</h2>
             <p className="text-slate-600 text-sm leading-relaxed">
-              This shows if your viewers are becoming more engaged with your videos over time. 
-              Higher engagement means people are liking, commenting, and sharing more - which helps your channel grow faster.
+              This shows how engaged your viewers are with your content. Higher scores mean more people are liking, 
+              commenting, and actively participating. We predict how this will change over the next 6 months.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Engagement Trend Chart - NEW LINE CHART */}
+      {/* Engagement Trend Chart - SIMPLIFIED */}
       <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
         <h3 className="text-lg font-bold text-slate-900 mb-2">Engagement Forecast Comparison</h3>
         <p className="text-sm text-slate-600 mb-4">
-          How viewer interaction is predicted to change over the next 6 months (% of viewers who like or comment)
+          How viewer interaction is predicted to change over the next 6 months (1-10 scale)
         </p>
         
         <div className="h-[300px]">
@@ -1090,11 +1153,19 @@ function EngagementPredictionView({ data, primaryName }) {
                 style={{ fontSize: '12px' }}
               />
               <YAxis 
-                label={{ value: 'Engagement %', angle: -90, position: 'insideLeft' }}
+                label={{ value: 'Engagement Score', angle: -90, position: 'insideLeft' }}
                 style={{ fontSize: '12px' }}
+                domain={[0, 10]}
+                ticks={[1, 3, 5, 7, 9, 10]}
               />
               <Tooltip 
-                formatter={(value) => [`${value}%`, ""]}
+                formatter={(value, name) => [
+                  <div key={name}>
+                    <div className="font-semibold">{getRatingDescription(value)}</div>
+                    <div className="text-xs text-slate-500">Score: {value}/10</div>
+                  </div>,
+                  name
+                ]}
               />
               <Legend />
               <Line 
@@ -1119,25 +1190,50 @@ function EngagementPredictionView({ data, primaryName }) {
           </ResponsiveContainer>
         </div>
 
+        {/* Simple Chart Explanation */}
+        <div className="mt-4 grid grid-cols-5 gap-2">
+          <div className="text-center">
+            <div className="text-xs text-red-500 font-semibold">1-2</div>
+            <div className="text-xs text-slate-600">Very Low</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-orange-500 font-semibold">3-4</div>
+            <div className="text-xs text-slate-600">Low</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-yellow-500 font-semibold">5-6</div>
+            <div className="text-xs text-slate-600">Fair</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-blue-500 font-semibold">7-8</div>
+            <div className="text-xs text-slate-600">Good</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xs text-green-500 font-semibold">9-10</div>
+            <div className="text-xs text-slate-600">Excellent</div>
+          </div>
+        </div>
+
         <div className="mt-4 p-4 bg-indigo-50 border-2 border-indigo-200 rounded-lg">
           <div className="flex items-start gap-3">
             <Info className="text-indigo-600 mt-0.5 flex-shrink-0" size={20} />
             <div className="flex-1">
-              <div className="font-semibold text-slate-900 mb-1">Understanding the Chart:</div>
+              <div className="font-semibold text-slate-900 mb-1">How to Read This Chart:</div>
               <p className="text-sm text-slate-700">
                 Your channel is shown with a <strong>solid line</strong>. Competitors have <strong>dashed lines</strong>. 
-                Higher percentages mean more viewers are actively liking and commenting on videos.
+                Higher scores mean viewers are more actively liking and commenting. The chart shows if engagement is 
+                improving (going up), declining (going down), or staying the same.
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Current Status - USER FRIENDLY */}
+      {/* Current Status - SIMPLIFIED */}
       <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
         <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
           <MessageCircle className="text-purple-600" size={24} />
-          Your Current Viewer Interaction
+          Your Current Engagement Status
         </h3>
         
         <div className={`p-5 rounded-xl border-2 ${
@@ -1157,9 +1253,9 @@ function EngagementPredictionView({ data, primaryName }) {
             </div>
             <div className="text-right">
               <div className="text-3xl font-bold text-slate-900">
-                {(engagementPred.current_engagement_rate * 100).toFixed(1)}%
+                {getEngagementRating(engagementPred.current_engagement_rate)}/10
               </div>
-              <div className="text-xs text-slate-500">of viewers engage</div>
+              <div className="text-xs text-slate-500">engagement score</div>
             </div>
           </div>
           <p className="text-sm text-slate-700 mt-3 p-3 bg-white/50 rounded-lg">
@@ -1181,7 +1277,7 @@ function EngagementPredictionView({ data, primaryName }) {
           </div>
           <p className="text-sm text-slate-700 mb-2">
             In 6 months, you'll likely have <strong className={predictedInsight.color}>{predictedInsight.level}</strong> engagement 
-            ({(engagementPred.predicted_6m_engagement * 100).toFixed(1)}% of viewers).
+            ({getEngagementRating(engagementPred.predicted_6m_engagement)}/10 score).
           </p>
           <p className="text-sm text-slate-600">
             {engagementPred.trend === "improving" && 
@@ -1194,7 +1290,39 @@ function EngagementPredictionView({ data, primaryName }) {
         </div>
       </div>
 
-      {/* Audience Quality */}
+      {/* What Engagement Means - SIMPLIFIED EXPLANATION */}
+      <div className="rounded-2xl bg-gradient-to-r from-purple-50 to-blue-50 border-2 border-purple-200 p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-3 flex items-center gap-2">
+          <Info className="text-purple-600" size={20} />
+          Why Engagement Matters
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="p-4 bg-white rounded-lg border border-purple-100">
+            <div className="text-2xl mb-2">📈</div>
+            <div className="font-bold text-slate-900 mb-2">YouTube Loves It</div>
+            <p className="text-sm text-slate-600">
+              Videos with high engagement get recommended more by YouTube's algorithm
+            </p>
+          </div>
+          <div className="p-4 bg-white rounded-lg border border-purple-100">
+            <div className="text-2xl mb-2">💬</div>
+            <div className="font-bold text-slate-900 mb-2">Builds Community</div>
+            <p className="text-sm text-slate-600">
+              Active comment sections create loyal fans who return for each video
+            </p>
+          </div>
+          <div className="p-4 bg-white rounded-lg border border-purple-100">
+            <div className="text-2xl mb-2">🎯</div>
+            <div className="font-bold text-slate-900 mb-2">Drives Growth</div>
+            <p className="text-sm text-slate-600">
+              Engaged viewers are more likely to subscribe and share your content
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Rest of the component remains the same... */}
+      {/* Audience Quality, Factors, Actionable Tips sections */}
       <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
         <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
           <Star className="text-indigo-600" size={24} />
@@ -1221,31 +1349,7 @@ function EngagementPredictionView({ data, primaryName }) {
         </div>
       </div>
 
-      {/* Factors Affecting Engagement */}
-      {engagementPred.factors && engagementPred.factors.length > 0 && (
-        <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-          <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-            <Info className="text-indigo-600" size={20} />
-            What's Affecting Your Engagement
-          </h3>
-          <div className="space-y-3">
-            {engagementPred.factors.map((factor, idx) => (
-              <div key={idx} className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                <div className="flex items-start gap-3">
-                  <div className="p-2 bg-indigo-100 rounded-lg">
-                    <Activity size={18} className="text-indigo-600" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm text-slate-700">{factor}</p>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Actionable Tips */}
+      {/* Actionable Tips - keep as is */}
       <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
         <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
           <Zap className="text-amber-500" size={20} />
@@ -1302,48 +1406,6 @@ function EngagementPredictionView({ data, primaryName }) {
           </div>
         </div>
       </div>
-    </div>
-  );
-}
-
-// Helper Components
-
-function ActionItemCard({ item }) {
-  const getPriorityColor = (priority) => {
-    if (priority === "high") return { bg: "bg-red-50", border: "border-red-300", text: "text-red-700", badge: "bg-red-100 text-red-700" };
-    if (priority === "medium") return { bg: "bg-yellow-50", border: "border-yellow-300", text: "text-yellow-700", badge: "bg-yellow-100 text-yellow-700" };
-    return { bg: "bg-blue-50", border: "border-blue-300", text: "text-blue-700", badge: "bg-blue-100 text-blue-700" };
-  };
-
-  const colors = getPriorityColor(item.priority);
-
-  return (
-    <div className={`${colors.bg} border-2 ${colors.border} rounded-xl p-5`}>
-      <div className="flex items-start justify-between mb-3">
-        <div className="flex-1">
-          <div className="flex items-center gap-2 mb-2">
-            <h4 className="font-bold text-slate-900">{item.title}</h4>
-            <span className={`text-xs font-semibold px-2 py-1 rounded-full ${colors.badge}`}>
-              {item.priority.toUpperCase()}
-            </span>
-          </div>
-          <p className="text-sm text-slate-700 mb-3">{item.description}</p>
-        </div>
-      </div>
-      
-      {item.actions && item.actions.length > 0 && (
-        <div className="mt-3 pt-3 border-t-2 border-white/50">
-          <div className="text-xs font-semibold text-slate-700 mb-2">Action Steps:</div>
-          <ul className="space-y-2">
-            {item.actions.map((action, idx) => (
-              <li key={idx} className="flex items-start gap-2 text-sm text-slate-700">
-                <ChevronRight size={16} className={`mt-0.5 flex-shrink-0 ${colors.text}`} />
-                <span>{action}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
     </div>
   );
 }
