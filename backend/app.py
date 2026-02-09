@@ -35,7 +35,13 @@ from routes.YouTube.audience_resonance import enhanced_analyzer_bp
 load_dotenv()
 
 app = Flask(__name__)
-CORS(app, resources={r"/api/*": {"origins": ["http://localhost:5173", "http://127.0.0.1:5173"]}})
+CORS(app, resources={
+    r"/api/*": {
+        "origins": ["http://localhost:5173", "http://127.0.0.1:5173"],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
 
 # JWT password take from .env
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET")

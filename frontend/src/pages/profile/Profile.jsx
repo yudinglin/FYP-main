@@ -576,14 +576,27 @@ function SubscriptionSection({
               <span className="text-sm font-semibold text-slate-900">{plan.max_saved_graphs}</span>
             </div>
             <div className="flex justify-between items-center py-2">
-              <span className="text-sm text-slate-600">Start Date:</span>
+              <span className="text-sm text-slate-600">Subscription Start:</span>
               <span className="text-sm font-semibold text-slate-900">
                 {new Date(subscription.start_date).toLocaleDateString()}
               </span>
             </div>
-            {subscription.end_date && (
+            {!isCancelled && (
               <div className="flex justify-between items-center py-2">
-                <span className="text-sm text-slate-600">End Date:</span>
+                <span className="text-sm text-slate-600">Next Billing Date:</span>
+                <span className="text-sm font-semibold text-slate-900">
+                  {(() => {
+                    const startDate = new Date(subscription.start_date);
+                    const nextBilling = new Date(startDate);
+                    nextBilling.setDate(startDate.getDate() + 30);
+                    return nextBilling.toLocaleDateString();
+                  })()}
+                </span>
+              </div>
+            )}
+            {isCancelled && subscription.end_date && (
+              <div className="flex justify-between items-center py-2">
+                <span className="text-sm text-slate-600">Cancelled On:</span>
                 <span className="text-sm font-semibold text-slate-900">
                   {new Date(subscription.end_date).toLocaleDateString()}
                 </span>
@@ -687,40 +700,32 @@ function SubscriptionSection({
         </section>
       )}
 
-      {/* Payment History */}
-      {payments.length > 0 && (
+      {/* Upcoming Billing */}
+      {!isCancelled && plan && (
         <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-slate-900">Payment History</h2>
-          <div className="space-y-2">
-            {payments.map((payment) => (
-              <div
-                key={payment.payment_id}
-                className="flex justify-between items-center py-3 border-b border-slate-100 last:border-0"
-              >
-                <div>
-                  <p className="text-sm font-semibold text-slate-900">
-                    Payment #{payment.payment_id}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {new Date(payment.payment_date).toLocaleDateString()}
-                  </p>
-                </div>
-                <div className="text-right">
-                  <p className="text-sm font-semibold text-slate-900">
-                    ${Number(payment.amount).toFixed(2)} {payment.currency}
-                  </p>
-                  <span
-                    className={`text-xs px-2 py-1 rounded-full ${
-                      payment.status === "SUCCESS"
-                        ? "bg-emerald-100 text-emerald-700"
-                        : "bg-red-100 text-red-700"
-                    }`}
-                  >
-                    {payment.status}
-                  </span>
-                </div>
-              </div>
-            ))}
+          <h2 className="text-lg font-semibold text-slate-900">Upcoming Billing</h2>
+          <div className="flex justify-between items-center py-3 border border-slate-200 rounded-lg px-4 bg-slate-50">
+            <div>
+              <p className="text-sm font-semibold text-slate-900">
+                {plan.name} Plan
+              </p>
+              <p className="text-xs text-slate-500">
+                Next billing: {(() => {
+                  const startDate = new Date(subscription.start_date);
+                  const nextBilling = new Date(startDate);
+                  nextBilling.setDate(startDate.getDate() + 30);
+                  return nextBilling.toLocaleDateString();
+                })()}
+              </p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-semibold text-slate-900">
+                ${plan.price_monthly.toFixed(2)}
+              </p>
+              <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-700">
+                Pending
+              </span>
+            </div>
           </div>
         </section>
       )}

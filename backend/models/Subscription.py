@@ -186,3 +186,54 @@ class Subscription:
         if not updated:
             return None
         return cls.find_by_id(subscription_id)
+
+    # ------------------------------------------------------------------
+    # CANCEL
+    # ------------------------------------------------------------------
+
+    @classmethod
+    def cancel_subscription(cls, subscription_id):
+        """Cancel a subscription and delete the associated user account."""
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        # Get subscription info before cancellation
+        subscription = cls.find_by_id(subscription_id)
+        if not subscription:
+            cursor.close()
+            conn.close()
+            return None
+
+        cancelled_at = datetime.now()
+        end_date = cancelled_at
+
+        # Update subscription status to CANCELLED
+        cursor.execute("""
+            UPDATE Subscription
+            SET status = 'CANCELLED', 
+                cancelled_at = %s,
+                end_date = %s
+            WHERE subscription_id = %s
+        """, (cancelled_at, end_date, subscription_id))
+        conn.commit()
+
+        # Delete the user account
+        cursor.execute("""
+            DELETE FROM User
+            WHERE user_id = %s
+        """, (subscription.user_id,))
+        conn.commit()
+
+        cursor.close()
+        conn.close()
+
+        # Return the cancelled subscription info
+        return cls(
+            subscription_id=subscription.subscription_id,
+            user_id=subscription.user_id,
+            plan_id=subscription.plan_id,
+            status='CANCELLED',
+            start_date=subscription.start_date,
+            end_date=end_date,
+            cancelled_at=cancelled_at
+        )
