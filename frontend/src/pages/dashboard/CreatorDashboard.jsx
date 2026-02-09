@@ -29,6 +29,7 @@ export default function CreatorDashboard() {
   const [viewCount, setViewCount] = useState(null);
   const [totalLikes, setTotalLikes] = useState(null);
   const [totalComments, setTotalComments] = useState(null);
+  const [channelName, setChannelName] = useState("");
   const { user } = useAuth();
 
   const [topVideos, setTopVideos] = useState([]);
@@ -54,6 +55,7 @@ export default function CreatorDashboard() {
       const d1 = await r1.json();
       setSubscribers(d1.subscriberCount ?? 0);
       setViewCount(d1.viewCount ?? 0);
+      setChannelName(d1.channelName || "");
 
       const r2 = await fetch(`http://localhost:5000/api/youtube/videos.list?url=${q}`);
       if (!r2.ok) throw new Error("videos.list request failed");
@@ -207,7 +209,7 @@ export default function CreatorDashboard() {
       <div className="max-w-7xl mx-auto px-6 py-6">
         <h1 className="text-2xl font-semibold text-slate-900">Welcome back  {user?.first_name || "Creator"}</h1>
         <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-          High-level overview of your YouTube channels, campaigns and network performance.
+          {channelName ? `Viewing channel: ${channelName}` : "High-level overview of your YouTube channels, campaigns and network performance."}
         </p>
       </div>
 

@@ -43,11 +43,11 @@ def extract_channel_id(url_or_id: str):
     return None
 
 
-#  channel basic information（subscriberCount / viewCount / uploadsPlaylistId）
+#  channel basic information（subscriberCount / viewCount / uploadsPlaylistId / channelName）
 
 def fetch_basic_channel_stats(channel_id: str):
     params = {
-        "part": "statistics,contentDetails",
+        "part": "statistics,contentDetails,snippet",
         "id": channel_id,
         "maxResults": 1,
     }
@@ -60,11 +60,13 @@ def fetch_basic_channel_stats(channel_id: str):
     item = items[0]
     stats = item["statistics"]
     uploads_playlist = item["contentDetails"]["relatedPlaylists"]["uploads"]
+    snippet = item.get("snippet", {})
 
     return {
         "subscriberCount": int(stats.get("subscriberCount", 0)),
         "viewCount": int(stats.get("viewCount", 0)),
         "uploadsPlaylistId": uploads_playlist,
+        "channelName": snippet.get("title", ""),
     }
 
 

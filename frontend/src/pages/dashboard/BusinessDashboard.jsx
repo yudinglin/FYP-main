@@ -50,6 +50,7 @@ export default function BusinessDashboard() {
   const [viewCount, setViewCount] = useState(null);
   const [totalLikes, setTotalLikes] = useState(null);
   const [totalComments, setTotalComments] = useState(null);
+  const [channelName, setChannelName] = useState("");
 
   const [topVideos, setTopVideos] = useState([]);
   const [latestComments, setLatestComments] = useState([]);
@@ -109,6 +110,7 @@ export default function BusinessDashboard() {
         const d1 = await r1.json();
         setSubscriberCount(Number(d1.subscriberCount || 0));
         setViewCount(Number(d1.viewCount || 0));
+        setChannelName(d1.channelName || "");
 
         // total likes/comments
         const r2 = await fetch(`http://localhost:5000/api/youtube/videos.list?url=${q}`);
@@ -322,7 +324,7 @@ export default function BusinessDashboard() {
           <div>
             <h1 className="text-2xl font-semibold text-slate-900">Welcome back, {user?.first_name || "Business"}</h1>
             <p className="mt-1 text-sm text-slate-500 max-w-2xl">
-              {primaryChannel ? `Currently viewing: ${primaryChannel.name || primaryChannel.url} (Primary channel)` : "No channels linked"}
+              {channelName ? `Currently viewing: ${channelName}` : primaryChannel ? `Currently viewing: ${primaryChannel.name || primaryChannel.url} (Primary channel)` : "No channels linked"}
             </p>
           </div>
           <button

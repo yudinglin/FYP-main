@@ -504,25 +504,21 @@ export default function PredictiveAnalysis() {
                     <StatCard
                       label="Current Subscribers"
                       value={growthAnalytics.stats.current.toLocaleString()}
-                      icon="👥"
                       gradient="from-red-600 to-red-700"
                     />
                     <StatCard
                       label="6-Month Projection"
                       value={growthAnalytics.stats.projected6Months.toLocaleString()}
-                      icon="📈"
                       gradient="from-blue-900 to-blue-950"
                     />
                     <StatCard
                       label="Avg Growth Rate"
                       value={`${growthAnalytics.stats.avgGrowthRate}%`}
-                      icon="⚡"
                       gradient="from-red-700 to-red-800"
                     />
                     <StatCard
                       label="Avg Monthly Gain"
                       value={growthAnalytics.stats.avgVelocity.toLocaleString()}
-                      icon="🚀"
                       gradient="from-blue-950 to-gray-900"
                     />
                   </div>

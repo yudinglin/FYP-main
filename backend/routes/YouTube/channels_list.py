@@ -22,4 +22,5 @@ def channels_list():
     return jsonify({
         "subscriberCount": basic["subscriberCount"],
         "viewCount": basic["viewCount"],
+        "channelName": basic.get("channelName", ""),
     }), 200

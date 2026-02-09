@@ -1174,9 +1174,9 @@ function EngagementPredictionView({ data, primaryName }) {
             {engagementPred.trend === "declining" && <TrendingDown className="text-red-600" size={24} />}
             {engagementPred.trend === "stable" && <Activity className="text-blue-600" size={24} />}
             <span className="font-bold text-lg text-slate-900">
-              {engagementPred.trend === "improving" && "📈 Predicted to Improve!"}
-              {engagementPred.trend === "declining" && "📉 May Decline"}
-              {engagementPred.trend === "stable" && "➡️ Staying Consistent"}
+              {engagementPred.trend === "improving" && "Predicted to Improve!"}
+              {engagementPred.trend === "declining" && "May Decline"}
+              {engagementPred.trend === "stable" && "Staying Consistent"}
             </span>
           </div>
           <p className="text-sm text-slate-700 mb-2">
