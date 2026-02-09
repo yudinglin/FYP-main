@@ -120,7 +120,7 @@ def fetch_video_ids(playlist_id: str, max_videos: int = 50):
 # Retrieve statistical information based on videoIds (shared with videos.list and similarity analysis)
 # UPDATED: Now includes thumbnail support
 
-def fetch_video_stats(video_ids, with_snippet: bool = True):
+def fetch_video_stats(video_ids, with_snippet: bool = True, with_duration: bool = False):
     if not video_ids:
         return []
 
@@ -128,7 +128,15 @@ def fetch_video_stats(video_ids, with_snippet: bool = True):
     all_videos = []
     for i in range(0, len(video_ids), 50):
         batch = video_ids[i: i + 50]
-        part = "statistics,snippet" if with_snippet else "statistics"
+        
+        # Build parts list based on what's needed
+        parts = ["statistics"]
+        if with_snippet:
+            parts.append("snippet")
+        if with_duration:
+            parts.append("contentDetails")
+        
+        part = ",".join(parts)
 
         params = {
             "part": part,
@@ -141,6 +149,7 @@ def fetch_video_stats(video_ids, with_snippet: bool = True):
         for item in data.get("items", []):
             st = item.get("statistics", {})
             sn = item.get("snippet", {}) if with_snippet else {}
+            cd = item.get("contentDetails", {}) if with_duration else {}
 
             def safe_int(x):
                 try:
@@ -170,10 +179,39 @@ def fetch_video_stats(video_ids, with_snippet: bool = True):
                     thumbnail_url = thumbnails["high"]["url"]
                 
                 video["thumbnail"] = thumbnail_url
+            
+            if with_duration:
+                # Parse ISO 8601 duration (e.g., "PT15M33S" = 15 minutes 33 seconds)
+                duration_str = cd.get("duration", "PT0S")
+                video["duration"] = parse_iso8601_duration(duration_str)
 
             all_videos.append(video)
 
     return all_videos
+
+
+def parse_iso8601_duration(duration_str):
+    """
+    Parse ISO 8601 duration format (PT#H#M#S) to seconds.
+    Examples: PT15M33S = 933 seconds, PT1H2M10S = 3730 seconds
+    """
+    import re
+    
+    if not duration_str or duration_str == "PT0S":
+        return 0
+    
+    # Match hours, minutes, seconds
+    pattern = r'PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?'
+    match = re.match(pattern, duration_str)
+    
+    if not match:
+        return 0
+    
+    hours = int(match.group(1) or 0)
+    minutes = int(match.group(2) or 0)
+    seconds = int(match.group(3) or 0)
+    
+    return hours * 3600 + minutes * 60 + seconds
 
 # Retrieve top-level comments for a given video
 def fetch_video_comments(video_id: str, max_comments: int = 50):

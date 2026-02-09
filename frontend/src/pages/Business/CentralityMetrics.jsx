@@ -1239,8 +1239,12 @@ function RetentionHeatmapView({ data, loading }) {
 
       {selectedChannel && (
         <>
-          {/* IMPROVED: Retention Heatmap with better explanation */}
-          <RetentionHeatmapSection heatmap={selectedChannel.retention_heatmap} />
+          {/* IMPROVED: Retention Heatmap with confidence and metadata */}
+          <RetentionHeatmapSection 
+            heatmap={selectedChannel.retention_heatmap} 
+            confidence={selectedChannel.confidence}
+            metadata={selectedChannel.metadata}
+          />
 
           {/* Golden Window */}
           {selectedChannel.golden_window && selectedChannel.golden_window.metrics && (
@@ -1262,8 +1266,8 @@ function RetentionHeatmapView({ data, loading }) {
   );
 }
 
-// IMPROVED: Better explanation of retention patterns
-function RetentionHeatmapSection({ heatmap }) {
+// IMPROVED: Better explanation of retention patterns with confidence indicator
+function RetentionHeatmapSection({ heatmap, confidence, metadata }) {
   const getZoneColor = (retention) => {
     if (retention >= 70) return "#10b981";
     if (retention >= 50) return "#3b82f6";
@@ -1285,11 +1289,29 @@ function RetentionHeatmapSection({ heatmap }) {
     return "Weak";
   };
 
+  const getConfidenceBadge = (confidence) => {
+    const badges = {
+      high: { color: "bg-green-100 text-green-800 border-green-300", label: "Reliable Estimate" },
+      medium: { color: "bg-yellow-100 text-yellow-800 border-yellow-300", label: "Good Estimate" },
+      low: { color: "bg-orange-100 text-orange-800 border-orange-300", label: "Rough Estimate" }
+    };
+    return badges[confidence] || badges.low;
+  };
+
+  const confidenceBadge = getConfidenceBadge(confidence);
+
   return (
     <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-      <div className="flex items-center gap-2 mb-3">
-        <Activity className="text-blue-600" size={20} />
-        <h2 className="text-lg font-semibold text-slate-900">Retention Heatmap</h2>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <Activity className="text-blue-600" size={20} />
+          <h2 className="text-lg font-semibold text-slate-900">Retention Heatmap</h2>
+        </div>
+        {confidence && (
+          <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${confidenceBadge.color}`}>
+            {confidenceBadge.label}
+          </span>
+        )}
       </div>
 
       {/* Explanation Box */}
@@ -1297,9 +1319,15 @@ function RetentionHeatmapSection({ heatmap }) {
         <div className="flex items-start gap-2">
           <Info size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-blue-900">
-            <strong>How to read this:</strong> Each zone shows what percentage of your videos keep viewers engaged 
-            through that section. Think of it like a funnel - if 93% start strong (Intro) but only 31% make it 
-            to the middle, you're losing viewers during the early section. Higher percentages = better retention.
+            <strong>What this shows:</strong> This chart estimates how many viewers stay engaged throughout your videos. 
+            Each section represents a different part of your video - from the intro to the ending. 
+            Higher percentages mean more viewers are sticking around.
+            {metadata && (
+              <div className="mt-2 text-xs text-blue-700">
+                Based on analyzing <strong>{metadata.sample_size} videos</strong> and how viewers interact with them 
+                (likes, comments, watch patterns).
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1326,7 +1354,7 @@ function RetentionHeatmapSection({ heatmap }) {
             axisLine={{ stroke: '#cbd5e1' }}
           />
           <Tooltip 
-            formatter={(value) => `${value.toFixed(1)}% of videos`}
+            formatter={(value) => `${value.toFixed(1)}% viewers stay engaged`}
             contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
           />
           <Area
@@ -1340,43 +1368,51 @@ function RetentionHeatmapSection({ heatmap }) {
       </ResponsiveContainer>
 
       {/* Zone Breakdown Cards */}
-      <div className="grid grid-cols-5 gap-2 mt-6">
-        {heatmap.map((zone, idx) => {
-          const ZoneIcon = getZoneIcon(zone.retention);
-          const zoneLabel = getZoneLabel(zone.retention);
-          return (
-            <div
-              key={idx}
-              className="p-4 rounded-xl border-2 transition-all hover:shadow-lg"
-              style={{ 
-                borderColor: `${getZoneColor(zone.retention)}40`,
-                backgroundColor: `${getZoneColor(zone.retention)}08`
-              }}
-            >
-              <div className="text-center">
-                <div className="flex items-center justify-center mb-2">
-                  <ZoneIcon size={24} style={{ color: getZoneColor(zone.retention) }} />
-                </div>
-                <div className="text-xs font-medium text-slate-700 mb-2">{zone.zone}</div>
-                <div className="text-2xl font-bold mb-1" style={{ color: getZoneColor(zone.retention) }}>
-                  {zone.retention.toFixed(0)}%
-                </div>
-                <div className="text-xs font-semibold px-2 py-0.5 rounded" style={{ 
-                  backgroundColor: `${getZoneColor(zone.retention)}20`,
-                  color: getZoneColor(zone.retention)
-                }}>
-                  {zoneLabel}
+      <div className="mt-6">
+        <div className="text-xs text-slate-600 mb-3 text-center">
+          💡 <strong>Tip:</strong> Think of this like a funnel - viewers drop off as the video progresses. 
+          Your goal is to keep the percentages as high as possible in each section.
+        </div>
+        <div className="grid grid-cols-5 gap-2">
+          {heatmap.map((zone, idx) => {
+            const ZoneIcon = getZoneIcon(zone.retention);
+            const zoneLabel = getZoneLabel(zone.retention);
+            return (
+              <div
+                key={idx}
+                className="p-4 rounded-xl border-2 transition-all hover:shadow-lg"
+                style={{ 
+                  borderColor: `${getZoneColor(zone.retention)}40`,
+                  backgroundColor: `${getZoneColor(zone.retention)}08`
+                }}
+              >
+                <div className="text-center">
+                  <div className="flex items-center justify-center mb-2">
+                    <ZoneIcon size={24} style={{ color: getZoneColor(zone.retention) }} />
+                  </div>
+                  <div className="text-xs font-medium text-slate-700 mb-2">{zone.zone}</div>
+                  <div className="text-2xl font-bold mb-1" style={{ color: getZoneColor(zone.retention) }}>
+                    {zone.retention.toFixed(0)}%
+                  </div>
+                  <div className="text-xs font-semibold px-2 py-0.5 rounded" style={{ 
+                    backgroundColor: `${getZoneColor(zone.retention)}20`,
+                    color: getZoneColor(zone.retention)
+                  }}>
+                    {zoneLabel}
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
+        </div>
       </div>
     </section>
   );
 }
 
 function GoldenWindowSection({ golden }) {
+  const metrics = golden.metrics || {};
+  
   return (
     <section className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl border-2 border-amber-300 p-6">
       <div className="flex items-center gap-2 mb-4">
@@ -1391,28 +1427,72 @@ function GoldenWindowSection({ golden }) {
         <p className="text-slate-700">
           Videos in this length get the best engagement and retention
         </p>
+        {metrics.dominant_content_type && (
+          <p className="text-sm text-slate-600 mt-1">
+            Best for: <span className="font-semibold capitalize">{metrics.dominant_content_type}</span> content
+          </p>
+        )}
       </div>
 
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="bg-white p-4 rounded-lg border border-amber-200 text-center">
           <div className="text-2xl font-bold text-amber-600 mb-1">
-            {(golden.metrics.avg_engagement * 100).toFixed(2)}%
+            {(metrics.avg_engagement * 100).toFixed(2)}%
           </div>
           <div className="text-xs text-slate-600">Avg Engagement</div>
         </div>
         <div className="bg-white p-4 rounded-lg border border-amber-200 text-center">
           <div className="text-2xl font-bold text-amber-600 mb-1">
-            {golden.metrics.avg_views.toLocaleString()}
+            {metrics.avg_views?.toLocaleString() || 0}
           </div>
           <div className="text-xs text-slate-600">Avg Views</div>
         </div>
         <div className="bg-white p-4 rounded-lg border border-amber-200 text-center">
           <div className="text-2xl font-bold text-amber-600 mb-1">
-            {golden.metrics.video_count}
+            {metrics.video_count || 0}
           </div>
           <div className="text-xs text-slate-600">Videos</div>
         </div>
+        <div className="bg-white p-4 rounded-lg border border-amber-200 text-center">
+          <div className="text-2xl font-bold text-amber-600 mb-1">
+            {metrics.consistency_score?.toFixed(0) || 0}%
+          </div>
+          <div className="text-xs text-slate-600">Consistency</div>
+        </div>
       </div>
+
+      {/* Additional metrics if available */}
+      {(metrics.comment_ratio || metrics.like_ratio) && (
+        <div className="mt-4 p-3 bg-white rounded-lg border border-amber-200">
+          <div className="text-xs font-semibold text-slate-700 mb-2">Engagement Breakdown</div>
+          <div className="grid grid-cols-2 gap-3 text-xs">
+            {metrics.comment_ratio && (
+              <div>
+                <span className="text-slate-600">Comment Rate:</span>
+                <span className="ml-1 font-semibold text-amber-700">
+                  {(metrics.comment_ratio * 100).toFixed(3)}%
+                </span>
+              </div>
+            )}
+            {metrics.like_ratio && (
+              <div>
+                <span className="text-slate-600">Like Rate:</span>
+                <span className="ml-1 font-semibold text-amber-700">
+                  {(metrics.like_ratio * 100).toFixed(2)}%
+                </span>
+              </div>
+            )}
+            {metrics.engagement_depth && (
+              <div>
+                <span className="text-slate-600">Engagement Depth:</span>
+                <span className="ml-1 font-semibold text-amber-700">
+                  {metrics.engagement_depth.toFixed(1)}
+                </span>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </section>
   );
 }

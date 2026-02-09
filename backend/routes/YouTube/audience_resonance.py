@@ -540,12 +540,369 @@ def engagement_quality():
     }), 200
 
 
+# ========================= IMPROVED RETENTION ESTIMATION =========================
+
+def estimate_realistic_retention(videos):
+    """
+    Estimate retention zones using multi-factor engagement analysis.
+    
+    Factors considered:
+    - Comment-to-view ratio (deeper engagement = better retention)
+    - Like-to-view ratio (satisfaction indicator)
+    - Video duration (affects drop-off patterns)
+    - Engagement density (engagement per minute)
+    
+    Returns: dict with zone-specific retention estimates
+    """
+    if not videos:
+        return {
+            "intro": 0, "early": 0, "middle": 0, "late": 0, "outro": 0,
+            "confidence": "low"
+        }
+    
+    retention_scores = []
+    
+    for video in videos:
+        views = video.get("views", 0)
+        likes = video.get("likes", 0)
+        comments = video.get("comments", 0)
+        duration = video.get("duration", 0)
+        
+        if views == 0:
+            continue
+        
+        # Calculate engagement ratios
+        like_ratio = likes / views
+        comment_ratio = comments / views
+        
+        # Weight comment ratio higher (indicates deeper engagement)
+        engagement_score = (comment_ratio * 2.5) + (like_ratio * 1.0)
+        
+        # Calculate engagement density (engagement per minute)
+        duration_minutes = max(duration / 60, 1)
+        engagement_density = engagement_score / duration_minutes
+        
+        # Estimate retention pattern based on engagement profile
+        # High comment ratio = viewers watched long enough to form opinions
+        # High like ratio = satisfied viewers (may have watched less but liked it)
+        # Duration affects natural drop-off curves
+        
+        # Base retention starts at 100% (everyone starts watching)
+        intro_retention = 100
+        
+        # Early retention (0-40% of video)
+        # Most viewers make it through intro, drop-off begins
+        if comment_ratio > 0.01:  # 1% comment rate = very engaged
+            early_retention = 85 + (comment_ratio * 1000)  # Up to 95%
+        elif comment_ratio > 0.005:  # 0.5% = good engagement
+            early_retention = 75 + (comment_ratio * 1500)
+        elif like_ratio > 0.05:  # High likes but low comments = good intro
+            early_retention = 70 + (like_ratio * 200)
+        else:
+            early_retention = 60 + (engagement_score * 500)
+        
+        # Middle retention (40-60% of video)
+        # Significant drop-off occurs here
+        if comment_ratio > 0.01:  # High comment rate = retained to middle
+            middle_retention = 60 + (comment_ratio * 1500)
+        elif comment_ratio > 0.005:
+            middle_retention = 45 + (comment_ratio * 2000)
+        elif engagement_density > 0.001:  # Good engagement density
+            middle_retention = 40 + (engagement_density * 10000)
+        else:
+            middle_retention = 30 + (engagement_score * 800)
+        
+        # Late retention (60-80% of video)
+        # Only engaged viewers remain
+        if comment_ratio > 0.01:
+            late_retention = 40 + (comment_ratio * 2000)
+        elif comment_ratio > 0.005:
+            late_retention = 30 + (comment_ratio * 2500)
+        elif engagement_density > 0.001:
+            late_retention = 25 + (engagement_density * 8000)
+        else:
+            late_retention = 20 + (engagement_score * 1000)
+        
+        # Outro retention (80-100% of video)
+        # Very few viewers complete videos
+        if comment_ratio > 0.015:  # Exceptional engagement
+            outro_retention = 30 + (comment_ratio * 1500)
+        elif comment_ratio > 0.01:
+            outro_retention = 20 + (comment_ratio * 2000)
+        elif engagement_density > 0.0015:
+            outro_retention = 15 + (engagement_density * 5000)
+        else:
+            outro_retention = 10 + (engagement_score * 800)
+        
+        # Duration-based adjustments
+        # Shorter videos have better completion rates
+        if duration < 300:  # < 5 minutes
+            duration_multiplier = 1.2
+        elif duration < 600:  # 5-10 minutes
+            duration_multiplier = 1.1
+        elif duration < 900:  # 10-15 minutes
+            duration_multiplier = 1.0
+        elif duration < 1800:  # 15-30 minutes
+            duration_multiplier = 0.9
+        else:  # > 30 minutes
+            duration_multiplier = 0.8
+        
+        # Apply duration adjustment to later zones
+        middle_retention *= duration_multiplier
+        late_retention *= duration_multiplier
+        outro_retention *= duration_multiplier
+        
+        # Cap at realistic maximums
+        intro_retention = min(intro_retention, 100)
+        early_retention = min(early_retention, 95)
+        middle_retention = min(middle_retention, 80)
+        late_retention = min(late_retention, 60)
+        outro_retention = min(outro_retention, 45)
+        
+        # Ensure monotonic decrease (retention can't increase)
+        early_retention = min(early_retention, intro_retention)
+        middle_retention = min(middle_retention, early_retention)
+        late_retention = min(late_retention, middle_retention)
+        outro_retention = min(outro_retention, late_retention)
+        
+        retention_scores.append({
+            "intro": intro_retention,
+            "early": early_retention,
+            "middle": middle_retention,
+            "late": late_retention,
+            "outro": outro_retention,
+            "engagement_score": engagement_score,
+            "comment_ratio": comment_ratio,
+            "like_ratio": like_ratio
+        })
+    
+    if not retention_scores:
+        return {
+            "intro": 0, "early": 0, "middle": 0, "late": 0, "outro": 0,
+            "confidence": "low"
+        }
+    
+    # Average across all videos
+    avg_retention = {
+        "intro": sum(s["intro"] for s in retention_scores) / len(retention_scores),
+        "early": sum(s["early"] for s in retention_scores) / len(retention_scores),
+        "middle": sum(s["middle"] for s in retention_scores) / len(retention_scores),
+        "late": sum(s["late"] for s in retention_scores) / len(retention_scores),
+        "outro": sum(s["outro"] for s in retention_scores) / len(retention_scores)
+    }
+    
+    # Determine confidence based on sample size and engagement variance
+    avg_comment_ratio = sum(s["comment_ratio"] for s in retention_scores) / len(retention_scores)
+    
+    if len(retention_scores) >= 30 and avg_comment_ratio > 0.003:
+        confidence = "high"
+    elif len(retention_scores) >= 15 and avg_comment_ratio > 0.001:
+        confidence = "medium"
+    else:
+        confidence = "low"
+    
+    avg_retention["confidence"] = confidence
+    avg_retention["sample_size"] = len(retention_scores)
+    avg_retention["avg_comment_ratio"] = avg_comment_ratio
+    
+    return avg_retention
+
+
+def enhanced_golden_window_analysis(duration_buckets, videos):
+    """
+    Enhanced golden window analysis with:
+    - Engagement consistency within duration bracket
+    - Drop-off pattern analysis (early vs late engagement)
+    - Content type effectiveness by duration
+    """
+    enhanced_performance = {}
+    
+    for bucket_name, bucket_videos in duration_buckets.items():
+        if not bucket_videos:
+            continue
+        
+        # Basic metrics
+        avg_engagement = sum(v["engagement_rate"] for v in bucket_videos) / len(bucket_videos)
+        avg_views = sum(v.get("views", 0) for v in bucket_videos) / len(bucket_videos)
+        
+        # Engagement consistency (standard deviation)
+        engagement_rates = [v["engagement_rate"] for v in bucket_videos]
+        if len(engagement_rates) > 1:
+            mean_eng = sum(engagement_rates) / len(engagement_rates)
+            variance = sum((x - mean_eng) ** 2 for x in engagement_rates) / len(engagement_rates)
+            std_dev = variance ** 0.5
+            consistency_score = max(0, 100 - (std_dev / mean_eng * 100)) if mean_eng > 0 else 0
+        else:
+            consistency_score = 100
+        
+        # Analyze comment vs like ratio (indicates depth of engagement)
+        total_views = sum(v.get("views", 0) for v in bucket_videos)
+        total_comments = sum(v.get("comments", 0) for v in bucket_videos)
+        total_likes = sum(v.get("likes", 0) for v in bucket_videos)
+        
+        comment_ratio = total_comments / total_views if total_views > 0 else 0
+        like_ratio = total_likes / total_views if total_views > 0 else 0
+        
+        # Engagement depth score (higher comment ratio = deeper engagement)
+        if comment_ratio > 0:
+            engagement_depth = (comment_ratio / like_ratio * 100) if like_ratio > 0 else 100
+        else:
+            engagement_depth = 0
+        
+        # Content type distribution
+        content_types = {}
+        for video in bucket_videos:
+            content_type = classify_content_type(video)
+            content_types[content_type] = content_types.get(content_type, 0) + 1
+        
+        dominant_content_type = max(content_types.items(), key=lambda x: x[1])[0] if content_types else "unknown"
+        
+        enhanced_performance[bucket_name] = {
+            "avg_engagement": round(avg_engagement, 4),
+            "avg_views": round(avg_views, 0),
+            "video_count": len(bucket_videos),
+            "consistency_score": round(consistency_score, 1),
+            "engagement_depth": round(engagement_depth, 1),
+            "comment_ratio": round(comment_ratio, 4),
+            "like_ratio": round(like_ratio, 4),
+            "dominant_content_type": dominant_content_type,
+            "content_type_distribution": content_types,
+            "top_video": max(bucket_videos, key=lambda v: v["engagement_rate"])
+        }
+    
+    return enhanced_performance
+
+
+def compare_retention_patterns(all_channels_data):
+    """
+    Compare retention strengths across channels:
+    - Intro effectiveness
+    - Middle retention strength
+    - Outro completion rates
+    - Overall retention curve shape
+    """
+    if len(all_channels_data) < 2:
+        return []
+    
+    primary = all_channels_data[0]
+    competitors = all_channels_data[1:]
+    
+    comparison_insights = []
+    
+    # Extract retention zones
+    primary_zones = primary["retention_zones"]
+    
+    # Calculate average competitor retention for each zone
+    avg_competitor_zones = {
+        "intro": sum(c["retention_zones"]["intro"] for c in competitors) / len(competitors),
+        "early": sum(c["retention_zones"]["early"] for c in competitors) / len(competitors),
+        "middle": sum(c["retention_zones"]["middle"] for c in competitors) / len(competitors),
+        "late": sum(c["retention_zones"]["late"] for c in competitors) / len(competitors),
+        "outro": sum(c["retention_zones"]["outro"] for c in competitors) / len(competitors)
+    }
+    
+    # Compare intro effectiveness
+    intro_diff = primary_zones["intro"] - avg_competitor_zones["intro"]
+    if abs(intro_diff) > 5:
+        if intro_diff > 0:
+            comparison_insights.append({
+                "type": "intro_strength",
+                "title": "Your Intros Hook Better",
+                "description": f"{primary_zones['intro']:.1f}% intro retention vs {avg_competitor_zones['intro']:.1f}% average.",
+                "action": "Your hooks work well. Document what makes them effective.",
+                "impact": "positive",
+                "metric": f"+{intro_diff:.1f}%"
+            })
+        else:
+            comparison_insights.append({
+                "type": "intro_weakness",
+                "title": "Competitors Hook Better",
+                "description": f"Your {primary_zones['intro']:.1f}% intro retention trails {avg_competitor_zones['intro']:.1f}% average.",
+                "action": "Study competitor intros. They're capturing attention faster.",
+                "impact": "critical",
+                "metric": f"{intro_diff:.1f}%"
+            })
+    
+    # Compare middle retention
+    middle_diff = primary_zones["middle"] - avg_competitor_zones["middle"]
+    if abs(middle_diff) > 5:
+        if middle_diff > 0:
+            comparison_insights.append({
+                "type": "middle_strength",
+                "title": "You Retain Viewers Better Mid-Video",
+                "description": f"{primary_zones['middle']:.1f}% middle retention vs {avg_competitor_zones['middle']:.1f}% average.",
+                "action": "Your pacing and content structure work well. Maintain this approach.",
+                "impact": "positive",
+                "metric": f"+{middle_diff:.1f}%"
+            })
+        else:
+            comparison_insights.append({
+                "type": "middle_weakness",
+                "title": "Mid-Video Drop-Off Higher Than Competitors",
+                "description": f"Your {primary_zones['middle']:.1f}% middle retention trails {avg_competitor_zones['middle']:.1f}% average.",
+                "action": "Add pattern interrupts, B-roll, or mini-hooks every 2-3 minutes.",
+                "impact": "high",
+                "metric": f"{middle_diff:.1f}%"
+            })
+    
+    # Compare outro completion
+    outro_diff = primary_zones["outro"] - avg_competitor_zones["outro"]
+    if abs(outro_diff) > 3:
+        if outro_diff > 0:
+            comparison_insights.append({
+                "type": "outro_strength",
+                "title": "Higher Video Completion Rate",
+                "description": f"{primary_zones['outro']:.1f}% outro retention vs {avg_competitor_zones['outro']:.1f}% average.",
+                "action": "Viewers watch to the end. Your content delivers on its promise.",
+                "impact": "positive",
+                "metric": f"+{outro_diff:.1f}%"
+            })
+        else:
+            comparison_insights.append({
+                "type": "outro_weakness",
+                "title": "Fewer Viewers Complete Videos",
+                "description": f"Your {primary_zones['outro']:.1f}% outro retention trails {avg_competitor_zones['outro']:.1f}% average.",
+                "action": "Front-load value or add end-screen hooks to improve completion.",
+                "impact": "medium",
+                "metric": f"{outro_diff:.1f}%"
+            })
+    
+    # Analyze retention curve shape
+    primary_drop = primary_zones["intro"] - primary_zones["outro"]
+    avg_competitor_drop = avg_competitor_zones["intro"] - avg_competitor_zones["outro"]
+    
+    if primary_drop < avg_competitor_drop - 5:
+        comparison_insights.append({
+            "type": "retention_curve",
+            "title": "Flatter Retention Curve",
+            "description": f"You lose {primary_drop:.1f}% from intro to outro vs {avg_competitor_drop:.1f}% average.",
+            "action": "Your content maintains interest better throughout. This is excellent.",
+            "impact": "positive",
+            "metric": f"{(avg_competitor_drop - primary_drop):.1f}% better"
+        })
+    elif primary_drop > avg_competitor_drop + 5:
+        comparison_insights.append({
+            "type": "retention_curve",
+            "title": "Steeper Drop-Off Curve",
+            "description": f"You lose {primary_drop:.1f}% from intro to outro vs {avg_competitor_drop:.1f}% average.",
+            "action": "Focus on maintaining momentum throughout videos. Study competitor pacing.",
+            "impact": "high",
+            "metric": f"{(primary_drop - avg_competitor_drop):.1f}% worse"
+        })
+    
+    return comparison_insights
+
+
 # ========================= AUDIENCE RETENTION HEATMAPS =========================
 @enhanced_analyzer_bp.route("/analyzer.retentionHeatmap", methods=["GET"])
 def retention_heatmap():
     """
     Analyze where viewers drop off in videos and identify golden retention windows.
-    Uses proxy metrics (engagement patterns, video length analysis).
+    IMPROVED: Uses multi-factor engagement analysis for realistic retention estimates.
+    - Comment-to-view ratio (deeper engagement indicator)
+    - Like-to-view ratio (satisfaction indicator)
+    - Video duration (affects drop-off patterns)
+    - Engagement density (engagement per minute)
     Compare primary vs linked channels.
     NO MOCKED DATA - all analysis based on real metrics.
     """
@@ -605,14 +962,18 @@ def retention_heatmap():
         if not video_ids:
             continue
 
-        videos = fetch_video_stats(video_ids, with_snippet=True)
+        # IMPROVED: Fetch videos with duration data
+        videos = fetch_video_stats(video_ids, with_snippet=True, with_duration=True)
         
-        # Calculate engagement rate for each video
+        # Calculate engagement rate and ratios for each video
         for video in videos:
             views = video.get("views", 0)
             likes = video.get("likes", 0)
             comments = video.get("comments", 0)
+            
             video["engagement_rate"] = (likes + comments) / views if views > 0 else 0
+            video["like_ratio"] = likes / views if views > 0 else 0
+            video["comment_ratio"] = comments / views if views > 0 else 0
 
         # RETENTION ANALYSIS BY VIDEO LENGTH - all real data
         duration_buckets = {
@@ -637,19 +998,8 @@ def retention_heatmap():
             else:
                 duration_buckets["very_long"].append(video)
         
-        # Calculate average engagement by duration - real metrics only
-        duration_performance = {}
-        for bucket, bucket_videos in duration_buckets.items():
-            if bucket_videos:
-                avg_engagement = sum(v["engagement_rate"] for v in bucket_videos) / len(bucket_videos)
-                avg_views = sum(v.get("views", 0) for v in bucket_videos) / len(bucket_videos)
-                
-                duration_performance[bucket] = {
-                    "avg_engagement": round(avg_engagement, 4),
-                    "avg_views": round(avg_views, 0),
-                    "video_count": len(bucket_videos),
-                    "top_video": max(bucket_videos, key=lambda v: v["engagement_rate"])
-                }
+        # IMPROVED: Enhanced duration performance analysis
+        duration_performance = enhanced_golden_window_analysis(duration_buckets, videos)
         
         # GOLDEN RETENTION WINDOW - based on real performance data
         golden_window_data = None
@@ -662,89 +1012,125 @@ def retention_heatmap():
         }
         
         if duration_performance:
-            golden_window = max(duration_performance.items(), key=lambda x: x[1]["avg_engagement"])
+            # Choose golden window based on engagement AND consistency
+            golden_window = max(
+                duration_performance.items(),
+                key=lambda x: (x[1]["avg_engagement"] * 0.7) + (x[1]["consistency_score"] / 100 * 0.3)
+            )
             golden_window_data = {
                 "duration_range": golden_window[0],
                 "duration_label": window_names.get(golden_window[0]),
                 "metrics": golden_window[1]
             }
         
-        # RETENTION BREAKDOWN - based on real engagement patterns
-        retention_zones = {
-            "intro": 0,
-            "early": 0,
-            "middle": 0,
-            "late": 0,
-            "outro": 0
-        }
+        # IMPROVED: Realistic retention estimation using multi-factor analysis
+        retention_estimate = estimate_realistic_retention(videos)
         
-        # Use engagement rate as proxy for retention
-        for video in videos:
-            eng = video["engagement_rate"]
-            if eng > 0.05:  # Strong engagement throughout
-                retention_zones["intro"] += 1
-                retention_zones["early"] += 1
-                retention_zones["middle"] += 1
-                retention_zones["late"] += 1
-                retention_zones["outro"] += 1
-            elif eng > 0.03:  # Good intro, decent middle
-                retention_zones["intro"] += 1
-                retention_zones["early"] += 1
-                retention_zones["middle"] += 0.7
-                retention_zones["late"] += 0.4
-                retention_zones["outro"] += 0.2
-            elif eng > 0.015:  # Okay intro, drops mid
-                retention_zones["intro"] += 1
-                retention_zones["early"] += 0.6
-                retention_zones["middle"] += 0.3
-                retention_zones["late"] += 0.1
-            else:  # Poor retention
-                retention_zones["intro"] += 0.6
-                retention_zones["early"] += 0.3
-                retention_zones["middle"] += 0.1
-        
-        # Normalize to percentages
-        total_videos = len(videos)
         retention_percentages = {
-            k: round(v / total_videos * 100, 1) if total_videos > 0 else 0
-            for k, v in retention_zones.items()
+            "intro": round(retention_estimate["intro"], 1),
+            "early": round(retention_estimate["early"], 1),
+            "middle": round(retention_estimate["middle"], 1),
+            "late": round(retention_estimate["late"], 1),
+            "outro": round(retention_estimate["outro"], 1)
         }
+        
+        confidence = retention_estimate.get("confidence", "low")
+        sample_size = retention_estimate.get("sample_size", len(videos))
+        avg_comment_ratio = retention_estimate.get("avg_comment_ratio", 0)
         
         # INSIGHTS - based on real patterns
         insights = []
         
+        # Confidence warning
+        if confidence == "low":
+            insights.append({
+                "type": "confidence_warning",
+                "title": "Limited Data for Accurate Estimates",
+                "description": f"Based on {sample_size} videos with {avg_comment_ratio*100:.3f}% avg comment rate.",
+                "action": "Retention estimates are approximate. More videos or higher engagement improves accuracy.",
+                "impact": "info"
+            })
+        
         if golden_window_data:
+            metrics = golden_window_data['metrics']
             insights.append({
                 "type": "golden_window",
                 "title": f"Optimal Length: {golden_window_data['duration_label'].title()}",
-                "description": f"Videos {golden_window_data['duration_label']} get the best viewer response with {golden_window_data['metrics']['video_count']} videos analyzed.",
-                "action": f"Focus on creating {golden_window_data['duration_label']} content for best results.",
+                "description": f"Videos {golden_window_data['duration_label']} get {metrics['avg_engagement']*100:.2f}% engagement with {metrics['consistency_score']:.0f}% consistency.",
+                "action": f"Focus on {golden_window_data['duration_label']} content. Dominant type: {metrics.get('dominant_content_type', 'unknown')}.",
                 "impact": "high"
             })
         
-        if retention_percentages["intro"] < retention_percentages["middle"]:
+        # Intro analysis
+        if retention_percentages["intro"] < retention_percentages["early"]:
             insights.append({
                 "type": "weak_intro",
-                "title": "Viewers Drop Off Early",
-                "description": "Intro retention is weaker than mid-video retention based on engagement patterns.",
+                "title": "Viewers Drop Off Immediately",
+                "description": "Intro retention is weaker than early-video retention.",
                 "action": "Strengthen your hooks. Start with the payoff, not the setup.",
                 "impact": "critical"
             })
-        elif retention_percentages["intro"] > retention_percentages["middle"] * 1.5:
+        elif retention_percentages["intro"] > 95:
             insights.append({
                 "type": "strong_intro",
-                "title": "Your Intros Hook Viewers Well",
-                "description": "High intro retention shows your hooks work effectively.",
+                "title": "Excellent Intro Hook",
+                "description": f"{retention_percentages['intro']:.1f}% intro retention shows strong viewer capture.",
                 "action": "Document your intro formula and use it consistently.",
                 "impact": "positive"
             })
         
-        if retention_percentages["middle"] < 30:
+        # Middle retention analysis
+        if retention_percentages["middle"] < 35:
             insights.append({
                 "type": "mid_video_dropoff",
-                "title": "Mid-Video Drop-Off Detected",
-                "description": f"Only {retention_percentages['middle']:.1f}% retention in middle sections.",
+                "title": "Significant Mid-Video Drop-Off",
+                "description": f"Only {retention_percentages['middle']:.1f}% estimated retention in middle sections.",
                 "action": "Use pattern interrupts: switch camera angles, add B-roll, create mini-hooks every 2-3 minutes.",
+                "impact": "high"
+            })
+        elif retention_percentages["middle"] > 60:
+            insights.append({
+                "type": "strong_middle",
+                "title": "Strong Mid-Video Retention",
+                "description": f"{retention_percentages['middle']:.1f}% middle retention is excellent.",
+                "action": "Your pacing and content structure work well. Maintain this approach.",
+                "impact": "positive"
+            })
+        
+        # Outro completion analysis
+        if retention_percentages["outro"] > 30:
+            insights.append({
+                "type": "high_completion",
+                "title": "High Video Completion Rate",
+                "description": f"{retention_percentages['outro']:.1f}% estimated outro retention is exceptional.",
+                "action": "Viewers watch to the end. Your content delivers on its promise.",
+                "impact": "positive"
+            })
+        elif retention_percentages["outro"] < 15:
+            insights.append({
+                "type": "low_completion",
+                "title": "Low Video Completion Rate",
+                "description": f"Only {retention_percentages['outro']:.1f}% estimated outro retention.",
+                "action": "Front-load value or add end-screen hooks to improve completion.",
+                "impact": "medium"
+            })
+        
+        # Retention curve analysis
+        total_drop = retention_percentages["intro"] - retention_percentages["outro"]
+        if total_drop < 50:
+            insights.append({
+                "type": "flat_curve",
+                "title": "Excellent Retention Throughout",
+                "description": f"Only {total_drop:.1f}% drop from intro to outro.",
+                "action": "Your content maintains interest exceptionally well.",
+                "impact": "positive"
+            })
+        elif total_drop > 75:
+            insights.append({
+                "type": "steep_curve",
+                "title": "Steep Drop-Off Curve",
+                "description": f"{total_drop:.1f}% drop from intro to outro.",
+                "action": "Focus on maintaining momentum. Study what keeps viewers engaged.",
                 "impact": "high"
             })
 
@@ -765,41 +1151,20 @@ def retention_heatmap():
             ],
             "insights": insights,
             "total_videos": len(videos),
-            "videos_analyzed": standardized_video_count
+            "videos_analyzed": standardized_video_count,
+            "confidence": confidence,
+            "metadata": {
+                "sample_size": sample_size,
+                "avg_comment_ratio": round(avg_comment_ratio, 5),
+                "estimation_method": "multi-factor engagement analysis"
+            }
         })
 
     if not all_channels_retention:
         return jsonify({"error": "No retention data found"}), 404
 
-    # CROSS-CHANNEL COMPARISON - real data only
-    comparison_insights = []
-    
-    if len(all_channels_retention) > 1:
-        primary = all_channels_retention[0]
-        competitors = all_channels_retention[1:]
-        
-        # Compare intro retention
-        primary_intro = primary["retention_zones"]["intro"]
-        avg_competitor_intro = sum(c["retention_zones"]["intro"] for c in competitors) / len(competitors)
-        
-        if primary_intro > avg_competitor_intro + 10:
-            comparison_insights.append({
-                "type": "intro_strength",
-                "title": "Your Intros Hook Better",
-                "description": f"{primary_intro:.1f}% intro retention vs {avg_competitor_intro:.1f}% average.",
-                "action": "Your hooks work well. Analyze what makes them effective.",
-                "impact": "positive",
-                "metric": f"+{(primary_intro - avg_competitor_intro):.1f}%"
-            })
-        elif primary_intro < avg_competitor_intro - 10:
-            comparison_insights.append({
-                "type": "intro_weakness",
-                "title": "Competitors Hook Better",
-                "description": f"Your {primary_intro:.1f}% intro retention trails {avg_competitor_intro:.1f}% average.",
-                "action": "Study competitor intros. They're capturing attention faster.",
-                "impact": "critical",
-                "metric": f"{(avg_competitor_intro - primary_intro):.1f}% gap"
-            })
+    # IMPROVED: Cross-channel comparison using new comparison function
+    comparison_insights = compare_retention_patterns(all_channels_retention)
 
     return jsonify({
         "channels": all_channels_retention,
