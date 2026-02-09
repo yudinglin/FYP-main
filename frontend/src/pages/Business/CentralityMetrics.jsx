@@ -1492,8 +1492,19 @@ function RetentionHeatmapView({ data, loading }) {
   );
 }
 
-// IMPROVED: Better explanation of retention patterns
+// IMPROVED: Cleaner, more understandable retention visualization
 function RetentionHeatmapSection({ heatmap }) {
+  if (!heatmap || heatmap.length === 0) {
+    return (
+      <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+        <div className="text-center text-slate-500 py-8">
+          <Activity className="mx-auto mb-2 text-slate-300" size={48} />
+          <p>No retention data available</p>
+        </div>
+      </section>
+    );
+  }
+
   const getZoneColor = (retention) => {
     if (retention >= 70) return "#10b981";
     if (retention >= 50) return "#3b82f6";
@@ -1501,100 +1512,126 @@ function RetentionHeatmapSection({ heatmap }) {
     return "#ef4444";
   };
 
-  const getZoneEmoji = (retention) => {
-    if (retention >= 70) return "🔥";
-    if (retention >= 50) return "✅";
-    if (retention >= 30) return "⚠️";
-    return "🔻";
+  const getZoneLabel = (retention) => {
+    if (retention >= 70) return "Excellent";
+    if (retention >= 50) return "Good";
+    if (retention >= 30) return "Fair";
+    return "Needs Work";
+  };
+
+  // Calculate drop-off between zones
+  const calculateDropOff = (currentIdx) => {
+    if (currentIdx === 0) return null;
+    const current = heatmap[currentIdx].retention;
+    const previous = heatmap[currentIdx - 1].retention;
+    return previous - current;
   };
 
   return (
     <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
       <div className="flex items-center gap-2 mb-3">
         <Activity className="text-blue-600" size={20} />
-        <h2 className="text-lg font-semibold text-slate-900">Retention Heatmap</h2>
+        <h2 className="text-lg font-semibold text-slate-900">Video Retention Analysis</h2>
       </div>
 
-      {/* Explanation Box */}
+      {/* Simplified Explanation */}
       <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
         <div className="flex items-start gap-2">
           <Info size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
           <div className="text-sm text-blue-900">
-            <strong>How to read this:</strong> Each zone shows what percentage of your videos keep viewers engaged 
-            through that section. Think of it like a funnel - if 93% start strong (Intro) but only 31% make it 
-            to the middle, you're losing viewers during the early section. Higher percentages = better retention.
+            <strong>What this shows:</strong> The percentage of your videos that maintain viewer engagement 
+            through each section. Higher percentages mean viewers are staying engaged longer.
           </div>
         </div>
       </div>
 
-      {/* Visual Representation */}
-      <ResponsiveContainer width="100%" height={250}>
-        <AreaChart data={heatmap}>
-          <defs>
-            <linearGradient id="retentionGradient" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.8}/>
-              <stop offset="95%" stopColor="#4f46e5" stopOpacity={0.1}/>
-            </linearGradient>
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
-          <XAxis 
-            dataKey="zone" 
-            tick={{ fontSize: 11, fill: '#64748b' }}
-            axisLine={{ stroke: '#cbd5e1' }}
-          />
-          <YAxis 
-            tick={{ fontSize: 11, fill: '#64748b' }}
-            label={{ value: 'Retention %', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: '#64748b' } }}
-            domain={[0, 100]}
-            axisLine={{ stroke: '#cbd5e1' }}
-          />
-          <Tooltip 
-            formatter={(value) => `${value.toFixed(1)}% of videos`}
-            contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
-          />
-          <Area
-            type="monotone"
-            dataKey="retention"
-            stroke="#4f46e5"
-            strokeWidth={2}
-            fill="url(#retentionGradient)"
-          />
-        </AreaChart>
-      </ResponsiveContainer>
-
-      {/* Zone Breakdown Cards */}
-      <div className="grid grid-cols-5 gap-2 mt-6">
-        {heatmap.map((zone, idx) => (
-          <div
-            key={idx}
-            className="p-4 rounded-xl border-2 transition-all hover:shadow-lg"
-            style={{ 
-              borderColor: `${getZoneColor(zone.retention)}40`,
-              backgroundColor: `${getZoneColor(zone.retention)}08`
-            }}
-          >
-            <div className="text-center">
-              <div className="text-2xl mb-2">{getZoneEmoji(zone.retention)}</div>
-              <div className="text-xs font-medium text-slate-700 mb-2">{zone.zone}</div>
-              <div className="text-2xl font-bold mb-1" style={{ color: getZoneColor(zone.retention) }}>
-                {zone.retention.toFixed(0)}%
-              </div>
-              <div className="text-xs text-slate-500">
-                of videos retain here
+      {/* Simplified Zone Cards - Larger and clearer */}
+      <div className="grid grid-cols-5 gap-3 mb-6">
+        {heatmap.map((zone, idx) => {
+          const dropOff = calculateDropOff(idx);
+          return (
+            <div
+              key={idx}
+              className="p-5 rounded-xl border-2 transition-all hover:shadow-md"
+              style={{ 
+                borderColor: getZoneColor(zone.retention),
+                backgroundColor: `${getZoneColor(zone.retention)}10`
+              }}
+            >
+              <div className="text-center">
+                <div className="text-xs font-semibold text-slate-600 mb-2 uppercase tracking-wide">
+                  {zone.zone}
+                </div>
+                <div 
+                  className="text-4xl font-bold mb-2" 
+                  style={{ color: getZoneColor(zone.retention) }}
+                >
+                  {Math.round(zone.retention)}%
+                </div>
+                <div className="text-xs font-medium mb-2" style={{ color: getZoneColor(zone.retention) }}>
+                  {getZoneLabel(zone.retention)}
+                </div>
+                {dropOff !== null && dropOff > 0 && (
+                  <div className="text-xs text-red-600 font-medium mt-2 flex items-center justify-center gap-1">
+                    <TrendingDown size={12} />
+                    -{Math.round(dropOff)}% drop
+                  </div>
+                )}
               </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
-      {/* Real-world analogy */}
-      <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+      {/* Visual Chart - Simplified */}
+      <div className="mb-6">
+        <ResponsiveContainer width="100%" height={200}>
+          <AreaChart data={heatmap}>
+            <defs>
+              <linearGradient id="retentionGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.8}/>
+                <stop offset="95%" stopColor="#4f46e5" stopOpacity={0.1}/>
+              </linearGradient>
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis 
+              dataKey="zone" 
+              tick={{ fontSize: 12, fill: '#64748b' }}
+              axisLine={{ stroke: '#cbd5e1' }}
+            />
+            <YAxis 
+              tick={{ fontSize: 12, fill: '#64748b' }}
+              label={{ value: 'Retention %', angle: -90, position: 'insideLeft', style: { fontSize: 12, fill: '#64748b' } }}
+              domain={[0, 100]}
+              axisLine={{ stroke: '#cbd5e1' }}
+            />
+            <Tooltip 
+              formatter={(value) => `${Math.round(value)}%`}
+              contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
+            />
+            <Area
+              type="monotone"
+              dataKey="retention"
+              stroke="#4f46e5"
+              strokeWidth={3}
+              fill="url(#retentionGradient)"
+            />
+          </AreaChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Key Insight */}
+      <div className="p-4 bg-amber-50 rounded-lg border border-amber-200">
         <div className="flex items-start gap-2">
-          <Lightbulb size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-slate-700">
-            <strong className="text-slate-900">Real-world example:</strong> Imagine 100 people walk into a store (Intro). 
-            If only 59 make it past the entrance area (Early), 31 reach the middle aisles (Middle), 13 get to the back 
-            (Late), and just 4 make it to checkout (Outro), you'd know your entrance and early store layout need work!
+          <Lightbulb size={18} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-amber-900">
+            <strong>Key Insight:</strong> {
+              heatmap[0]?.retention >= 70 
+                ? "Strong intro retention! Focus on maintaining this engagement throughout your videos."
+                : heatmap[0]?.retention >= 50
+                ? "Good start, but improve your intro hooks to capture more viewers immediately."
+                : "Your intros need work. Consider stronger hooks in the first 10 seconds to grab attention."
+            }
           </div>
         </div>
       </div>
