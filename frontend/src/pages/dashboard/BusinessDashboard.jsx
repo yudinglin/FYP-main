@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Download, FileChartLine, FileText, SlidersHorizontal, X, TrendingUp, ExternalLink, Upload, FileImage, Award, Zap } from "lucide-react";
+import { Download, FileChartLine, FileText, SlidersHorizontal, X, TrendingUp, ExternalLink, Award, Zap } from "lucide-react";
 import ReviewBubble from "../../pages/misc/ReviewBubble.jsx";
 import { useAuth } from "../../core/context/AuthContext";
 
@@ -65,12 +65,7 @@ export default function BusinessDashboard() {
   const [exportMessage, setExportMessage] = useState("");
   const [isReportModalOpen, setIsReportModalOpen] = useState(false);
 
-  // Thumbnail tester states
-  const [thumbnails, setThumbnails] = useState([]);
-  const [thumbnailPreviews, setThumbnailPreviews] = useState([]);
-  const [thumbnailData, setThumbnailData] = useState(null);
-  const [thumbnailLoading, setThumbnailLoading] = useState(false);
-  const [thumbnailError, setThumbnailError] = useState("");
+
 
   const navigate = useNavigate();
 
@@ -193,66 +188,7 @@ export default function BusinessDashboard() {
     fetchAll();
   }, [selectedUrls]);
 
-  // Thumbnail upload handling
-  const handleThumbnailUpload = (e) => {
-    const files = Array.from(e.target.files);
-    
-    // Limit to 2 thumbnails for dashboard version
-    if (files.length + thumbnails.length > 2) {
-      setThumbnailError("Maximum 2 thumbnails for quick comparison");
-      return;
-    }
 
-    setThumbnailError("");
-    const newPreviews = [];
-    const newThumbnails = [];
-
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        newPreviews.push(event.target.result);
-        newThumbnails.push(event.target.result);
-        
-        if (newPreviews.length === files.length) {
-          setThumbnailPreviews([...thumbnailPreviews, ...newPreviews]);
-          setThumbnails([...thumbnails, ...newThumbnails]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const removeThumbnail = (index) => {
-    setThumbnails(thumbnails.filter((_, i) => i !== index));
-    setThumbnailPreviews(thumbnailPreviews.filter((_, i) => i !== index));
-    setThumbnailData(null);
-  };
-
-  const handleThumbnailAnalysis = async () => {
-    if (thumbnails.length === 0) {
-      setThumbnailError("Please upload at least one thumbnail");
-      return;
-    }
-
-    setThumbnailLoading(true);
-    setThumbnailError("");
-
-    try {
-      const res = await fetch(`${API_BASE}/api/youtube/analyzer.thumbnailAnalyzer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ thumbnails }),
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-      setThumbnailData(await res.json());
-    } catch (err) {
-      console.error(err);
-      setThumbnailError(err?.message || "Failed to analyze thumbnails");
-    } finally {
-      setThumbnailLoading(false);
-    }
-  };
 
   const reportSummary = useMemo(() => {
     const engagementRate =
@@ -425,10 +361,7 @@ export default function BusinessDashboard() {
               />
           </nav>
 
-          <div className="px-4 py-3 bg-slate-950/40 border-t border-slate-800 text-xs text-slate-400">
-            <p className="font-medium text-slate-200">Tip</p>
-            <p className="mt-1">Use Quick Thumbnail Test to compare designs before uploading.</p>
-          </div>
+
         </aside>
 
         <main className="flex-1 space-y-6">
@@ -496,20 +429,7 @@ export default function BusinessDashboard() {
                 )}
               </Panel>
 
-              {/* Quick Thumbnail Tester */}
-              <Panel title="Quick Thumbnail Test" subtitle="Compare up to 2 designs">
-                <QuickThumbnailTester
-                  thumbnails={thumbnails}
-                  thumbnailPreviews={thumbnailPreviews}
-                  thumbnailData={thumbnailData}
-                  thumbnailLoading={thumbnailLoading}
-                  thumbnailError={thumbnailError}
-                  onUpload={handleThumbnailUpload}
-                  onRemove={removeThumbnail}
-                  onAnalyze={handleThumbnailAnalysis}
-                  onNavigateToFull={() => navigate("/dashboard/business/analyzer")}
-                />
-              </Panel>
+
             </div>
 
             <div className="space-y-4">
@@ -564,184 +484,6 @@ export default function BusinessDashboard() {
   );
 }
 
-// ==================== QUICK THUMBNAIL TESTER COMPONENT ====================
-function QuickThumbnailTester({
-  thumbnails,
-  thumbnailPreviews,
-  thumbnailData,
-  thumbnailLoading,
-  thumbnailError,
-  onUpload,
-  onRemove,
-  onAnalyze,
-  onNavigateToFull
-}) {
-  if (thumbnailData) {
-    return (
-      <div className="space-y-3">
-        {/* Winner announcement */}
-        <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-lg border-2 border-green-400 p-3">
-          <div className="flex items-center gap-2 mb-1">
-            <Award className="text-green-600" size={18} />
-            <p className="text-sm font-bold text-slate-900">Winner</p>
-          </div>
-          <p className="text-xs text-green-800">{thumbnailData.recommendation}</p>
-        </div>
-
-        {/* Comparison results */}
-        <div className="grid grid-cols-2 gap-3">
-          {thumbnailData.results?.map((result, idx) => (
-            <CompactThumbnailResult
-              key={idx}
-              result={result}
-              preview={thumbnailPreviews[result.thumbnail_id - 1]}
-              isWinner={result.thumbnail_id === thumbnailData.winner}
-            />
-          ))}
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-2">
-          <button
-            onClick={() => {
-              onRemove(0);
-              onRemove(0);
-            }}
-            className="flex-1 px-3 py-2 text-xs font-medium text-slate-700 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 transition"
-          >
-            Test Again
-          </button>
-          <button
-            onClick={onNavigateToFull}
-            className="flex-1 px-3 py-2 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition"
-          >
-            Full Analyzer →
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-3">
-      {/* Upload area */}
-      <label className="block cursor-pointer">
-        <div className="border-2 border-dashed border-slate-300 rounded-lg p-4 text-center hover:border-indigo-400 transition-colors bg-slate-50">
-          <FileImage className="mx-auto text-slate-400 mb-2" size={32} />
-          <p className="text-xs font-medium text-slate-700">
-            Upload 2 thumbnail options
-          </p>
-          <p className="text-xs text-slate-500 mt-1">
-            JPG, PNG • Max 5MB each
-          </p>
-        </div>
-        <input
-          type="file"
-          accept="image/*"
-          multiple
-          onChange={onUpload}
-          className="hidden"
-        />
-      </label>
-
-      {/* Error message */}
-      {thumbnailError && (
-        <div className="text-xs text-red-600 bg-red-50 border border-red-200 rounded px-2 py-1">
-          {thumbnailError}
-        </div>
-      )}
-
-      {/* Preview thumbnails */}
-      {thumbnailPreviews.length > 0 && (
-        <div className="grid grid-cols-2 gap-2">
-          {thumbnailPreviews.map((preview, idx) => (
-            <div key={idx} className="relative group">
-              <img
-                src={preview}
-                alt={`Option ${idx + 1}`}
-                className="w-full h-20 object-cover rounded border-2 border-slate-200"
-              />
-              <button
-                onClick={() => onRemove(idx)}
-                className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
-              >
-                <X size={12} />
-              </button>
-              <div className="absolute bottom-1 left-1 bg-indigo-600 text-white text-xs px-1.5 py-0.5 rounded font-semibold">
-                #{idx + 1}
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Analyze button */}
-      {thumbnails.length > 0 && (
-        <button
-          onClick={onAnalyze}
-          disabled={thumbnailLoading}
-          className="w-full bg-indigo-600 text-white px-3 py-2 rounded-lg hover:bg-indigo-700 transition-colors font-medium text-sm disabled:opacity-60 disabled:cursor-not-allowed"
-        >
-          {thumbnailLoading ? "Analyzing..." : `Compare ${thumbnails.length} Thumbnails`}
-        </button>
-      )}
-
-      {/* Link to full analyzer */}
-      {thumbnails.length === 0 && (
-        <button
-          onClick={onNavigateToFull}
-          className="w-full text-xs text-indigo-600 hover:text-indigo-700 font-medium py-2"
-        >
-          Need detailed analysis? Use Full Analyzer →
-        </button>
-      )}
-    </div>
-  );
-}
-
-function CompactThumbnailResult({ result, preview, isWinner }) {
-  if (result.error) {
-    return (
-      <div className="bg-red-50 rounded-lg border border-red-200 p-2">
-        <p className="text-xs text-red-700">Analysis error</p>
-      </div>
-    );
-  }
-
-  return (
-    <div className={`rounded-lg border-2 p-2 ${isWinner ? "border-green-500 bg-green-50" : "border-slate-200 bg-white"}`}>
-      {isWinner && (
-        <div className="mb-1">
-          <span className="bg-green-500 text-white text-xs px-2 py-0.5 rounded-full font-semibold inline-flex items-center gap-1">
-            <Award size={10} /> Best
-          </span>
-        </div>
-      )}
-
-      <img
-        src={preview}
-        alt={`Option ${result.thumbnail_id}`}
-        className="w-full h-16 object-cover rounded mb-2 border border-slate-200"
-      />
-
-      <div className="space-y-1">
-        <div className="flex items-center justify-between">
-          <span className="text-xs text-slate-600">Score</span>
-          <span className={`text-lg font-bold ${isWinner ? "text-green-600" : "text-indigo-600"}`}>
-            {result.overall_score}
-          </span>
-        </div>
-        <div className="w-full bg-slate-200 rounded-full h-1.5">
-          <div
-            className={`h-1.5 rounded-full ${isWinner ? "bg-green-600" : "bg-indigo-600"}`}
-            style={{ width: `${result.overall_score}%` }}
-          />
-        </div>
-        <p className="text-xs text-slate-600 mt-1">CTR: {result.ctr_prediction}</p>
-      </div>
-    </div>
-  );
-}
 
 // ==================== EXISTING COMPONENTS ====================
 function SidebarItem({ label, active = false, onClick }) {

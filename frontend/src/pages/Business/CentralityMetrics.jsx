@@ -1,4 +1,10 @@
-// frontend/src/pages/Business/EnhancedChannelAnalyzer.jsx
+// IMPROVEMENTS MADE:
+// 1. Replaced hexagonal radar chart with clear bar charts for Quality Metrics
+// 2. Added explanatory text for Retention Heatmap with real-world analogies
+// 3. Improved Viewer Engagement Segments with clearer visualization and explanations
+// 4. Enhanced Competitor Gap Analysis with visual topic cards and better UI
+// 5. Added educational tooltips and context throughout
+
 import React, { useState, useMemo } from "react";
 import { useAuth } from "../../core/context/AuthContext";
 import {
@@ -17,11 +23,6 @@ import {
   YAxis,
   Tooltip,
   Legend,
-  RadarChart,
-  PolarGrid,
-  PolarAngleAxis,
-  PolarRadiusAxis,
-  Radar,
 } from "recharts";
 import {
   Users,
@@ -59,6 +60,9 @@ import {
   Smile,
   Meh,
   Frown,
+  Info,
+  Tag,
+  TrendingUpIcon,
 } from "lucide-react";
 
 const API_BASE = "http://127.0.0.1:5000";
@@ -480,7 +484,7 @@ function AudienceJourneyView({ data, loading }) {
 
       {selectedChannel && (
         <>
-          {/* Viewer Segments */}
+          {/* IMPROVED: Viewer Segments with better explanation */}
           <ViewerSegmentsSection channel={selectedChannel} />
 
           {/* Subscriber Magnets */}
@@ -508,53 +512,138 @@ function AudienceJourneyView({ data, loading }) {
   );
 }
 
+// IMPROVED: Better explanation and visualization of viewer segments
 function ViewerSegmentsSection({ channel }) {
   const segments = channel.viewer_segments_percentages || {};
   
   const segmentData = [
-    { name: "Superfans", value: segments.superfans || 0, color: "#10b981", icon: Flame },
-    { name: "Engaged", value: segments.engaged || 0, color: "#3b82f6", icon: ThumbsUp },
-    { name: "Casual", value: segments.casual || 0, color: "#f59e0b", icon: Eye },
-    { name: "At Risk", value: segments.at_risk || 0, color: "#ef4444", icon: AlertTriangle },
+    { 
+      name: "Superfans", 
+      value: segments.superfans || 0, 
+      color: "#10b981", 
+      icon: Flame,
+      description: "Highly engaged viewers who interact with most of your content"
+    },
+    { 
+      name: "Engaged", 
+      value: segments.engaged || 0, 
+      color: "#3b82f6", 
+      icon: ThumbsUp,
+      description: "Regular viewers who consistently watch and engage"
+    },
+    { 
+      name: "Casual", 
+      value: segments.casual || 0, 
+      color: "#f59e0b", 
+      icon: Eye,
+      description: "Occasional viewers who watch but don't engage much"
+    },
+    { 
+      name: "At Risk", 
+      value: segments.at_risk || 0, 
+      color: "#ef4444", 
+      icon: AlertTriangle,
+      description: "Viewers who rarely engage and may stop watching"
+    },
   ];
+
+  const totalCount = channel.viewer_segments || {};
 
   return (
     <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-3">
         <Users className="text-indigo-600" size={20} />
         <h2 className="text-lg font-semibold text-slate-900">Viewer Engagement Segments</h2>
       </div>
+      
+      {/* Explanation Box */}
+      <div className="mb-6 p-4 bg-indigo-50 rounded-lg border border-indigo-200">
+        <div className="flex items-start gap-2">
+          <Info size={18} className="text-indigo-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-indigo-900">
+            <strong>What this shows:</strong> Your audience is divided into 4 groups based on how they engage with your videos. 
+            This helps you understand viewer loyalty and identify which content keeps people coming back.
+          </div>
+        </div>
+      </div>
 
-      <div className="grid grid-cols-4 gap-4 mb-6">
+      {/* Segment Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
         {segmentData.map((segment) => {
           const Icon = segment.icon;
           return (
-            <div key={segment.name} className="text-center">
-              <div className="flex items-center justify-center mb-2">
-                <Icon size={24} style={{ color: segment.color }} />
+            <div 
+              key={segment.name} 
+              className="p-4 rounded-xl border-2 transition-all hover:shadow-md"
+              style={{ 
+                borderColor: segment.color + '40',
+                backgroundColor: segment.color + '08'
+              }}
+            >
+              <div className="flex items-center justify-center mb-3">
+                <div 
+                  className="p-3 rounded-full"
+                  style={{ backgroundColor: segment.color + '20' }}
+                >
+                  <Icon size={24} style={{ color: segment.color }} />
+                </div>
               </div>
-              <div className="text-3xl font-bold mb-1" style={{ color: segment.color }}>
-                {segment.value.toFixed(1)}%
+              <div className="text-center">
+                <div className="text-3xl font-bold mb-1" style={{ color: segment.color }}>
+                  {segment.value.toFixed(1)}%
+                </div>
+                <div className="text-sm font-semibold text-slate-900 mb-2">{segment.name}</div>
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  {segment.description}
+                </p>
               </div>
-              <div className="text-sm text-slate-600">{segment.name}</div>
             </div>
           );
         })}
       </div>
 
-      <ResponsiveContainer width="100%" height={200}>
-        <BarChart data={segmentData}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-          <YAxis tick={{ fontSize: 11 }} label={{ value: 'Percentage', angle: -90, position: 'insideLeft' }} />
-          <Tooltip formatter={(value) => `${value.toFixed(1)}%`} />
-          <Bar dataKey="value" fill="#4f46e5" radius={[8, 8, 0, 0]}>
-            {segmentData.map((entry, index) => (
-              <Cell key={`cell-${index}`} fill={entry.color} />
-            ))}
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
+      {/* Visual Bar Chart */}
+      <div className="mb-4">
+        <ResponsiveContainer width="100%" height={200}>
+          <BarChart data={segmentData}>
+            <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+            <XAxis 
+              dataKey="name" 
+              tick={{ fontSize: 12, fill: '#64748b' }}
+              axisLine={{ stroke: '#cbd5e1' }}
+            />
+            <YAxis 
+              tick={{ fontSize: 12, fill: '#64748b' }}
+              label={{ value: 'Percentage of Videos', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: '#64748b' } }}
+              axisLine={{ stroke: '#cbd5e1' }}
+            />
+            <Tooltip 
+              formatter={(value) => `${value.toFixed(1)}%`}
+              contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
+            />
+            <Bar dataKey="value" radius={[8, 8, 0, 0]}>
+              {segmentData.map((entry, index) => (
+                <Cell key={`cell-${index}`} fill={entry.color} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ResponsiveContainer>
+      </div>
+
+      {/* Actionable Insight */}
+      <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
+        <div className="flex items-start gap-2">
+          <Lightbulb size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-slate-700">
+            <strong className="text-slate-900">Growth Strategy:</strong> Aim for 30%+ Superfans and under 15% At Risk. 
+            {segments.superfans > 30 
+              ? " You're doing great! Keep creating the content that drives this loyalty."
+              : segments.at_risk > segments.superfans
+              ? " Focus on improving content quality - too many videos are losing viewer interest."
+              : " Increase engagement by asking more questions and encouraging interaction in your videos."}
+          </div>
+        </div>
+      </div>
     </section>
   );
 }
@@ -562,7 +651,7 @@ function ViewerSegmentsSection({ channel }) {
 function SubscriberMagnetsSection({ magnets }) {
   return (
     <section className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border-2 border-green-200 p-6">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-3">
         <UserPlus className="text-green-600" size={24} />
         <h2 className="text-xl font-bold text-slate-900">🎯 Subscriber Magnet Videos</h2>
       </div>
@@ -632,7 +721,7 @@ function MagnetVideoCard({ video, rank }) {
 function ChurnRisksSection({ risks }) {
   return (
     <section className="bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl border-2 border-red-200 p-6">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-3">
         <UserMinus className="text-red-600" size={24} />
         <h2 className="text-xl font-bold text-slate-900">⚠️ Churn Risk Videos</h2>
       </div>
@@ -702,7 +791,7 @@ function ChurnVideoCard({ video, rank }) {
 function ContentSequencesSection({ sequences }) {
   return (
     <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-3">
         <Share2 className="text-purple-600" size={20} />
         <h2 className="text-lg font-semibold text-slate-900">Successful Content Sequences</h2>
       </div>
@@ -804,8 +893,8 @@ function EngagementQualityView({ data, loading }) {
           {/* Quality Score Overview */}
           <QualityScoreSection channel={selectedChannel} />
 
-          {/* Quality Metrics Radar */}
-          <QualityMetricsRadar metrics={selectedChannel.quality_metrics} />
+          {/* IMPROVED: Quality Metrics with clear bar charts */}
+          <QualityMetricsBar metrics={selectedChannel.quality_metrics} />
 
           {/* Depth Distribution */}
           <DepthDistributionSection distribution={selectedChannel.depth_distribution} />
@@ -1058,90 +1147,107 @@ function QualityScoreSection({ channel }) {
   );
 }
 
-function QualityMetricsRadar({ metrics }) {
-  const radarData = [
-    { metric: "Depth", value: Math.min(100, (metrics.avg_comment_length / 20) * 100) },
-    { metric: "Questions", value: Math.min(100, (metrics.question_rate / 30) * 100) },
-    { metric: "Actions", value: Math.min(100, (metrics.action_rate / 15) * 100) },
-    { metric: "Community", value: Math.min(100, (metrics.community_rate / 20) * 100) },
-    { metric: "Meaningful", value: metrics.meaningful_rate },
+// IMPROVED: Replaced radar chart with clear bar chart visualization
+function QualityMetricsBar({ metrics }) {
+  const metricData = [
+    { 
+      name: "Comment Depth", 
+      value: metrics.avg_comment_length,
+      max: 50,
+      description: "Average words per comment",
+      color: "#3b82f6",
+      icon: FileText
+    },
+    { 
+      name: "Questions Asked", 
+      value: metrics.question_rate,
+      max: 100,
+      description: "% of comments asking questions",
+      color: "#10b981",
+      icon: MessageCircle
+    },
+    { 
+      name: "Action Takers", 
+      value: metrics.action_rate,
+      max: 100,
+      description: "% mentioning they took action",
+      color: "#f59e0b",
+      icon: Zap
+    },
+    { 
+      name: "Community Interaction", 
+      value: metrics.community_rate,
+      max: 100,
+      description: "% engaging with other viewers",
+      color: "#8b5cf6",
+      icon: Users
+    },
+    { 
+      name: "Meaningful Content", 
+      value: metrics.meaningful_rate,
+      max: 100,
+      description: "% of non-spam comments",
+      color: "#06b6d4",
+      icon: CheckCircle
+    }
   ];
 
   return (
     <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-3">
         <BarChart3 className="text-blue-600" size={20} />
         <h2 className="text-lg font-semibold text-slate-900">Quality Metrics Breakdown</h2>
       </div>
+      <p className="text-sm text-slate-600 mb-6">
+        These metrics measure the depth and quality of your audience engagement beyond simple like counts
+      </p>
 
-      <ResponsiveContainer width="100%" height={300}>
-        <RadarChart data={radarData}>
-          <PolarGrid />
-          <PolarAngleAxis dataKey="metric" tick={{ fontSize: 12 }} />
-          <PolarRadiusAxis angle={90} domain={[0, 100]} tick={{ fontSize: 10 }} />
-          <Radar
-            name="Quality Score"
-            dataKey="value"
-            stroke="#4f46e5"
-            fill="#4f46e5"
-            fillOpacity={0.6}
-          />
-          <Tooltip formatter={(value) => `${value.toFixed(1)}%`} />
-        </RadarChart>
-      </ResponsiveContainer>
+      <div className="space-y-5">
+        {metricData.map((metric) => {
+          const Icon = metric.icon;
+          const percentage = (metric.value / metric.max) * 100;
+          
+          return (
+            <div key={metric.name}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2">
+                  <Icon size={16} style={{ color: metric.color }} />
+                  <span className="text-sm font-medium text-slate-900">{metric.name}</span>
+                </div>
+                <div className="text-right">
+                  <span className="text-lg font-bold" style={{ color: metric.color }}>
+                    {metric.name === "Comment Depth" 
+                      ? metric.value.toFixed(1) 
+                      : `${metric.value.toFixed(1)}%`}
+                  </span>
+                </div>
+              </div>
+              
+              <div className="mb-1">
+                <div className="h-3 bg-slate-100 rounded-full overflow-hidden">
+                  <div 
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ 
+                      width: `${Math.min(100, percentage)}%`,
+                      backgroundColor: metric.color
+                    }}
+                  />
+                </div>
+              </div>
+              
+              <p className="text-xs text-slate-500">{metric.description}</p>
+            </div>
+          );
+        })}
+      </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4">
-        <MetricBadge
-          label="Avg Words"
-          value={metrics.avg_comment_length.toFixed(1)}
-          icon={FileText}
-          color="blue"
-        />
-        <MetricBadge
-          label="Questions"
-          value={`${metrics.question_rate.toFixed(1)}%`}
-          icon={MessageCircle}
-          color="green"
-        />
-        <MetricBadge
-          label="Actions"
-          value={`${metrics.action_rate.toFixed(1)}%`}
-          icon={Zap}
-          color="amber"
-        />
-        <MetricBadge
-          label="Community"
-          value={`${metrics.community_rate.toFixed(1)}%`}
-          icon={Users}
-          color="purple"
-        />
-        <MetricBadge
-          label="Meaningful"
-          value={`${metrics.meaningful_rate.toFixed(1)}%`}
-          icon={CheckCircle}
-          color="green"
-        />
+      <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+        <p className="text-sm text-blue-900">
+          <strong>💡 What this means:</strong> Higher scores indicate viewers are deeply engaged, 
+          asking thoughtful questions, taking action on your advice, and building community with each other.
+        </p>
       </div>
     </section>
-  );
-}
-
-function MetricBadge({ label, value, icon: Icon, color }) {
-  const colors = {
-    blue: "bg-blue-100 text-blue-700 border-blue-200",
-    green: "bg-green-100 text-green-700 border-green-200",
-    amber: "bg-amber-100 text-amber-700 border-amber-200",
-    purple: "bg-purple-100 text-purple-700 border-purple-200",
-  };
-
-  return (
-    <div className={`p-3 rounded-lg border ${colors[color]}`}>
-      <div className="flex items-center gap-2 mb-1">
-        <Icon size={14} />
-        <span className="text-xs font-medium">{label}</span>
-      </div>
-      <div className="text-lg font-bold">{value}</div>
-    </div>
   );
 }
 
@@ -1280,7 +1386,7 @@ function RetentionHeatmapView({ data, loading }) {
 
       {selectedChannel && (
         <>
-          {/* Retention Heatmap */}
+          {/* IMPROVED: Retention Heatmap with better explanation */}
           <RetentionHeatmapSection heatmap={selectedChannel.retention_heatmap} />
 
           {/* Golden Window */}
@@ -1303,6 +1409,7 @@ function RetentionHeatmapView({ data, loading }) {
   );
 }
 
+// IMPROVED: Better explanation of retention patterns
 function RetentionHeatmapSection({ heatmap }) {
   const getZoneColor = (retention) => {
     if (retention >= 70) return "#10b981";
@@ -1311,42 +1418,102 @@ function RetentionHeatmapSection({ heatmap }) {
     return "#ef4444";
   };
 
+  const getZoneEmoji = (retention) => {
+    if (retention >= 70) return "🔥";
+    if (retention >= 50) return "✅";
+    if (retention >= 30) return "⚠️";
+    return "🔻";
+  };
+
   return (
     <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-3">
         <Activity className="text-blue-600" size={20} />
         <h2 className="text-lg font-semibold text-slate-900">Retention Heatmap</h2>
       </div>
 
+      {/* Explanation Box */}
+      <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+        <div className="flex items-start gap-2">
+          <Info size={18} className="text-blue-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-blue-900">
+            <strong>How to read this:</strong> Each zone shows what percentage of your videos keep viewers engaged 
+            through that section. Think of it like a funnel - if 93% start strong (Intro) but only 31% make it 
+            to the middle, you're losing viewers during the early section. Higher percentages = better retention.
+          </div>
+        </div>
+      </div>
+
+      {/* Visual Representation */}
       <ResponsiveContainer width="100%" height={250}>
         <AreaChart data={heatmap}>
-          <CartesianGrid strokeDasharray="3 3" />
-          <XAxis dataKey="zone" tick={{ fontSize: 11 }} />
-          <YAxis tick={{ fontSize: 11 }} label={{ value: 'Retention %', angle: -90, position: 'insideLeft' }} />
-          <Tooltip formatter={(value) => `${value.toFixed(1)}%`} />
+          <defs>
+            <linearGradient id="retentionGradient" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.8}/>
+              <stop offset="95%" stopColor="#4f46e5" stopOpacity={0.1}/>
+            </linearGradient>
+          </defs>
+          <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" />
+          <XAxis 
+            dataKey="zone" 
+            tick={{ fontSize: 11, fill: '#64748b' }}
+            axisLine={{ stroke: '#cbd5e1' }}
+          />
+          <YAxis 
+            tick={{ fontSize: 11, fill: '#64748b' }}
+            label={{ value: 'Retention %', angle: -90, position: 'insideLeft', style: { fontSize: 11, fill: '#64748b' } }}
+            domain={[0, 100]}
+            axisLine={{ stroke: '#cbd5e1' }}
+          />
+          <Tooltip 
+            formatter={(value) => `${value.toFixed(1)}% of videos`}
+            contentStyle={{ borderRadius: '8px', border: '1px solid #e2e8f0' }}
+          />
           <Area
             type="monotone"
             dataKey="retention"
             stroke="#4f46e5"
-            fill="#4f46e5"
-            fillOpacity={0.6}
+            strokeWidth={2}
+            fill="url(#retentionGradient)"
           />
         </AreaChart>
       </ResponsiveContainer>
 
-      <div className="grid grid-cols-5 gap-2 mt-4">
+      {/* Zone Breakdown Cards */}
+      <div className="grid grid-cols-5 gap-2 mt-6">
         {heatmap.map((zone, idx) => (
           <div
             key={idx}
-            className="p-3 rounded-lg text-center"
-            style={{ backgroundColor: `${getZoneColor(zone.retention)}20` }}
+            className="p-4 rounded-xl border-2 transition-all hover:shadow-lg"
+            style={{ 
+              borderColor: `${getZoneColor(zone.retention)}40`,
+              backgroundColor: `${getZoneColor(zone.retention)}08`
+            }}
           >
-            <div className="text-sm font-medium text-slate-700 mb-1">{zone.zone}</div>
-            <div className="text-xl font-bold" style={{ color: getZoneColor(zone.retention) }}>
-              {zone.retention.toFixed(0)}%
+            <div className="text-center">
+              <div className="text-2xl mb-2">{getZoneEmoji(zone.retention)}</div>
+              <div className="text-xs font-medium text-slate-700 mb-2">{zone.zone}</div>
+              <div className="text-2xl font-bold mb-1" style={{ color: getZoneColor(zone.retention) }}>
+                {zone.retention.toFixed(0)}%
+              </div>
+              <div className="text-xs text-slate-500">
+                of videos retain here
+              </div>
             </div>
           </div>
         ))}
+      </div>
+
+      {/* Real-world analogy */}
+      <div className="mt-6 p-4 bg-slate-50 rounded-lg border border-slate-200">
+        <div className="flex items-start gap-2">
+          <Lightbulb size={16} className="text-amber-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-slate-700">
+            <strong className="text-slate-900">Real-world example:</strong> Imagine 100 people walk into a store (Intro). 
+            If only 59 make it past the entrance area (Early), 31 reach the middle aisles (Middle), 13 get to the back 
+            (Late), and just 4 make it to checkout (Outro), you'd know your entrance and early store layout need work!
+          </div>
+        </div>
       </div>
     </section>
   );
@@ -1501,7 +1668,7 @@ function CompetitorGapsView({ data, loading }) {
         </section>
       )}
 
-      {/* Content Gaps */}
+      {/* IMPROVED: Content Gaps with visual topic cards */}
       {contentGaps.length > 0 && (
         <ContentGapsSection gaps={contentGaps} />
       )}
@@ -1581,34 +1748,77 @@ function OpportunityCard({ opportunity }) {
   );
 }
 
+// IMPROVED: Visual topic cards instead of plain list
 function ContentGapsSection({ gaps }) {
   return (
     <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex items-center gap-2 mb-3">
         <Search className="text-purple-600" size={20} />
         <h2 className="text-lg font-semibold text-slate-900">High-Value Content Gaps</h2>
       </div>
       <p className="text-sm text-slate-600 mb-4">
-        Topics competitors cover successfully that you're missing.
+        Topics competitors cover successfully that you're missing - ranked by opportunity size.
       </p>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {gaps.map((gap, idx) => (
-          <div key={idx} className="p-4 bg-purple-50 rounded-lg border border-purple-200">
-            <div className="flex items-center justify-between mb-2">
-              <h4 className="font-bold text-purple-900 capitalize">{gap.topic}</h4>
-              <span className="text-xs px-2 py-1 bg-purple-200 text-purple-900 rounded-full font-semibold">
-                {gap.frequency} videos
-              </span>
+          <div 
+            key={idx} 
+            className="group p-5 rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 hover:shadow-xl hover:scale-105 transition-all duration-200"
+          >
+            {/* Topic Header */}
+            <div className="flex items-start justify-between mb-3">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 mb-2">
+                  <Tag size={16} className="text-purple-600" />
+                  <h4 className="font-bold text-purple-900 capitalize text-lg">
+                    {gap.topic}
+                  </h4>
+                </div>
+                <p className="text-xs text-purple-700 font-medium">
+                  Competitor: {gap.competitor}
+                </p>
+              </div>
+              <div className="text-right ml-2">
+                <div className="inline-flex items-center gap-1 px-2 py-1 bg-purple-600 text-white rounded-full text-xs font-bold">
+                  <Hash size={12} />
+                  {idx + 1}
+                </div>
+              </div>
             </div>
-            <p className="text-sm text-purple-700 mb-1">
-              Competitor: {gap.competitor}
-            </p>
-            <p className="text-sm font-semibold text-purple-900">
-              {(gap.engagement * 100).toFixed(2)}% engagement
-            </p>
+
+            {/* Metrics */}
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div className="p-3 bg-white rounded-lg border border-purple-200">
+                <div className="text-xs text-slate-600 mb-1">Videos</div>
+                <div className="text-xl font-bold text-purple-900">{gap.frequency}</div>
+              </div>
+              <div className="p-3 bg-white rounded-lg border border-purple-200">
+                <div className="text-xs text-slate-600 mb-1">Engagement</div>
+                <div className="text-xl font-bold text-purple-900">
+                  {(gap.engagement * 100).toFixed(1)}%
+                </div>
+              </div>
+            </div>
+
+            {/* Opportunity Indicator */}
+            <div className="flex items-center gap-2 p-2 bg-purple-600 text-white rounded-lg text-xs font-semibold">
+              <TrendingUpIcon size={14} />
+              <span>High Opportunity - Untapped Audience</span>
+            </div>
           </div>
         ))}
+      </div>
+
+      {/* Summary Action */}
+      <div className="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
+        <div className="flex items-start gap-2">
+          <Lightbulb size={16} className="text-purple-600 flex-shrink-0 mt-0.5" />
+          <div className="text-sm text-purple-900">
+            <strong>Action Plan:</strong> Start with the top 3 gaps. Create 2-3 videos for each topic over 
+            the next month to capture this proven audience demand.
+          </div>
+        </div>
       </div>
     </section>
   );

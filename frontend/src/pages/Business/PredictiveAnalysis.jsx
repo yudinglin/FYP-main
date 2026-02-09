@@ -38,9 +38,8 @@ import {
   Lightbulb,
   HelpCircle,
   Image as ImageIcon,
-  Upload,
-  X,
-  FileImage,
+  MessageCircle,
+  Heart,
 } from "lucide-react";
 
 // Utility Functions
@@ -99,19 +98,44 @@ function getQualityDescription(score) {
   }
 }
 
-// Helper to get simple engagement level
-function getEngagementLevel(rate) {
+// Helper to get simple engagement insights
+function getEngagementInsight(rate) {
   const percentage = rate * 100;
   if (percentage >= 5) {
-    return { label: "Excellent", color: "text-emerald-600" };
+    return {
+      level: "Excellent",
+      color: "text-emerald-600",
+      description: "Your viewers love interacting! They're liking and commenting way more than average.",
+      icon: "🔥"
+    };
   } else if (percentage >= 3) {
-    return { label: "Very Good", color: "text-green-600" };
+    return {
+      level: "Very Good",
+      color: "text-green-600",
+      description: "Great engagement! Viewers are actively participating with likes and comments.",
+      icon: "👍"
+    };
   } else if (percentage >= 1.5) {
-    return { label: "Good", color: "text-blue-600" };
+    return {
+      level: "Good",
+      color: "text-blue-600",
+      description: "Solid interaction from viewers. There's room to get even more people involved.",
+      icon: "✓"
+    };
   } else if (percentage >= 0.5) {
-    return { label: "Fair", color: "text-orange-600" };
+    return {
+      level: "Fair",
+      color: "text-orange-600",
+      description: "Some viewers are engaging, but many are just watching. Try encouraging more comments.",
+      icon: "→"
+    };
   } else {
-    return { label: "Needs Improvement", color: "text-slate-600" };
+    return {
+      level: "Needs Improvement",
+      color: "text-slate-600",
+      description: "Most viewers are watching quietly. Ask questions to spark more conversation!",
+      icon: "💡"
+    };
   }
 }
 
@@ -121,15 +145,13 @@ const VIEWS = {
   FORECAST: "forecast",
   COMPARISON: "comparison",
   ENGAGEMENT: "engagement",
-  THUMBNAIL: "thumbnail",
 };
 
 // View descriptions for user guidance
 const VIEW_DESCRIPTIONS = {
   forecast: "See how many subscribers you'll gain in the next 3, 6, and 12 months based on your current performance",
   comparison: "Find out when you'll catch up to competitors and discover who's growing faster",
-  engagement: "Learn if your audience engagement is improving and get tips to boost interaction",
-  thumbnail: "Upload and test multiple thumbnail options to see which one will get more clicks"
+  engagement: "Learn if your audience engagement is improving and get tips to boost interaction"
 };
 
 export default function PredictiveAnalysis() {
@@ -161,12 +183,7 @@ export default function PredictiveAnalysis() {
   const [error, setError] = useState("");
   const [analysisData, setAnalysisData] = useState(null);
 
-  // Thumbnail states
-  const [thumbnails, setThumbnails] = useState([]);
-  const [thumbnailPreviews, setThumbnailPreviews] = useState([]);
-  const [thumbnailData, setThumbnailData] = useState(null);
-  const [thumbnailLoading, setThumbnailLoading] = useState(false);
-  const [thumbnailError, setThumbnailError] = useState("");
+
 
   // Initialize with all competitors selected
   useEffect(() => {
@@ -177,7 +194,7 @@ export default function PredictiveAnalysis() {
 
   // Auto-analyze when page loads if we have a primary channel
   useEffect(() => {
-    if (primaryChannel && !analysisData && !loading && selectedView !== VIEWS.THUMBNAIL) {
+    if (primaryChannel && !analysisData && !loading) {
       handleAnalyze();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -241,62 +258,7 @@ export default function PredictiveAnalysis() {
     );
   };
 
-  // Thumbnail upload handling
-  const handleThumbnailUpload = (e) => {
-    const files = Array.from(e.target.files);
-    if (files.length + thumbnails.length > 4) {
-      setThumbnailError("Maximum 4 thumbnails allowed");
-      return;
-    }
 
-    const newPreviews = [];
-    const newThumbnails = [];
-
-    files.forEach((file) => {
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        newPreviews.push(event.target.result);
-        newThumbnails.push(event.target.result);
-        
-        if (newPreviews.length === files.length) {
-          setThumbnailPreviews([...thumbnailPreviews, ...newPreviews]);
-          setThumbnails([...thumbnails, ...newThumbnails]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
-  };
-
-  const removeThumbnail = (index) => {
-    setThumbnails(thumbnails.filter((_, i) => i !== index));
-    setThumbnailPreviews(thumbnailPreviews.filter((_, i) => i !== index));
-  };
-
-  const handleThumbnailAnalysis = async () => {
-    if (thumbnails.length === 0) {
-      setThumbnailError("Please upload at least one thumbnail");
-      return;
-    }
-
-    setThumbnailLoading(true);
-    setThumbnailError("");
-
-    try {
-      const res = await fetch(`${API_BASE}/api/youtube/analyzer.thumbnailAnalyzer`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ thumbnails }),
-      });
-
-      if (!res.ok) throw new Error(await res.text());
-      setThumbnailData(await res.json());
-    } catch (err) {
-      console.error(err);
-      setThumbnailError(err?.message || "Failed to analyze thumbnails");
-    } finally {
-      setThumbnailLoading(false);
-    }
-  };
 
   const MenuItem = ({ icon: Icon, label, view, description }) => (
     <button
@@ -359,19 +321,13 @@ export default function PredictiveAnalysis() {
                   view={VIEWS.ENGAGEMENT}
                   description={VIEW_DESCRIPTIONS.engagement}
                 />
-                <MenuItem 
-                  icon={ImageIcon} 
-                  label="Thumbnail Tester" 
-                  view={VIEWS.THUMBNAIL}
-                  description={VIEW_DESCRIPTIONS.thumbnail}
-                />
+
               </div>
             </div>
 
-            {/* Channel Selection - Only show for non-thumbnail views */}
-            {selectedView !== VIEWS.THUMBNAIL && (
-              <>
-                <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
+            {/* Channel Selection */}
+            <>
+              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
                   <h3 className="text-sm font-semibold text-slate-700 mb-3">
                     Your Channels
                   </h3>
@@ -459,41 +415,12 @@ export default function PredictiveAnalysis() {
                     </div>
                   </div>
                 )}
-              </>
-            )}
-
-            {/* Thumbnail Tester Sidebar */}
-            {selectedView === VIEWS.THUMBNAIL && (
-              <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-4">
-                <h3 className="text-sm font-semibold text-slate-700 mb-3">
-                  Thumbnail Testing
-                </h3>
-                <div className="text-sm text-slate-600">
-                  Upload 1-4 thumbnail options to compare their predicted performance.
-                </div>
-
-                {thumbnailError && (
-                  <div className="mt-3 p-2 bg-red-50 border border-red-200 rounded text-xs text-red-700">
-                    {thumbnailError}
-                  </div>
-                )}
-              </div>
-            )}
+            </>
           </div>
 
           {/* Main Content */}
           <div className="flex-1">
-            {selectedView === VIEWS.THUMBNAIL ? (
-              <ThumbnailTesterView
-                thumbnails={thumbnails}
-                thumbnailPreviews={thumbnailPreviews}
-                thumbnailData={thumbnailData}
-                loading={thumbnailLoading}
-                onUpload={handleThumbnailUpload}
-                onRemove={removeThumbnail}
-                onAnalyze={handleThumbnailAnalysis}
-              />
-            ) : error && !analysisData ? (
+            {error && !analysisData ? (
               <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-6">
                 <div className="flex items-start gap-3">
                   <AlertCircle className="text-rose-500 mt-0.5" size={18} />
@@ -525,133 +452,8 @@ export default function PredictiveAnalysis() {
   );
 }
 
-// ==================== THUMBNAIL TESTER VIEW ====================
-function ThumbnailTesterView({ thumbnails, thumbnailPreviews, thumbnailData, loading, onUpload, onRemove, onAnalyze }) {
-  return (
-    <div className="space-y-6">
-      {/* Upload Section */}
-      <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-        <div className="flex items-center gap-2 mb-4">
-          <Upload className="text-indigo-600" size={20} />
-          <h2 className="text-lg font-semibold text-slate-900">Upload Thumbnail Options</h2>
-        </div>
-
-        <div className="mb-4">
-          <label className="block w-full cursor-pointer">
-            <div className="border-2 border-dashed border-slate-300 rounded-xl p-8 text-center hover:border-indigo-400 transition-colors bg-slate-50">
-              <FileImage className="mx-auto text-slate-400 mb-3" size={48} />
-              <p className="text-sm font-medium text-slate-700 mb-1">
-                Click to upload thumbnails
-              </p>
-              <p className="text-xs text-slate-500">
-                Upload 1-4 options (JPG, PNG) • Max 5MB each
-              </p>
-            </div>
-            <input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={onUpload}
-              className="hidden"
-            />
-          </label>
-        </div>
-
-        {/* Thumbnail Previews */}
-        {thumbnailPreviews.length > 0 && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
-            {thumbnailPreviews.map((preview, idx) => (
-              <div key={idx} className="relative group">
-                <img
-                  src={preview}
-                  alt={`Thumbnail ${idx + 1}`}
-                  className="w-full h-32 object-cover rounded-lg border-2 border-slate-200"
-                />
-                <button
-                  onClick={() => onRemove(idx)}
-                  className="absolute top-2 right-2 bg-red-500 hover:bg-red-600 text-white p-1.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
-                >
-                  <X size={14} />
-                </button>
-                <div className="absolute bottom-2 left-2 bg-indigo-600 text-white text-xs px-2 py-1 rounded font-semibold">
-                  Option #{idx + 1}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {thumbnails.length > 0 && (
-          <button
-            onClick={onAnalyze}
-            disabled={loading}
-            className="w-full bg-indigo-600 text-white px-4 py-3 rounded-lg hover:bg-indigo-700 transition-colors font-medium disabled:opacity-60"
-          >
-            {loading ? "Analyzing..." : `Analyze ${thumbnails.length} Thumbnail${thumbnails.length > 1 ? 's' : ''}`}
-          </button>
-        )}
-      </section>
-
-      {/* Results */}
-      {thumbnailData && (
-        <>
-          {/* Winner Announcement */}
-          <section className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border-2 border-green-400 p-6">
-            <div className="flex items-center gap-3 mb-3">
-              <div className="w-12 h-12 bg-green-500 rounded-full flex items-center justify-center">
-                <Award className="text-white" size={24} />
-              </div>
-              <div>
-                <h2 className="text-xl font-bold text-slate-900">🏆 Winner</h2>
-                <p className="text-green-800 font-medium">{thumbnailData.recommendation}</p>
-              </div>
-            </div>
-          </section>
-
-          {/* Detailed Results */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {thumbnailData.results?.map((result, idx) => (
-              <ThumbnailResultCard
-                key={idx}
-                result={result}
-                preview={thumbnailPreviews[result.thumbnail_id - 1]}
-                isWinner={result.thumbnail_id === thumbnailData.winner}
-              />
-            ))}
-          </div>
-        </>
-      )}
-
-      {!thumbnailData && thumbnails.length === 0 && !loading && (
-        <div className="rounded-2xl bg-white border border-slate-100 shadow-sm p-12">
-          <div className="text-center max-w-2xl mx-auto">
-            <ImageIcon className="mx-auto text-slate-300 mb-4" size={64} />
-            <h3 className="text-xl font-semibold text-slate-900 mb-2">Thumbnail Performance Tester</h3>
-            <p className="text-slate-600 mb-6">Upload multiple thumbnail options and see which one will get more clicks.</p>
-
-            <div className="text-left space-y-3">
-              {[
-                "AI-powered click-through rate predictions",
-                "Analyzes faces, colors, and text readability",
-                "Compare up to 4 options side-by-side",
-                "Get specific tips to improve each design"
-              ].map((feature, idx) => (
-                <div key={idx} className="flex items-center gap-3">
-                  <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                    <CheckCircle className="text-indigo-600" size={16} />
-                  </div>
-                  <p className="text-sm text-slate-700">{feature}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ThumbnailResultCard({ result, preview, isWinner }) {
+// SIMPLIFIED Thumbnail Card - Less technical, more actionable
+function SimplifiedThumbnailCard({ result, preview, isWinner }) {
   if (result.error) {
     return (
       <div className="bg-red-50 rounded-xl border-2 border-red-300 p-5">
@@ -661,6 +463,16 @@ function ThumbnailResultCard({ result, preview, isWinner }) {
     );
   }
 
+  // Simplified rating
+  const getSimpleRating = (score) => {
+    if (score >= 80) return { label: "Excellent", color: "text-green-600", emoji: "🔥" };
+    if (score >= 60) return { label: "Good", color: "text-blue-600", emoji: "👍" };
+    if (score >= 40) return { label: "Fair", color: "text-orange-600", emoji: "→" };
+    return { label: "Needs Work", color: "text-red-600", emoji: "💡" };
+  };
+
+  const rating = getSimpleRating(result.overall_score);
+
   return (
     <div className={`bg-white rounded-xl border-2 shadow-sm p-5 ${
       isWinner ? "border-green-500" : "border-slate-200"
@@ -668,7 +480,7 @@ function ThumbnailResultCard({ result, preview, isWinner }) {
       {isWinner && (
         <div className="mb-3">
           <span className="bg-green-500 text-white text-xs px-3 py-1 rounded-full font-semibold inline-flex items-center gap-1">
-            <Award size={12} /> Best Option
+            <Award size={12} /> Best Choice - Use This One!
           </span>
         </div>
       )}
@@ -680,69 +492,53 @@ function ThumbnailResultCard({ result, preview, isWinner }) {
       />
 
       <div className="space-y-4">
-        {/* Overall Score */}
-        <div>
+        {/* Overall Rating - Simplified */}
+        <div className={`p-4 rounded-lg border-2 ${
+          rating.label === "Excellent" ? "bg-green-50 border-green-200" :
+          rating.label === "Good" ? "bg-blue-50 border-blue-200" :
+          rating.label === "Fair" ? "bg-orange-50 border-orange-200" :
+          "bg-red-50 border-red-200"
+        }`}>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-slate-700">Overall Score</span>
-            <span className="text-2xl font-bold text-indigo-600">{result.overall_score}/100</span>
+            <span className="text-2xl">{rating.emoji}</span>
+            <span className={`text-2xl font-bold ${rating.color}`}>{rating.label}</span>
           </div>
-          <div className="w-full bg-slate-200 rounded-full h-3">
-            <div
-              className="bg-indigo-600 h-3 rounded-full transition-all"
-              style={{ width: `${result.overall_score}%` }}
-            />
+          <div className="text-sm text-slate-700">
+            Expected click rate: <strong>{result.ctr_prediction}</strong>
           </div>
         </div>
 
-        {/* CTR Prediction */}
-        <div className="p-3 bg-green-50 rounded-lg border border-green-200">
-          <p className="text-xs text-green-700 mb-1">Predicted Click Rate</p>
-          <p className="text-xl font-bold text-green-900">{result.ctr_prediction}</p>
+        {/* What's Working / What Needs Work */}
+        <div className="space-y-3">
+          <div>
+            <h4 className="text-xs font-bold text-green-700 mb-2 flex items-center gap-1">
+              <CheckCircle size={14} /> What's Working
+            </h4>
+            <ul className="text-xs text-slate-700 space-y-1">
+              {result.scores.face_presence >= 70 && <li>✓ Clear, visible face catches attention</li>}
+              {result.scores.color_contrast >= 70 && <li>✓ Colors stand out and grab eyes</li>}
+              {result.scores.text_readability >= 70 && <li>✓ Text is easy to read</li>}
+              {result.scores.emotional_appeal >= 70 && <li>✓ Creates strong emotional reaction</li>}
+              {result.scores.clutter_score >= 70 && <li>✓ Clean, focused design</li>}
+              {!([result.scores.face_presence, result.scores.color_contrast, result.scores.text_readability, 
+                  result.scores.emotional_appeal, result.scores.clutter_score].some(s => s >= 70)) && 
+                <li className="text-slate-500 italic">This thumbnail needs improvement in all areas</li>}
+            </ul>
+          </div>
+
+          {result.recommendations.length > 0 && (
+            <div>
+              <h4 className="text-xs font-bold text-orange-700 mb-2 flex items-center gap-1">
+                <Lightbulb size={14} /> Quick Improvements
+              </h4>
+              <ul className="text-xs text-slate-700 space-y-1">
+                {result.recommendations.slice(0, 3).map((rec, idx) => (
+                  <li key={idx}>• {rec}</li>
+                ))}
+              </ul>
+            </div>
+          )}
         </div>
-
-        {/* Individual Scores */}
-        <div className="space-y-2">
-          <p className="text-xs font-semibold text-slate-700 uppercase">Breakdown</p>
-          <ScoreBar label="Face Detection" score={result.scores.face_presence} />
-          <ScoreBar label="Color Contrast" score={result.scores.color_contrast} />
-          <ScoreBar label="Text Readability" score={result.scores.text_readability} />
-          <ScoreBar label="Emotional Appeal" score={result.scores.emotional_appeal} />
-          <ScoreBar label="Clutter Score" score={result.scores.clutter_score} />
-        </div>
-
-        {/* Recommendations */}
-        <div className="p-3 bg-slate-50 rounded-lg">
-          <p className="text-xs font-medium text-slate-700 mb-2">💡 Tips:</p>
-          <ul className="text-xs text-slate-600 space-y-1">
-            {result.recommendations.map((rec, idx) => (
-              <li key={idx}>• {rec}</li>
-            ))}
-          </ul>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function ScoreBar({ label, score }) {
-  const getColor = (s) => {
-    if (s >= 75) return "bg-green-500";
-    if (s >= 50) return "bg-blue-500";
-    if (s >= 25) return "bg-amber-500";
-    return "bg-red-500";
-  };
-
-  return (
-    <div>
-      <div className="flex justify-between text-xs text-slate-600 mb-1">
-        <span>{label}</span>
-        <span className="font-medium">{score}/100</span>
-      </div>
-      <div className="w-full bg-slate-200 rounded-full h-1.5">
-        <div
-          className={`h-1.5 rounded-full ${getColor(score)}`}
-          style={{ width: `${score}%` }}
-        />
       </div>
     </div>
   );
@@ -809,6 +605,9 @@ function GrowthForecastView({ data, primaryName }) {
       label: `+${formatNumber(predictions.growth_12_months)}`
     }
   ];
+
+  const currentInsight = getEngagementInsight(engagementPred.current_engagement_rate);
+  const predictedInsight = getEngagementInsight(engagementPred.predicted_6m_engagement);
 
   return (
     <div className="space-y-6">
@@ -937,46 +736,28 @@ function GrowthForecastView({ data, primaryName }) {
           </div>
         </div>
 
-        {/* Engagement Forecast - SIMPLIFIED */}
+        {/* Engagement Quick View - USER FRIENDLY */}
         <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
           <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-            <ThumbsUp className="text-indigo-600" size={20} />
-            Engagement Forecast
+            <Heart className="text-pink-600" size={20} />
+            Viewer Interaction
           </h3>
           <div className="space-y-4">
-            <div>
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm text-slate-600">Current Level</span>
-                <span className={`font-semibold text-lg ${getEngagementLevel(engagementPred.current_engagement_rate).color}`}>
-                  {getEngagementLevel(engagementPred.current_engagement_rate).label}
-                </span>
-              </div>
-              <div className="flex justify-between items-center mb-3">
-                <span className="text-sm text-slate-600">Projected (6 months)</span>
-                <span className={`font-semibold text-lg ${
-                  engagementPred.trend === "improving" ? "text-green-600" :
-                  engagementPred.trend === "declining" ? "text-red-600" :
-                  "text-blue-600"
-                }`}>
-                  {getEngagementLevel(engagementPred.predicted_6m_engagement).label}
-                </span>
-              </div>
-              
-              {/* Simple progress bar */}
-              <div className="relative h-8 bg-slate-200 rounded-full overflow-hidden">
-                <div 
-                  className={`h-full rounded-full transition-all flex items-center justify-center text-white text-xs font-bold ${
-                    engagementPred.trend === "improving" ? "bg-green-500" :
-                    engagementPred.trend === "declining" ? "bg-red-500" :
-                    "bg-blue-500"
-                  }`}
-                  style={{ width: `${Math.min(100, engagementPred.predicted_6m_engagement * 2000)}%` }}
-                >
-                  {engagementPred.trend === "improving" && "Improving"}
-                  {engagementPred.trend === "declining" && "Declining"}
-                  {engagementPred.trend === "stable" && "Stable"}
+            <div className={`p-4 rounded-xl border-2 ${
+              currentInsight.level === "Excellent" ? "bg-green-50 border-green-200" :
+              currentInsight.level === "Very Good" ? "bg-blue-50 border-blue-200" :
+              currentInsight.level === "Good" ? "bg-indigo-50 border-indigo-200" :
+              currentInsight.level === "Fair" ? "bg-orange-50 border-orange-200" :
+              "bg-slate-50 border-slate-200"
+            }`}>
+              <div className="flex items-center gap-2 mb-2">
+                <span className="text-2xl">{currentInsight.icon}</span>
+                <div>
+                  <div className={`font-bold ${currentInsight.color}`}>{currentInsight.level}</div>
+                  <div className="text-xs text-slate-600">Current Status</div>
                 </div>
               </div>
+              <p className="text-sm text-slate-700 mt-2">{currentInsight.description}</p>
             </div>
 
             <div className={`p-3 rounded-lg border-2 ${
@@ -993,34 +774,20 @@ function GrowthForecastView({ data, primaryName }) {
                   engagementPred.trend === "declining" ? "text-red-700" :
                   "text-blue-700"
                 }`}>
-                  {engagementPred.trend === "improving" && "Great News!"}
-                  {engagementPred.trend === "declining" && "Needs Attention"}
-                  {engagementPred.trend === "stable" && "Steady Performance"}
+                  {engagementPred.trend === "improving" && "📈 Getting Better!"}
+                  {engagementPred.trend === "declining" && "📉 Needs Attention"}
+                  {engagementPred.trend === "stable" && "➡️ Staying Steady"}
                 </span>
               </div>
               <div className="text-xs text-slate-700">
                 {engagementPred.trend === "improving" && 
-                  "Your viewers are becoming more engaged over time. Keep doing what you're doing!"}
+                  `In 6 months, expect "${predictedInsight.level}" level engagement. Keep it up!`}
                 {engagementPred.trend === "declining" && 
-                  "Your engagement is trending down. Try asking more questions and responding to comments."}
+                  "Viewers are interacting less. Ask more questions in your videos!"}
                 {engagementPred.trend === "stable" && 
-                  "Your engagement is consistent. Look for ways to boost interaction even higher."}
+                  "Consistent performance. Look for ways to boost interaction even higher."}
               </div>
             </div>
-
-            {engagementPred.factors && engagementPred.factors.length > 0 && (
-              <div className="mt-3">
-                <div className="text-xs font-semibold text-slate-600 mb-2">Key Factors:</div>
-                <ul className="space-y-1">
-                  {engagementPred.factors.slice(0, 2).map((factor, idx) => (
-                    <li key={idx} className="text-xs text-slate-600 flex items-start gap-2">
-                      <span className="text-indigo-600 mt-0.5">•</span>
-                      <span>{factor}</span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -1256,15 +1023,38 @@ function CompetitiveTimelineView({ data, primaryName }) {
   );
 }
 
-// Engagement Prediction View - SIMPLIFIED
+// Engagement Prediction View - WITH LINE CHART
 function EngagementPredictionView({ data, primaryName }) {
   const primary = data.primary_channel;
   const engagementPred = primary.engagement_predictions;
   const competitors = data.competitors || [];
 
   const qualityInfo = getQualityDescription(primary.audience_quality);
-  const currentLevel = getEngagementLevel(engagementPred.current_engagement_rate);
-  const predictedLevel = getEngagementLevel(engagementPred.predicted_6m_engagement);
+  const currentInsight = getEngagementInsight(engagementPred.current_engagement_rate);
+  const predictedInsight = getEngagementInsight(engagementPred.predicted_6m_engagement);
+
+  // Create engagement trend data for line chart
+  const engagementChartData = [
+    {
+      month: "Now",
+      [primaryName || "You"]: (engagementPred.current_engagement_rate * 100).toFixed(2),
+      ...competitors.reduce((acc, comp) => {
+        acc[comp.channel_name] = (comp.engagement_predictions.current_engagement_rate * 100).toFixed(2);
+        return acc;
+      }, {})
+    },
+    {
+      month: "6 Months",
+      [primaryName || "You"]: (engagementPred.predicted_6m_engagement * 100).toFixed(2),
+      ...competitors.reduce((acc, comp) => {
+        acc[comp.channel_name] = (comp.engagement_predictions.predicted_6m_engagement * 100).toFixed(2);
+        return acc;
+      }, {})
+    }
+  ];
+
+  // Colors for different channels
+  const channelColors = ["#4f46e5", "#06b6d4", "#10b981", "#f59e0b", "#ef4444"];
 
   return (
     <div className="space-y-6">
@@ -1284,112 +1074,123 @@ function EngagementPredictionView({ data, primaryName }) {
         </div>
       </div>
 
-      {/* Engagement Forecast Header - SIMPLIFIED */}
-      <div className="rounded-2xl bg-gradient-to-br from-purple-600 to-pink-600 shadow-lg p-8 text-white">
-        <div className="flex items-center gap-3 mb-6">
-          <TrendingUp size={28} />
-          <h2 className="text-2xl font-bold">Your Engagement Forecast</h2>
-        </div>
+      {/* Engagement Trend Chart - NEW LINE CHART */}
+      <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-2">Engagement Forecast Comparison</h3>
+        <p className="text-sm text-slate-600 mb-4">
+          How viewer interaction is predicted to change over the next 6 months (% of viewers who like or comment)
+        </p>
         
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-          <div className="rounded-xl p-5 bg-white/10 backdrop-blur border border-white/20">
-            <div className="text-sm font-medium text-white/80 mb-2">Current Level</div>
-            <div className="text-3xl font-bold mb-1">
-              {currentLevel.label}
-            </div>
-            <div className="text-xs text-white/70">How engaged viewers are now</div>
-          </div>
-          
-          <div className="rounded-xl p-5 bg-white/20 border-2 border-white/40 backdrop-blur">
-            <div className="text-sm font-medium text-white/90 mb-2">Projected (6 months)</div>
-            <div className="text-3xl font-bold mb-1">
-              {predictedLevel.label}
-            </div>
-            <div className="text-xs text-white/80 flex items-center gap-1">
-              {engagementPred.trend === "improving" && (
-                <>
-                  <TrendingUp size={14} />
-                  Getting better!
-                </>
-              )}
-              {engagementPred.trend === "declining" && (
-                <>
-                  <TrendingDown size={14} />
-                  Needs work
-                </>
-              )}
-              {engagementPred.trend === "stable" && "Staying steady"}
-            </div>
-          </div>
-          
-          <div className="rounded-xl p-5 bg-white/10 backdrop-blur border border-white/20">
-            <div className="text-sm font-medium text-white/80 mb-2">Trend Direction</div>
-            <div className="text-2xl font-bold mb-1 capitalize flex items-center gap-2">
-              {engagementPred.trend === "improving" && (
-                <>
-                  <TrendingUp size={24} />
-                  <span>Improving</span>
-                </>
-              )}
-              {engagementPred.trend === "declining" && (
-                <>
-                  <TrendingDown size={24} />
-                  <span>Declining</span>
-                </>
-              )}
-              {engagementPred.trend === "stable" && (
-                <>
-                  <Activity size={24} />
-                  <span>Stable</span>
-                </>
-              )}
-            </div>
-            <div className="text-xs text-white/70">
-              {engagementPred.trend === "improving" ? "Keep it up!" : 
-               engagementPred.trend === "declining" ? "Needs attention" : 
-               "Maintaining steady"}
-            </div>
-          </div>
+        <div className="h-[300px]">
+          <ResponsiveContainer width="100%" height="100%">
+            <LineChart data={engagementChartData}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis 
+                dataKey="month"
+                style={{ fontSize: '12px' }}
+              />
+              <YAxis 
+                label={{ value: 'Engagement %', angle: -90, position: 'insideLeft' }}
+                style={{ fontSize: '12px' }}
+              />
+              <Tooltip 
+                formatter={(value) => [`${value}%`, ""]}
+              />
+              <Legend />
+              <Line 
+                type="monotone" 
+                dataKey={primaryName || "You"} 
+                stroke={channelColors[0]} 
+                strokeWidth={3}
+                dot={{ r: 6 }}
+              />
+              {competitors.map((comp, idx) => (
+                <Line 
+                  key={comp.channel_name}
+                  type="monotone" 
+                  dataKey={comp.channel_name} 
+                  stroke={channelColors[(idx + 1) % channelColors.length]} 
+                  strokeWidth={2}
+                  strokeDasharray="5 5"
+                  dot={{ r: 4 }}
+                />
+              ))}
+            </LineChart>
+          </ResponsiveContainer>
         </div>
 
-        {/* Simple Visual Representation */}
-        <div className="bg-white/10 rounded-xl p-5 backdrop-blur border border-white/20">
-          <div className="text-sm font-semibold text-white/90 mb-3">Engagement Journey</div>
-          <div className="flex items-center gap-4">
+        <div className="mt-4 p-4 bg-indigo-50 border-2 border-indigo-200 rounded-lg">
+          <div className="flex items-start gap-3">
+            <Info className="text-indigo-600 mt-0.5 flex-shrink-0" size={20} />
             <div className="flex-1">
-              <div className="flex justify-between text-xs text-white/70 mb-2">
-                <span>Now</span>
-                <span>6 Months</span>
-              </div>
-              <div className="relative h-12 bg-white/20 rounded-full overflow-hidden">
-                <div className="absolute inset-0 flex items-center">
-                  <div 
-                    className={`h-full rounded-full transition-all ${
-                      engagementPred.trend === "improving" ? "bg-green-400" :
-                      engagementPred.trend === "declining" ? "bg-red-400" :
-                      "bg-blue-400"
-                    }`}
-                    style={{ width: `${Math.min(100, engagementPred.current_engagement_rate * 2000)}%` }}
-                  />
-                  <div 
-                    className={`absolute h-full border-2 border-dashed transition-all ${
-                      engagementPred.trend === "improving" ? "border-green-200" :
-                      engagementPred.trend === "declining" ? "border-red-200" :
-                      "border-blue-200"
-                    }`}
-                    style={{ 
-                      left: `${Math.min(100, engagementPred.predicted_6m_engagement * 2000)}%`,
-                      width: '2px'
-                    }}
-                  />
-                </div>
-              </div>
-              <div className="flex justify-between text-xs text-white/90 mt-2">
-                <span className="font-semibold">{currentLevel.label}</span>
-                <span className="font-semibold">{predictedLevel.label}</span>
-              </div>
+              <div className="font-semibold text-slate-900 mb-1">Understanding the Chart:</div>
+              <p className="text-sm text-slate-700">
+                Your channel is shown with a <strong>solid line</strong>. Competitors have <strong>dashed lines</strong>. 
+                Higher percentages mean more viewers are actively liking and commenting on videos.
+              </p>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Current Status - USER FRIENDLY */}
+      <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
+        <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
+          <MessageCircle className="text-purple-600" size={24} />
+          Your Current Viewer Interaction
+        </h3>
+        
+        <div className={`p-5 rounded-xl border-2 ${
+          currentInsight.level === "Excellent" ? "bg-green-50 border-green-200" :
+          currentInsight.level === "Very Good" ? "bg-blue-50 border-blue-200" :
+          currentInsight.level === "Good" ? "bg-indigo-50 border-indigo-200" :
+          currentInsight.level === "Fair" ? "bg-orange-50 border-orange-200" :
+          "bg-slate-50 border-slate-200"
+        }`}>
+          <div className="flex items-center justify-between mb-3">
+            <div className="flex items-center gap-3">
+              <span className="text-4xl">{currentInsight.icon}</span>
+              <div>
+                <div className={`text-2xl font-bold mb-1 ${currentInsight.color}`}>{currentInsight.level}</div>
+                <div className="text-sm text-slate-600">Current engagement level</div>
+              </div>
+            </div>
+            <div className="text-right">
+              <div className="text-3xl font-bold text-slate-900">
+                {(engagementPred.current_engagement_rate * 100).toFixed(1)}%
+              </div>
+              <div className="text-xs text-slate-500">of viewers engage</div>
+            </div>
+          </div>
+          <p className="text-sm text-slate-700 mt-3 p-3 bg-white/50 rounded-lg">
+            {currentInsight.description}
+          </p>
+        </div>
+
+        {/* 6-Month Prediction */}
+        <div className="mt-4 p-4 rounded-xl border-2 bg-gradient-to-r from-purple-50 to-pink-50 border-purple-200">
+          <div className="flex items-center gap-2 mb-2">
+            {engagementPred.trend === "improving" && <TrendingUp className="text-green-600" size={24} />}
+            {engagementPred.trend === "declining" && <TrendingDown className="text-red-600" size={24} />}
+            {engagementPred.trend === "stable" && <Activity className="text-blue-600" size={24} />}
+            <span className="font-bold text-lg text-slate-900">
+              {engagementPred.trend === "improving" && "📈 Predicted to Improve!"}
+              {engagementPred.trend === "declining" && "📉 May Decline"}
+              {engagementPred.trend === "stable" && "➡️ Staying Consistent"}
+            </span>
+          </div>
+          <p className="text-sm text-slate-700 mb-2">
+            In 6 months, you'll likely have <strong className={predictedInsight.color}>{predictedInsight.level}</strong> engagement 
+            ({(engagementPred.predicted_6m_engagement * 100).toFixed(1)}% of viewers).
+          </p>
+          <p className="text-sm text-slate-600">
+            {engagementPred.trend === "improving" && 
+              "Keep up the great work! Your audience is getting more involved."}
+            {engagementPred.trend === "declining" && 
+              "Time to boost interaction. Try asking more questions in your videos!"}
+            {engagementPred.trend === "stable" && 
+              "Consistent performance. Look for opportunities to increase participation."}
+          </p>
         </div>
       </div>
 
@@ -1397,7 +1198,7 @@ function EngagementPredictionView({ data, primaryName }) {
       <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
         <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
           <Star className="text-indigo-600" size={24} />
-          Current Audience Quality
+          Audience Quality Score
         </h3>
         
         <div className={`p-5 rounded-xl border-2 ${qualityInfo.borderColor} ${qualityInfo.bgColor}`}>
@@ -1411,9 +1212,9 @@ function EngagementPredictionView({ data, primaryName }) {
               <div className="text-xs text-slate-500">out of 100</div>
             </div>
           </div>
-          <div className="w-full bg-slate-200 rounded-full h-2 mt-3">
+          <div className="w-full bg-slate-200 rounded-full h-3 mt-3">
             <div 
-              className={`h-2 rounded-full transition-all ${qualityInfo.color.replace('text-', 'bg-')}`}
+              className={`h-3 rounded-full transition-all ${qualityInfo.color.replace('text-', 'bg-')}`}
               style={{ width: `${primary.audience_quality}%` }}
             />
           </div>

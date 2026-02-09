@@ -15,6 +15,187 @@ from .youtube_utils import (
 
 enhanced_analyzer_bp = Blueprint("enhanced_analyzer", __name__, url_prefix="/api/youtube")
 
+# ========================= IMPROVED HELPER FUNCTIONS =========================
+
+def extract_meaningful_topics(videos):
+    """
+    Extract meaningful topics from video titles using NLP techniques.
+    Filters out stop words and generic terms to find actual content topics.
+    """
+    # Comprehensive stop words list
+    stop_words = {
+        'about', 'with', 'what', 'this', 'that', 'from', 'have', 'been', 
+        'into', 'your', 'more', 'than', 'when', 'where', 'which', 'their',
+        'there', 'these', 'those', 'will', 'would', 'could', 'should',
+        'make', 'made', 'want', 'very', 'just', 'some', 'also', 'here',
+        'they', 'them', 'then', 'than', 'only', 'other', 'such', 'even',
+        'most', 'much', 'many', 'well', 'back', 'down', 'over', 'after',
+        'before', 'through', 'during', 'while', 'since', 'until', 'because',
+        'video', 'videos', 'watch', 'watching', 'episode', 'part', 'full',
+        'new', 'latest', 'updated', 'best', 'top', 'must', 'need', 'every',
+        'how', 'why', 'can', 'you', 'your', 'the', 'and', 'for', 'are',
+        'all', 'any', 'has', 'had', 'but', 'not', 'was', 'our', 'out'
+    }
+    
+    # Generic promotional words to filter
+    promotional_words = {
+        'subscribe', 'like', 'share', 'comment', 'click', 'free', 'download',
+        'link', 'description', 'channel', 'please', 'don\'t', 'forget'
+    }
+    
+    stop_words.update(promotional_words)
+    
+    all_words = []
+    all_bigrams = []
+    all_trigrams = []
+    
+    for video in videos:
+        title = video.get("title", "").lower()
+        # Remove special characters but keep spaces
+        title = re.sub(r'[^\w\s-]', '', title)
+        words = title.split()
+        
+        # Single words (4+ characters, not stop words)
+        for word in words:
+            if len(word) >= 4 and word not in stop_words and word.isalpha():
+                all_words.append(word)
+        
+        # Bigrams (2-word phrases)
+        for i in range(len(words) - 1):
+            if words[i] not in stop_words or words[i+1] not in stop_words:
+                bigram = f"{words[i]} {words[i+1]}"
+                # Filter bigrams that are meaningful
+                if len(bigram) > 7 and not all(w in stop_words for w in words[i:i+2]):
+                    all_bigrams.append(bigram)
+        
+        # Trigrams (3-word phrases) - for specialized topics
+        for i in range(len(words) - 2):
+            if not all(w in stop_words for w in words[i:i+3]):
+                trigram = f"{words[i]} {words[i+1]} {words[i+2]}"
+                if len(trigram) > 10:
+                    all_trigrams.append(trigram)
+    
+    # Count frequencies
+    word_freq = Counter(all_words)
+    bigram_freq = Counter(all_bigrams)
+    trigram_freq = Counter(all_trigrams)
+    
+    # Combine all topics with frequency threshold
+    topics = []
+    
+    # Trigrams (most specific) - require 2+ occurrences
+    for phrase, count in trigram_freq.items():
+        if count >= 2:
+            topics.append((phrase, count))
+    
+    # Bigrams - require 3+ occurrences
+    for phrase, count in bigram_freq.items():
+        if count >= 3:
+            # Don't add if already covered by a trigram
+            if not any(phrase in t[0] for t in topics):
+                topics.append((phrase, count))
+    
+    # Single words - require 5+ occurrences
+    for word, count in word_freq.items():
+        if count >= 5:
+            # Don't add if already covered by a phrase
+            if not any(word in t[0] for t in topics):
+                topics.append((word, count))
+    
+    # Sort by frequency and return top 20
+    topics.sort(key=lambda x: x[1], reverse=True)
+    return topics[:20]
+
+def classify_content_type(video):
+    """Classify video by content type"""
+    title = video.get("title", "").lower()
+    
+    if any(word in title for word in ["how to", "tutorial", "guide", "learn", "explained"]):
+        return "tutorial"
+    elif any(word in title for word in ["funny", "challenge", "prank", "reaction", "vlog"]):
+        return "entertainment"
+    elif any(word in title for word in ["review", "vs", "comparison", "best", "top"]):
+        return "review"
+    elif any(word in title for word in ["news", "update", "announcement", "2024", "2025", "2026"]):
+        return "news"
+    else:
+        return "other"
+
+def analyze_content_sequences(videos):
+    """Analyze which content type sequences lead to better engagement"""
+    # Sort videos by publish date
+    sorted_videos = sorted(
+        videos,
+        key=lambda v: v.get("publishedAt", ""),
+        reverse=False
+    )
+    
+    sequences = []
+    for i in range(len(sorted_videos) - 2):
+        seq = [
+            classify_content_type(sorted_videos[i]),
+            classify_content_type(sorted_videos[i+1]),
+            classify_content_type(sorted_videos[i+2])
+        ]
+        avg_engagement = sum(
+            sorted_videos[j].get("engagement_rate", 0) 
+            for j in range(i, i+3)
+        ) / 3
+        
+        sequences.append({
+            "sequence": " → ".join(seq),
+            "avg_engagement": avg_engagement
+        })
+    
+    # Find top sequences
+    sequence_performance = {}
+    for seq_data in sequences:
+        seq_key = seq_data["sequence"]
+        if seq_key not in sequence_performance:
+            sequence_performance[seq_key] = []
+        sequence_performance[seq_key].append(seq_data["avg_engagement"])
+    
+    # Calculate averages
+    sequence_averages = [
+        {
+            "sequence": seq,
+            "avg_engagement": round(sum(engs) / len(engs), 4),
+            "occurrences": len(engs)
+        }
+        for seq, engs in sequence_performance.items()
+        if len(engs) >= 2  # Only sequences that happened 2+ times
+    ]
+    
+    sequence_averages.sort(key=lambda x: x["avg_engagement"], reverse=True)
+    
+    return sequence_averages[:5]  # Top 5 sequences
+
+def analyze_intro_patterns(videos):
+    """Extract common intro patterns from video titles"""
+    patterns = {
+        "question_hook": 0,
+        "number_hook": 0,
+        "urgency_hook": 0,
+        "curiosity_gap": 0,
+        "direct_value": 0
+    }
+    
+    for video in videos:
+        title = video.get("title", "")
+        
+        if "?" in title:
+            patterns["question_hook"] += 1
+        if any(char.isdigit() for char in title):
+            patterns["number_hook"] += 1
+        if any(word in title.lower() for word in ["now", "today", "urgent", "breaking"]):
+            patterns["urgency_hook"] += 1
+        if any(word in title.lower() for word in ["secret", "hidden", "revealed", "truth"]):
+            patterns["curiosity_gap"] += 1
+        if any(word in title.lower() for word in ["how to", "guide", "tutorial", "tips"]):
+            patterns["direct_value"] += 1
+    
+    return patterns
+
 
 # ========================= AUDIENCE JOURNEY MAPPING =========================
 @enhanced_analyzer_bp.route("/analyzer.audienceJourney", methods=["GET"])
@@ -23,6 +204,7 @@ def audience_journey():
     Map the audience journey: which videos attract subscribers, which lose them,
     and which content sequences lead to better retention.
     Compare primary channel vs linked channels.
+    IMPROVED: Uses standardized video sampling for fair comparison.
     """
     urls_param = request.args.get("urls")
     if not urls_param:
@@ -37,6 +219,28 @@ def audience_journey():
     
     if not channel_urls:
         return jsonify({"error": "No valid channel URLs provided"}), 400
+
+    # Determine minimum video count for fair sampling
+    channel_video_counts = []
+    
+    for channel_url in channel_urls:
+        channel_id = extract_channel_id(channel_url)
+        if not channel_id:
+            continue
+            
+        basic = fetch_basic_channel_stats(channel_id)
+        if not basic:
+            continue
+            
+        playlist_id = basic["uploadsPlaylistId"]
+        video_ids = fetch_video_ids(playlist_id, max_videos)
+        channel_video_counts.append(len(video_ids))
+    
+    # Use minimum video count across all channels for fair comparison
+    if channel_video_counts:
+        standardized_video_count = min(min(channel_video_counts), max_videos)
+    else:
+        standardized_video_count = max_videos
 
     all_channels_analysis = []
 
@@ -53,7 +257,7 @@ def audience_journey():
 
         channel_name = basic.get("title", f"Channel {idx + 1}")
         playlist_id = basic["uploadsPlaylistId"]
-        video_ids = fetch_video_ids(playlist_id, max_videos)
+        video_ids = fetch_video_ids(playlist_id, standardized_video_count)
         
         if not video_ids:
             continue
@@ -191,7 +395,8 @@ def audience_journey():
             },
             "insights": insights,
             "avg_engagement": round(avg_engagement, 4),
-            "total_videos": len(videos)
+            "total_videos": len(videos),
+            "videos_analyzed": standardized_video_count  # NEW: track actual count
         })
 
     if not all_channels_analysis:
@@ -276,7 +481,12 @@ def audience_journey():
     return jsonify({
         "channels": all_channels_analysis,
         "comparison_insights": comparison_insights,
-        "has_comparison": len(all_channels_analysis) > 1
+        "has_comparison": len(all_channels_analysis) > 1,
+        "sampling_metadata": {
+            "videos_per_channel": standardized_video_count,
+            "is_standardized": len(set(channel_video_counts)) > 1 if channel_video_counts else False,
+            "original_counts": dict(zip(channel_urls[:len(channel_video_counts)], channel_video_counts))
+        } if len(channel_video_counts) > 0 else {}
     }), 200
 
 
@@ -291,6 +501,7 @@ def engagement_quality():
     - Action indicators
     - Community building
     Compare primary vs linked channels.
+    IMPROVED: Ensures equal video sampling across channels for fair comparison.
     """
     urls_param = request.args.get("urls")
     if not urls_param:
@@ -308,6 +519,28 @@ def engagement_quality():
     if not channel_urls:
         return jsonify({"error": "No valid channel URLs provided"}), 400
 
+    # IMPROVEMENT: Determine minimum video count for fair sampling
+    channel_video_counts = []
+    
+    for channel_url in channel_urls:
+        channel_id = extract_channel_id(channel_url)
+        if not channel_id:
+            continue
+            
+        basic = fetch_basic_channel_stats(channel_id)
+        if not basic:
+            continue
+            
+        playlist_id = basic["uploadsPlaylistId"]
+        video_ids = fetch_video_ids(playlist_id, max_videos)
+        channel_video_counts.append(len(video_ids))
+    
+    # Use minimum video count across all channels for fair comparison
+    if channel_video_counts:
+        standardized_video_count = min(min(channel_video_counts), max_videos)
+    else:
+        standardized_video_count = max_videos
+
     all_channels_quality = []
 
     for idx, channel_url in enumerate(channel_urls):
@@ -323,7 +556,9 @@ def engagement_quality():
 
         channel_name = basic.get("title", f"Channel {idx + 1}")
         playlist_id = basic["uploadsPlaylistId"]
-        video_ids = fetch_video_ids(playlist_id, max_videos)
+        
+        # IMPROVEMENT: Use standardized count for all channels
+        video_ids = fetch_video_ids(playlist_id, standardized_video_count)
         
         if not video_ids:
             continue
@@ -332,7 +567,7 @@ def engagement_quality():
         
         # Fetch comments
         all_comments = []
-        for video_id, video in zip(video_ids[:max_videos], videos):
+        for video_id, video in zip(video_ids[:standardized_video_count], videos):
             comments = fetch_video_comments(video_id, max_comments_per_video)
             for comment in comments:
                 comment["video_id"] = video_id
@@ -542,6 +777,7 @@ def engagement_quality():
             "channel_name": channel_name,
             "is_primary": is_primary,
             "total_comments": len(all_comments),
+            "videos_analyzed": standardized_video_count,
             "quality_metrics": {
                 "overall_quality_score": round(quality_score, 1),
                 "avg_comment_length": round(avg_comment_length, 1),
@@ -642,7 +878,12 @@ def engagement_quality():
     return jsonify({
         "channels": all_channels_quality,
         "comparison_insights": comparison_insights,
-        "has_comparison": len(all_channels_quality) > 1
+        "has_comparison": len(all_channels_quality) > 1,
+        "sampling_metadata": {
+            "videos_per_channel": standardized_video_count,
+            "is_standardized": len(set(channel_video_counts)) > 1 if channel_video_counts else False,
+            "original_counts": dict(zip(channel_urls[:len(channel_video_counts)], channel_video_counts))
+        } if len(channel_video_counts) > 0 else {}
     }), 200
 
 
@@ -653,6 +894,7 @@ def retention_heatmap():
     Analyze where viewers drop off in videos and identify golden retention windows.
     Uses proxy metrics (engagement patterns, video length analysis).
     Compare primary vs linked channels.
+    IMPROVED: Uses standardized video sampling for fair comparison.
     """
     urls_param = request.args.get("urls")
     if not urls_param:
@@ -667,6 +909,28 @@ def retention_heatmap():
     
     if not channel_urls:
         return jsonify({"error": "No valid channel URLs provided"}), 400
+
+    # Determine minimum video count for fair sampling
+    channel_video_counts = []
+    
+    for channel_url in channel_urls:
+        channel_id = extract_channel_id(channel_url)
+        if not channel_id:
+            continue
+            
+        basic = fetch_basic_channel_stats(channel_id)
+        if not basic:
+            continue
+            
+        playlist_id = basic["uploadsPlaylistId"]
+        video_ids = fetch_video_ids(playlist_id, max_videos)
+        channel_video_counts.append(len(video_ids))
+    
+    # Use minimum video count across all channels for fair comparison
+    if channel_video_counts:
+        standardized_video_count = min(min(channel_video_counts), max_videos)
+    else:
+        standardized_video_count = max_videos
 
     all_channels_retention = []
 
@@ -683,7 +947,7 @@ def retention_heatmap():
 
         channel_name = basic.get("title", f"Channel {idx + 1}")
         playlist_id = basic["uploadsPlaylistId"]
-        video_ids = fetch_video_ids(playlist_id, max_videos)
+        video_ids = fetch_video_ids(playlist_id, standardized_video_count)
         
         if not video_ids:
             continue
@@ -737,15 +1001,21 @@ def retention_heatmap():
         
         # GOLDEN RETENTION WINDOW
         # Identify the sweet spot duration
+        golden_window_data = None
+        window_names = {
+            "ultra_short": "under 3 minutes",
+            "short": "3-8 minutes",
+            "medium": "8-15 minutes",
+            "long": "15-30 minutes",
+            "very_long": "over 30 minutes"
+        }
+        
         if duration_performance:
             golden_window = max(duration_performance.items(), key=lambda x: x[1]["avg_engagement"])
-            
-            window_names = {
-                "ultra_short": "under 3 minutes",
-                "short": "3-8 minutes",
-                "medium": "8-15 minutes",
-                "long": "15-30 minutes",
-                "very_long": "over 30 minutes"
+            golden_window_data = {
+                "duration_range": golden_window[0],
+                "duration_label": window_names.get(golden_window[0]),
+                "metrics": golden_window[1]
             }
         
         # INTRO RETENTION ANALYSIS
@@ -803,12 +1073,12 @@ def retention_heatmap():
         # INSIGHTS
         insights = []
         
-        if golden_window:
+        if golden_window_data:
             insights.append({
                 "type": "golden_window",
-                "title": f"Your Sweet Spot: {window_names[golden_window[0]].title()} Videos",
-                "description": f"Videos {window_names[golden_window[0]]} get {(golden_window[1]['avg_engagement'] * 100):.2f}% engagement - your best retention.",
-                "action": f"Focus on creating {window_names[golden_window[0]]} content. You have {golden_window[1]['video_count']} videos in this range.",
+                "title": f"Your Sweet Spot: {golden_window_data['duration_label'].title()} Videos",
+                "description": f"Videos {golden_window_data['duration_label']} get {(golden_window_data['metrics']['avg_engagement'] * 100):.2f}% engagement - your best retention.",
+                "action": f"Focus on creating {golden_window_data['duration_label']} content. You have {golden_window_data['metrics']['video_count']} videos in this range.",
                 "impact": "high"
             })
         
@@ -853,11 +1123,7 @@ def retention_heatmap():
             "channel_name": channel_name,
             "is_primary": is_primary,
             "duration_performance": duration_performance,
-            "golden_window": {
-                "duration_range": golden_window[0] if golden_window else None,
-                "duration_label": window_names.get(golden_window[0]) if golden_window else None,
-                "metrics": golden_window[1] if golden_window else None
-            } if duration_performance else None,
+            "golden_window": golden_window_data,
             "retention_zones": retention_percentages,
             "retention_heatmap": [
                 {"zone": "Intro (0-20%)", "retention": retention_percentages["intro"]},
@@ -871,7 +1137,8 @@ def retention_heatmap():
                 "ineffective": intro_patterns_bad
             },
             "insights": insights,
-            "total_videos": len(videos)
+            "total_videos": len(videos),
+            "videos_analyzed": standardized_video_count
         })
 
     if not all_channels_retention:
@@ -947,7 +1214,12 @@ def retention_heatmap():
     return jsonify({
         "channels": all_channels_retention,
         "comparison_insights": comparison_insights,
-        "has_comparison": len(all_channels_retention) > 1
+        "has_comparison": len(all_channels_retention) > 1,
+        "sampling_metadata": {
+            "videos_per_channel": standardized_video_count,
+            "is_standardized": len(set(channel_video_counts)) > 1 if channel_video_counts else False,
+            "original_counts": dict(zip(channel_urls[:len(channel_video_counts)], channel_video_counts))
+        } if len(channel_video_counts) > 0 else {}
     }), 200
 
 
@@ -957,6 +1229,7 @@ def competitor_gaps():
     """
     Identify content gaps, posting frequency gaps, and opportunity areas.
     Show what competitors do that you don't, and vice versa.
+    IMPROVED: Better topic extraction and visual categorization.
     """
     urls_param = request.args.get("urls")
     if not urls_param:
@@ -971,6 +1244,21 @@ def competitor_gaps():
     
     if len(channel_urls) < 2:
         return jsonify({"error": "Need at least 2 channels for gap analysis"}), 400
+
+    # IMPROVEMENT: Determine minimum video count
+    channel_video_counts = []
+    for channel_url in channel_urls:
+        channel_id = extract_channel_id(channel_url)
+        if not channel_id:
+            continue
+        basic = fetch_basic_channel_stats(channel_id)
+        if not basic:
+            continue
+        playlist_id = basic["uploadsPlaylistId"]
+        video_ids = fetch_video_ids(playlist_id, max_videos)
+        channel_video_counts.append(len(video_ids))
+    
+    standardized_video_count = min(min(channel_video_counts), max_videos) if channel_video_counts else max_videos
 
     all_channels_data = []
 
@@ -987,22 +1275,17 @@ def competitor_gaps():
 
         channel_name = basic.get("title", f"Channel {idx + 1}")
         playlist_id = basic["uploadsPlaylistId"]
-        video_ids = fetch_video_ids(playlist_id, max_videos)
+        
+        # Use standardized count
+        video_ids = fetch_video_ids(playlist_id, standardized_video_count)
         
         if not video_ids:
             continue
 
         videos = fetch_video_stats(video_ids, with_snippet=True)
         
-        # Extract topics from titles
-        all_topics = []
-        for video in videos:
-            title = video.get("title", "").lower()
-            # Extract meaningful words (4+ chars)
-            words = [w for w in title.split() if len(w) > 4 and w.isalpha()]
-            all_topics.extend(words)
-        
-        topic_frequency = Counter(all_topics)
+        # IMPROVEMENT: Use new topic extraction function
+        meaningful_topics = extract_meaningful_topics(videos)
         
         # Content type distribution
         content_types = [classify_content_type(v) for v in videos]
@@ -1015,7 +1298,7 @@ def competitor_gaps():
             comments = video.get("comments", 0)
             video["engagement_rate"] = (likes + comments) / views if views > 0 else 0
         
-        # Posting frequency
+        # Posting frequency analysis
         video_dates = []
         for video in videos:
             pub_date = video.get("publishedAt", "")
@@ -1042,13 +1325,14 @@ def competitor_gaps():
             "channel_id": channel_id,
             "channel_name": channel_name,
             "is_primary": is_primary,
-            "topics": topic_frequency.most_common(20),
+            "topics": meaningful_topics,  # Now using improved extraction
             "content_types": dict(content_type_dist),
             "avg_posting_frequency_days": round(avg_posting_frequency, 1),
             "videos_per_month": round(30 / avg_posting_frequency, 1) if avg_posting_frequency > 0 else 0,
             "avg_views": round(avg_views, 0),
             "avg_engagement": round(avg_engagement, 4),
-            "total_videos": len(videos)
+            "total_videos": len(videos),
+            "videos_analyzed": standardized_video_count  # NEW: track actual count
         })
 
     if len(all_channels_data) < 2:
@@ -1057,36 +1341,37 @@ def competitor_gaps():
     primary = all_channels_data[0]
     competitors = all_channels_data[1:]
 
-    # CONTENT GAP ANALYSIS
+    # CONTENT GAP ANALYSIS with improved topics
     primary_topics = set(t[0] for t in primary["topics"])
     
-    # Topics competitors cover that you don't
     competitor_topics = set()
     for comp in competitors:
         competitor_topics.update(t[0] for t in comp["topics"])
     
     content_gaps = competitor_topics - primary_topics
     
-    # Find high-performing topics from competitors that you're missing
+    # Find high-value gaps with better categorization
     high_value_gaps = []
     for comp in competitors:
         for topic, count in comp["topics"]:
-            if topic in content_gaps and count >= 3:  # Mentioned 3+ times
+            if topic in content_gaps and count >= 2:  # At least 2 mentions
                 high_value_gaps.append({
                     "topic": topic,
                     "competitor": comp["channel_name"],
                     "frequency": count,
-                    "their_engagement": comp["avg_engagement"]
+                    "their_engagement": comp["avg_engagement"],
+                    "topic_length": len(topic.split()),  # NEW: classify as phrase or word
+                    "is_specific": len(topic.split()) > 1  # NEW: is it a specific phrase?
                 })
     
-    # Sort by engagement
-    high_value_gaps.sort(key=lambda x: x["frequency"], reverse=True)
-    high_value_gaps = high_value_gaps[:10]  # Top 10
+    # Sort by specificity first, then frequency
+    high_value_gaps.sort(key=lambda x: (x["is_specific"], x["frequency"]), reverse=True)
+    high_value_gaps = high_value_gaps[:15]  # Top 15
     
     # YOUR UNIQUE TOPICS (what you cover that they don't)
     your_unique_topics = primary_topics - competitor_topics
     your_unique_performers = [
-        {"topic": t[0], "frequency": t[1]}
+        {"topic": t[0], "frequency": t[1], "is_specific": len(t[0].split()) > 1}
         for t in primary["topics"]
         if t[0] in your_unique_topics
     ][:10]
@@ -1206,12 +1491,13 @@ def competitor_gaps():
     return jsonify({
         "primary_channel": {
             "name": primary["channel_name"],
-            "topics": primary["topics"][:15],
+            "topics": primary["topics"][:20],
             "content_types": primary["content_types"],
             "posting_frequency": primary["avg_posting_frequency_days"],
             "videos_per_month": primary["videos_per_month"],
             "avg_views": primary["avg_views"],
-            "avg_engagement": primary["avg_engagement"]
+            "avg_engagement": primary["avg_engagement"],
+            "videos_analyzed": primary["videos_analyzed"]
         },
         "competitors_summary": [
             {
@@ -1220,7 +1506,8 @@ def competitor_gaps():
                 "videos_per_month": c["videos_per_month"],
                 "avg_views": c["avg_views"],
                 "avg_engagement": c["avg_engagement"],
-                "top_topics": c["topics"][:5]
+                "top_topics": c["topics"][:5],
+                "videos_analyzed": c["videos_analyzed"]
             }
             for c in competitors
         ],
@@ -1229,7 +1516,9 @@ def competitor_gaps():
                 "topic": gap["topic"],
                 "competitor": gap["competitor"],
                 "frequency": gap["frequency"],
-                "engagement": round(gap["their_engagement"], 4)
+                "engagement": round(gap["their_engagement"], 4),
+                "is_phrase": gap["is_specific"],
+                "opportunity_type": "specific" if gap["is_specific"] else "general"
             }
             for gap in high_value_gaps
         ],
@@ -1251,100 +1540,10 @@ def competitor_gaps():
             "views_gap": round(views_gap, 0)
         },
         "gap_insights": gap_insights,
-        "opportunities": opportunities
+        "opportunities": opportunities,
+        "sampling_metadata": {
+            "videos_per_channel": standardized_video_count,
+            "ensures_fair_comparison": True,
+            "original_counts": dict(zip(channel_urls[:len(channel_video_counts)], channel_video_counts))
+        } if len(channel_video_counts) > 0 else {}
     }), 200
-
-
-# ========================= HELPER FUNCTIONS =========================
-
-def classify_content_type(video):
-    """Classify video by content type"""
-    title = video.get("title", "").lower()
-    
-    if any(word in title for word in ["how to", "tutorial", "guide", "learn", "explained"]):
-        return "tutorial"
-    elif any(word in title for word in ["funny", "challenge", "prank", "reaction", "vlog"]):
-        return "entertainment"
-    elif any(word in title for word in ["review", "vs", "comparison", "best", "top"]):
-        return "review"
-    elif any(word in title for word in ["news", "update", "announcement", "2024", "2025", "2026"]):
-        return "news"
-    else:
-        return "other"
-
-
-def analyze_content_sequences(videos):
-    """Analyze which content type sequences lead to better engagement"""
-    # Sort videos by publish date
-    sorted_videos = sorted(
-        videos,
-        key=lambda v: v.get("publishedAt", ""),
-        reverse=False
-    )
-    
-    sequences = []
-    for i in range(len(sorted_videos) - 2):
-        seq = [
-            classify_content_type(sorted_videos[i]),
-            classify_content_type(sorted_videos[i+1]),
-            classify_content_type(sorted_videos[i+2])
-        ]
-        avg_engagement = sum(
-            sorted_videos[j].get("engagement_rate", 0) 
-            for j in range(i, i+3)
-        ) / 3
-        
-        sequences.append({
-            "sequence": " → ".join(seq),
-            "avg_engagement": avg_engagement
-        })
-    
-    # Find top sequences
-    sequence_performance = {}
-    for seq_data in sequences:
-        seq_key = seq_data["sequence"]
-        if seq_key not in sequence_performance:
-            sequence_performance[seq_key] = []
-        sequence_performance[seq_key].append(seq_data["avg_engagement"])
-    
-    # Calculate averages
-    sequence_averages = [
-        {
-            "sequence": seq,
-            "avg_engagement": round(sum(engs) / len(engs), 4),
-            "occurrences": len(engs)
-        }
-        for seq, engs in sequence_performance.items()
-        if len(engs) >= 2  # Only sequences that happened 2+ times
-    ]
-    
-    sequence_averages.sort(key=lambda x: x["avg_engagement"], reverse=True)
-    
-    return sequence_averages[:5]  # Top 5 sequences
-
-
-def analyze_intro_patterns(videos):
-    """Extract common intro patterns from video titles"""
-    patterns = {
-        "question_hook": 0,
-        "number_hook": 0,
-        "urgency_hook": 0,
-        "curiosity_gap": 0,
-        "direct_value": 0
-    }
-    
-    for video in videos:
-        title = video.get("title", "")
-        
-        if "?" in title:
-            patterns["question_hook"] += 1
-        if any(char.isdigit() for char in title):
-            patterns["number_hook"] += 1
-        if any(word in title.lower() for word in ["now", "today", "urgent", "breaking"]):
-            patterns["urgency_hook"] += 1
-        if any(word in title.lower() for word in ["secret", "hidden", "revealed", "truth"]):
-            patterns["curiosity_gap"] += 1
-        if any(word in title.lower() for word in ["how to", "guide", "tutorial", "tips"]):
-            patterns["direct_value"] += 1
-    
-    return patterns
