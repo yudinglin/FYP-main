@@ -2044,9 +2044,11 @@ function TabButtonWithInfo({ icon: Icon, label, description, tab, activeTab, onC
           <div className={`text-sm font-medium mb-1 ${isActive ? "text-indigo-700" : "text-slate-900"}`}>
             {label}
           </div>
-          <p className={`text-xs leading-relaxed ${isActive ? "text-indigo-600" : "text-slate-500"}`}>
-            {description}
-          </p>
+          {isActive && (
+            <p className="text-xs leading-relaxed text-indigo-600">
+              {description}
+            </p>
+          )}
         </div>
       </div>
     </button>

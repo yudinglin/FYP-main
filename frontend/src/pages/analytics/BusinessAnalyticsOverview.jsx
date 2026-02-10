@@ -64,7 +64,7 @@ export default function BusinessAnalyticsOverview() {
           highlights={[
             "Interactive network graph showing video correlations",
             "Visualize video similarity based on views, likes, and comments",
-            "Compare performance across up to 3 linked channels",
+            "Compare performance across up to 5 linked channels",
             "Identify content clusters and performance patterns",
             "See which videos are connected by similar audience behavior",
           ]}
