@@ -275,7 +275,7 @@ export default function EnhancedChannelAnalyzer() {
                 />
                 <TabButtonWithInfo
                   icon={Activity}
-                  label="Retention Heatmap"
+                  label="Estimated Audience Retention Heatmap"
                   description="See exactly where viewers drop off and find your optimal video length"
                   tab="retention"
                   activeTab={activeTab}
@@ -1182,7 +1182,7 @@ function TopQualityCommentsSection({ comments }) {
   );
 }
 
-// ==================== RETENTION HEATMAP VIEW ====================
+// ==================== ESTIMATED AUDIENCE RETENTION HEATMAP VIEW ====================
 function RetentionHeatmapView({ data, loading }) {
   const [selectedChannel, setSelectedChannel] = useState(null);
 
@@ -1196,7 +1196,7 @@ function RetentionHeatmapView({ data, loading }) {
     return (
       <EmptyState
         icon={Activity}
-        title="Audience Retention Heatmap"
+        title="Estimated Audience Retention Heatmap"
         description="Discover where viewers drop off and identify your golden retention window."
         features={[
           "See retention patterns across video sections",
@@ -1238,7 +1238,7 @@ function RetentionHeatmapView({ data, loading }) {
 
       {selectedChannel && (
         <>
-          {/* Retention Heatmap with confidence and metadata */}
+          {/* Estimated Audience Retention Heatmap with confidence and metadata */}
           <RetentionHeatmapSection 
             heatmap={selectedChannel.retention_heatmap} 
             confidence={selectedChannel.confidence}
@@ -1303,7 +1303,7 @@ function RetentionHeatmapSection({ heatmap, confidence, metadata }) {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Activity className="text-blue-600" size={20} />
-          <h2 className="text-lg font-semibold text-slate-900">Retention Heatmap</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Estimated Audience Retention Heatmap</h2>
         </div>
         {confidence && (
           <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${confidenceBadge.color}`}>

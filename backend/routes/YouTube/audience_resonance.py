@@ -893,7 +893,7 @@ def compare_retention_patterns(all_channels_data):
     return comparison_insights
 
 
-# ========================= AUDIENCE RETENTION HEATMAPS =========================
+# ========================= ESTIMATED AUDIENCE RETENTION HEATMAPS =========================
 @enhanced_analyzer_bp.route("/analyzer.retentionHeatmap", methods=["GET"])
 def retention_heatmap():
     """

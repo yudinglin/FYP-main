@@ -42,7 +42,7 @@ export default function BusinessAnalyticsOverview() {
           }
           highlights={[
             "Measure comment depth and conversation quality beyond sentiment",
-            "See exactly where viewers drop off with retention heatmaps",
+            "See exactly where viewers drop off with Estimated Audience Retention Heatmaps",
             "Find your optimal video length for maximum retention",
             "Discover content opportunities competitors are missing",
             "Identify areas where you dominate your competition",
