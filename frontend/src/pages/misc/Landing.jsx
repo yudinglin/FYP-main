@@ -166,22 +166,22 @@ export default function Landing() {
       {/* 🎥 DEMO VIDEO MODAL */}
       {showDemo && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70">
-          <div className="relative w-[90%] max-w-3xl rounded-2xl bg-black overflow-hidden">
             <button
               onClick={() => setShowDemo(false)}
-              className="absolute top-3 right-3 z-10 text-white text-xl"
+              className="absolute top-6 right-6 text-white text-2xl z-50"
             >
               ✕
             </button>
-
-            <video
-              className="w-full aspect-video"
-              src="/YouAnalyze-demo.mp4"
-              controls
-              autoPlay
-            />
+            <div className="relative w-[90%] max-w-3xl rounded-2xl bg-black overflow-hidden">
+              <video
+                className="w-full aspect-video"
+                src="/YouAnalyze-demo.mp4"
+                controls
+                autoPlay
+              />
+            </div>
           </div>
-        </div>
+
       )}
     </div>
   );
