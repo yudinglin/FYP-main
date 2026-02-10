@@ -278,9 +278,9 @@ export default function PredictiveAnalysis() {
       
       // Add names to growth comparisons
       if (data.growth_comparisons) {
-        data.growth_comparisons = data.growth_comparisons.map((gc, idx) => ({
+        data.growth_comparisons = data.growth_comparisons.map((gc) => ({
           ...gc,
-          competitor_name: competitorChannels[idx]?.name || gc.competitor_name,
+          competitor_name: data.competitors[gc.competitor_index]?.channel_name || gc.competitor_name,
         }));
       }
       
@@ -653,74 +653,74 @@ function GrowthForecastView({ data, primaryName }) {
   return (
     <div className="space-y-6">
       {/* Hero Forecast Card */}
-      <div className="rounded-2xl bg-gradient-to-br from-indigo-600 to-purple-600 shadow-lg p-8 text-white">
+      <div className="rounded-2xl bg-white shadow-lg p-8 border-2 border-purple-200">
         <div className="flex items-center gap-3 mb-4">
-          <Sparkles size={28} />
-          <h2 className="text-2xl font-bold">Your Growth Forecast</h2>
+          <Sparkles size={28} className="text-purple-600" />
+          <h2 className="text-2xl font-bold text-purple-600">Your Growth Forecast</h2>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-          <div className="rounded-xl p-5 bg-white/10 backdrop-blur border border-white/20">
-            <div className="text-sm font-medium text-white/80 mb-2">Current Subscribers</div>
-            <div className="text-3xl font-bold mb-1">{formatNumber(primary.subscribers)}</div>
-            <div className="text-xs text-white/70">Starting point</div>
+          <div className="rounded-xl p-5 bg-purple-50 border border-purple-200">
+            <div className="text-sm font-medium text-purple-700 mb-2">Current Subscribers</div>
+            <div className="text-3xl font-bold mb-1 text-purple-900">{formatNumber(primary.subscribers)}</div>
+            <div className="text-xs text-purple-600">Starting point</div>
           </div>
           
-          <div className="rounded-xl p-5 bg-white/20 border-2 border-white/40 backdrop-blur">
-            <div className="text-sm font-medium text-white/90 mb-2 flex items-center gap-2">
-              <Target size={16} />
+          <div className="rounded-xl p-5 bg-purple-100 border-2 border-purple-300">
+            <div className="text-sm font-medium text-purple-800 mb-2 flex items-center gap-2">
+              <Target size={16} className="text-purple-700" />
               6-Month Forecast
             </div>
-            <div className="text-3xl font-bold mb-1">{formatNumber(predictions.predicted_6_months)}</div>
-            <div className="text-xs text-white/80 flex items-center gap-1">
+            <div className="text-3xl font-bold mb-1 text-purple-900">{formatNumber(predictions.predicted_6_months)}</div>
+            <div className="text-xs text-purple-700 flex items-center gap-1">
               <TrendingUp size={14} />
               +{formatNumber(predictions.growth_6_months)} new subscribers
             </div>
           </div>
           
-          <div className="rounded-xl p-5 bg-white/10 backdrop-blur border border-white/20">
-            <div className="text-sm font-medium text-white/80 mb-2">Monthly Growth</div>
-            <div className="text-3xl font-bold mb-1">{predictions.monthly_growth_rate}%</div>
-            <div className="text-xs text-white/70">Avg. per month</div>
+          <div className="rounded-xl p-5 bg-purple-50 border border-purple-200">
+            <div className="text-sm font-medium text-purple-700 mb-2">Monthly Growth</div>
+            <div className="text-3xl font-bold mb-1 text-purple-900">{predictions.monthly_growth_rate}%</div>
+            <div className="text-xs text-purple-600">Avg. per month</div>
           </div>
         </div>
 
         {/* Growth Chart */}
-        <div className="bg-white/10 rounded-xl p-5 backdrop-blur border border-white/20">
-          <div className="text-sm font-semibold text-white/90 mb-4">Projected Growth Trajectory</div>
+        <div className="bg-white rounded-xl p-5 border border-purple-200">
+          <div className="text-sm font-semibold text-purple-600 mb-4">Projected Growth Trajectory</div>
           <div className="h-[240px]">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
                 <defs>
                   <linearGradient id="subscriberGradient" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ffffff" stopOpacity={0.3}/>
-                    <stop offset="95%" stopColor="#ffffff" stopOpacity={0}/>
+                    <stop offset="5%" stopColor="#9333ea" stopOpacity={0.3}/>
+                    <stop offset="95%" stopColor="#9333ea" stopOpacity={0}/>
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(147,51,234,0.1)" />
                 <XAxis 
                   dataKey="month" 
-                  stroke="rgba(255,255,255,0.7)"
-                  style={{ fontSize: '12px' }}
+                  stroke="#9333ea"
+                  style={{ fontSize: '12px', fill: '#9333ea' }}
                 />
                 <YAxis 
-                  stroke="rgba(255,255,255,0.7)"
-                  style={{ fontSize: '12px' }}
+                  stroke="#9333ea"
+                  style={{ fontSize: '12px', fill: '#9333ea' }}
                   tickFormatter={(value) => formatNumber(value)}
                 />
                 <Tooltip 
                   contentStyle={{
-                    backgroundColor: 'rgba(0,0,0,0.8)',
-                    border: 'none',
+                    backgroundColor: '#ffffff',
+                    border: '1px solid #9333ea',
                     borderRadius: '8px',
-                    color: '#fff'
+                    color: '#9333ea'
                   }}
                   formatter={(value) => [formatNumber(value), "Subscribers"]}
                 />
                 <Area 
                   type="monotone" 
                   dataKey="subscribers" 
-                  stroke="#ffffff" 
+                  stroke="#9333ea" 
                   strokeWidth={3}
                   fill="url(#subscriberGradient)"
                 />
@@ -732,13 +732,13 @@ function GrowthForecastView({ data, primaryName }) {
         {/* Confidence Indicator */}
         <div className="mt-4 flex items-center gap-3 text-sm">
           <div className={`px-3 py-1 rounded-full font-semibold ${
-            predictions.confidence === "high" ? "bg-green-500/20 text-green-100 border border-green-400/30" :
-            predictions.confidence === "medium" ? "bg-yellow-500/20 text-yellow-100 border border-yellow-400/30" :
-            "bg-slate-500/20 text-slate-100 border border-slate-400/30"
+            predictions.confidence === "high" ? "bg-green-100 text-green-700 border border-green-300" :
+            predictions.confidence === "medium" ? "bg-yellow-100 text-yellow-700 border border-yellow-300" :
+            "bg-slate-100 text-slate-700 border border-slate-300"
           }`}>
             {predictions.confidence.toUpperCase()} CONFIDENCE
           </div>
-          <span className="text-white/70">
+          <span className="text-purple-700">
             Based on {primary.video_count} videos of performance data
           </span>
         </div>
@@ -1298,21 +1298,18 @@ function EngagementPredictionView({ data, primaryName }) {
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="p-4 bg-white rounded-lg border border-purple-100">
-            <div className="text-2xl mb-2">📈</div>
             <div className="font-bold text-slate-900 mb-2">YouTube Loves It</div>
             <p className="text-sm text-slate-600">
               Videos with high engagement get recommended more by YouTube's algorithm
             </p>
           </div>
           <div className="p-4 bg-white rounded-lg border border-purple-100">
-            <div className="text-2xl mb-2">💬</div>
             <div className="font-bold text-slate-900 mb-2">Builds Community</div>
             <p className="text-sm text-slate-600">
               Active comment sections create loyal fans who return for each video
             </p>
           </div>
           <div className="p-4 bg-white rounded-lg border border-purple-100">
-            <div className="text-2xl mb-2">🎯</div>
             <div className="font-bold text-slate-900 mb-2">Drives Growth</div>
             <p className="text-sm text-slate-600">
               Engaged viewers are more likely to subscribe and share your content
@@ -1321,33 +1318,7 @@ function EngagementPredictionView({ data, primaryName }) {
         </div>
       </div>
 
-      {/* Rest of the component remains the same... */}
-      {/* Audience Quality, Factors, Actionable Tips sections */}
-      <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
-        <h3 className="text-lg font-bold text-slate-900 mb-4 flex items-center gap-2">
-          <Star className="text-indigo-600" size={24} />
-          Audience Quality Score
-        </h3>
-        
-        <div className={`p-5 rounded-xl border-2 ${qualityInfo.borderColor} ${qualityInfo.bgColor}`}>
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <div className={`text-2xl font-bold mb-1 ${qualityInfo.color}`}>{qualityInfo.label}</div>
-              <div className="text-sm text-slate-700">{qualityInfo.description}</div>
-            </div>
-            <div className="text-right">
-              <div className="text-4xl font-bold text-slate-900">{primary.audience_quality}</div>
-              <div className="text-xs text-slate-500">out of 100</div>
-            </div>
-          </div>
-          <div className="w-full bg-slate-200 rounded-full h-3 mt-3">
-            <div 
-              className={`h-3 rounded-full transition-all ${qualityInfo.color.replace('text-', 'bg-')}`}
-              style={{ width: `${primary.audience_quality}%` }}
-            />
-          </div>
-        </div>
-      </div>
+
 
       {/* Actionable Tips - keep as is */}
       <div className="rounded-2xl bg-white border border-slate-200 shadow-sm p-6">
