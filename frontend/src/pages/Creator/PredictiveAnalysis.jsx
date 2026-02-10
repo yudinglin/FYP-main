@@ -402,7 +402,7 @@ export default function PredictiveAnalysis() {
               ))}
             </div>
           ) : (
-            <p className="text-gray-600">All major milestones achieved! 🎉</p>
+            <p className="text-gray-600">All major milestones achieved!</p>
           )}
         </div>
 

@@ -1222,11 +1222,6 @@ function RetentionHeatmapView({ data, loading }) {
 
   return (
     <div className="space-y-6">
-      {/* Comparison Insights */}
-      {hasComparison && comparisonInsights.length > 0 && (
-        <ComparisonInsightsSection insights={comparisonInsights} />
-      )}
-
       {/* Channel Selector */}
       {channels.length > 1 && (
         <ChannelSelector
@@ -1245,9 +1240,18 @@ function RetentionHeatmapView({ data, loading }) {
             metadata={selectedChannel.metadata}
           />
 
+          {/* Comparison Insights */}
+          {hasComparison && comparisonInsights.length > 0 && (
+            <ComparisonInsightsSection insights={comparisonInsights} />
+          )}
+
           {/* Golden Window */}
           {selectedChannel.golden_window && selectedChannel.golden_window.metrics && (
-            <GoldenWindowSection golden={selectedChannel.golden_window} />
+            <GoldenWindowSection 
+              golden={selectedChannel.golden_window} 
+              channelName={selectedChannel.channel_name}
+              isPrimary={selectedChannel.is_primary}
+            />
           )}
 
           {/* Duration Performance */}
@@ -1408,14 +1412,15 @@ function RetentionHeatmapSection({ heatmap, confidence, metadata }) {
   );
 }
 
-function GoldenWindowSection({ golden }) {
+function GoldenWindowSection({ golden, channelName, isPrimary }) {
   const metrics = golden.metrics || {};
+  const displayName = isPrimary ? "Your" : (channelName || "Channel");
   
   return (
     <section className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl border-2 border-amber-300 p-6">
       <div className="flex items-center gap-2 mb-4">
         <Award className="text-amber-600" size={24} />
-        <h2 className="text-xl font-bold text-slate-900">Your Golden Retention Window</h2>
+        <h2 className="text-xl font-bold text-slate-900">{displayName} Golden Retention Window</h2>
       </div>
 
       <div className="text-center mb-4">
@@ -2374,8 +2379,50 @@ function ComparisonInsightCard({ insight }) {
     }
   };
 
+  // Convert metric to understandable text
+  const getMetricLabel = (metric, impact) => {
+    // If metric is already text (not a number or percentage), return as is
+    if (typeof metric === 'string' && !metric.includes('%') && isNaN(parseFloat(metric))) {
+      return metric;
+    }
+
+    // Parse percentage or number
+    const numericValue = parseFloat(metric);
+    
+    if (isNaN(numericValue)) {
+      return metric; // Return original if can't parse
+    }
+
+    // Convert to score out of 10 or descriptive text
+    if (metric.includes('%')) {
+      const score = (numericValue / 10).toFixed(1);
+      
+      if (impact === 'positive') {
+        if (numericValue >= 80) return 'Excellent';
+        if (numericValue >= 60) return 'Very Good';
+        if (numericValue >= 40) return 'Good';
+        if (numericValue >= 20) return 'Fair';
+        return 'Needs Work';
+      } else {
+        if (numericValue >= 80) return 'Critical';
+        if (numericValue >= 60) return 'Concerning';
+        if (numericValue >= 40) return 'Needs Attention';
+        if (numericValue >= 20) return 'Fair';
+        return 'Good';
+      }
+    }
+    
+    // For non-percentage numbers, convert to score
+    if (numericValue >= 8) return 'Excellent';
+    if (numericValue >= 6) return 'Very Good';
+    if (numericValue >= 4) return 'Good';
+    if (numericValue >= 2) return 'Fair';
+    return 'Needs Work';
+  };
+
   const style = impactStyles[insight.impact] || impactStyles.needs_improvement;
   const ArrowIcon = style.arrow;
+  const metricLabel = getMetricLabel(insight.metric, insight.impact);
 
   return (
     <div className={`p-5 rounded-xl border-2 ${style.border} ${style.bg}`}>
@@ -2383,7 +2430,7 @@ function ComparisonInsightCard({ insight }) {
         <h3 className="font-bold text-slate-900 text-lg flex-1">{insight.title}</h3>
         <span className={`text-xs px-3 py-1.5 rounded-full ${style.badge} font-semibold flex items-center gap-1`}>
           <ArrowIcon size={14} />
-          {insight.metric}
+          {metricLabel}
         </span>
       </div>
 
@@ -2454,7 +2501,47 @@ function InsightCard({ insight }) {
     positive: { border: "border-green-300", bg: "bg-green-50", badge: "bg-green-100 text-green-700" },
   };
 
+  // Convert percentages in description to understandable text
+  const convertPercentagesToText = (text) => {
+    if (!text) return text;
+    
+    // Pattern to match percentage comparisons like "57.0% from intro to outro vs 74.5% average"
+    return text.replace(/(\d+\.?\d*)%\s+from\s+intro\s+to\s+outro\s+vs\s+(\d+\.?\d*)%\s+average/gi, (match, yourPercent, avgPercent) => {
+      const yourValue = parseFloat(yourPercent);
+      const avgValue = parseFloat(avgPercent);
+      
+      const getRetentionLabel = (percent) => {
+        if (percent >= 80) return 'excellent retention';
+        if (percent >= 60) return 'strong retention';
+        if (percent >= 40) return 'moderate retention';
+        if (percent >= 20) return 'weak retention';
+        return 'very weak retention';
+      };
+      
+      const yourLabel = getRetentionLabel(100 - yourValue);
+      const avgLabel = getRetentionLabel(100 - avgValue);
+      
+      if (yourValue > avgValue) {
+        return `${yourLabel} (below average compared to ${avgLabel})`;
+      } else if (yourValue < avgValue) {
+        return `${yourLabel} (above average compared to ${avgLabel})`;
+      } else {
+        return `${yourLabel} (similar to average)`;
+      }
+    })
+    // Pattern for general percentage values
+    .replace(/(\d+\.?\d*)%/g, (match, percent) => {
+      const value = parseFloat(percent);
+      if (value >= 80) return 'excellent';
+      if (value >= 60) return 'very good';
+      if (value >= 40) return 'good';
+      if (value >= 20) return 'fair';
+      return 'needs improvement';
+    });
+  };
+
   const colors = impactColors[insight.impact] || impactColors.medium;
+  const processedDescription = convertPercentagesToText(insight.description);
 
   return (
     <div className={`p-4 rounded-xl border ${colors.border} ${colors.bg}`}>
@@ -2466,7 +2553,7 @@ function InsightCard({ insight }) {
           </span>
         )}
       </div>
-      <p className="text-sm text-slate-700 mb-3">{insight.description}</p>
+      <p className="text-sm text-slate-700 mb-3">{processedDescription}</p>
       <div className="p-3 bg-white rounded-lg border border-slate-200">
         <div className="flex items-center gap-1.5 mb-1">
           <CheckCircle size={14} className="text-green-600" />
