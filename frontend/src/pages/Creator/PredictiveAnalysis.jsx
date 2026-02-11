@@ -402,7 +402,7 @@ export default function PredictiveAnalysis() {
               ))}
             </div>
           ) : (
-            <p className="text-gray-600">All major milestones achieved! 🎉</p>
+            <p className="text-gray-600">All major milestones achieved!</p>
           )}
         </div>
 
@@ -441,18 +441,32 @@ export default function PredictiveAnalysis() {
           <button
             onClick={() => setActiveView("charts")}
             className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
-              activeView === "charts" ? "bg-indigo-100 text-indigo-700" : "text-slate-700 hover:bg-slate-100"
+              activeView === "charts" ? "bg-indigo-50 border-2 border-indigo-200" : "text-slate-700 hover:bg-slate-100 border-2 border-transparent"
             }`}
           >
-            Charts & Graphs
+            <div className={`text-sm font-medium mb-1 ${activeView === "charts" ? "text-indigo-700" : "text-slate-900"}`}>
+              Charts & Graphs
+            </div>
+            {activeView === "charts" && (
+              <p className="text-xs leading-relaxed text-indigo-600">
+                Visual representation of your subscriber growth with predictions and trends
+              </p>
+            )}
           </button>
           <button
             onClick={() => setActiveView("summary")}
             className={`w-full text-left px-3 py-2 rounded-md transition-colors ${
-              activeView === "summary" ? "bg-indigo-100 text-indigo-700" : "text-slate-700 hover:bg-slate-100"
+              activeView === "summary" ? "bg-indigo-50 border-2 border-indigo-200" : "text-slate-700 hover:bg-slate-100 border-2 border-transparent"
             }`}
           >
-            Summary
+            <div className={`text-sm font-medium mb-1 ${activeView === "summary" ? "text-indigo-700" : "text-slate-900"}`}>
+              Summary
+            </div>
+            {activeView === "summary" && (
+              <p className="text-xs leading-relaxed text-indigo-600">
+                Key insights and actionable recommendations for channel growth
+              </p>
+            )}
           </button>
         </div>
       </div>

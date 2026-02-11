@@ -893,7 +893,7 @@ def compare_retention_patterns(all_channels_data):
     return comparison_insights
 
 
-# ========================= AUDIENCE RETENTION HEATMAPS =========================
+# ========================= ESTIMATED AUDIENCE RETENTION HEATMAPS =========================
 @enhanced_analyzer_bp.route("/analyzer.retentionHeatmap", methods=["GET"])
 def retention_heatmap():
     """
@@ -1348,31 +1348,28 @@ def competitor_gaps():
         top_gap = high_value_gaps[0]
         gap_insights.append({
             "type": "topic_gap",
-            "title": f"Competitors Cover '{top_gap['topic'].title()}'",
-            "description": f"{top_gap['competitor']} covers '{top_gap['topic']}' {top_gap['frequency']} times.",
-            "action": f"Create 3-5 videos about '{top_gap['topic']}' to capture this audience.",
-            "impact": "high",
-            "opportunity_size": f"{top_gap['frequency']} videos by competitor"
+            "title": f"Missing Content Topic: '{top_gap['topic'].title()}'",
+            "description": f"Competitors are successfully covering '{top_gap['topic']}' while you haven't explored this topic yet.",
+            "action": f"Create several videos about '{top_gap['topic']}' to capture this proven audience demand.",
+            "impact": "high"
         })
     
     if frequency_gap > 3:
         gap_insights.append({
             "type": "posting_gap",
             "title": "You Post Less Frequently",
-            "description": f"You post every {primary['avg_posting_frequency_days']:.1f} days vs {avg_competitor_frequency:.1f} days average.",
-            "action": f"Increase frequency to at least {avg_competitor_frequency:.0f}-day intervals.",
-            "impact": "critical",
-            "opportunity_size": f"{((30/avg_competitor_frequency) - (30/primary['avg_posting_frequency_days'])):.1f} more videos/month needed"
+            "description": "Competitors maintain a more consistent posting schedule than you do.",
+            "action": "Increase your posting frequency to match competitor pace and maintain audience engagement.",
+            "impact": "critical"
         })
     
     if engagement_gap < -0.01:
         gap_insights.append({
             "type": "engagement_gap",
-            "title": "Response Rate Gap",
-            "description": f"Your response rate trails competitors.",
-            "action": "Study competitor hooks, thumbnails, and content structure.",
-            "impact": "critical",
-            "opportunity_size": f"{abs(engagement_gap * 100):.2f}% to gain"
+            "title": "Audience Response Needs Improvement",
+            "description": "Competitors are generating stronger viewer engagement and responses to their content.",
+            "action": "Study competitor hooks, thumbnails, and content structure to understand what resonates with audiences.",
+            "impact": "critical"
         })
     
     # OPPORTUNITIES

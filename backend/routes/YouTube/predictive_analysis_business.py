@@ -423,6 +423,7 @@ def compare_growth_timelines(primary_predictions, competitor_predictions_list, p
         
         comparisons.append({
             "competitor_name": comp_name,
+            "competitor_index": i,
             "current_size_diff": primary_current - comp_current,
             "growth_rate_diff": round(primary_growth_rate - comp_growth_rate, 2),
             "6m_growth_diff": int(growth_diff),

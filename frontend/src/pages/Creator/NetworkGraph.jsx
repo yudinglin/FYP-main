@@ -313,24 +313,43 @@ export default function NetworkGraph() {
     return m ? m[1] : "";
   };
 
-  const MenuItem = ({ icon: Icon, label, view, badge }) => (
-    <button
-      onClick={() => setActiveView(view)}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-        activeView === view
-          ? "bg-indigo-50 text-indigo-700 font-medium"
-          : "text-slate-600 hover:bg-slate-50"
-      }`}
-    >
-      <Icon size={20} />
-      <span className="flex-1 text-left">{label}</span>
-      {badge && (
-        <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">
-          {badge}
-        </span>
-      )}
-    </button>
-  );
+  const MenuItem = ({ icon: Icon, label, view, badge, description }) => {
+    const isActive = activeView === view;
+    return (
+      <button
+        onClick={() => setActiveView(view)}
+        className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+          isActive
+            ? "bg-indigo-50 border-2 border-indigo-200"
+            : "border-2 border-transparent hover:bg-slate-50"
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <Icon 
+            size={18} 
+            className={`flex-shrink-0 mt-0.5 ${isActive ? "text-indigo-700" : "text-slate-600"}`}
+          />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`text-sm font-medium ${isActive ? "text-indigo-700" : "text-slate-900"}`}>
+                {label}
+              </span>
+              {badge && (
+                <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">
+                  {badge}
+                </span>
+              )}
+            </div>
+            {isActive && description && (
+              <p className="text-xs leading-relaxed text-indigo-600">
+                {description}
+              </p>
+            )}
+          </div>
+        </div>
+      </button>
+    );
+  };
 
   const MetricCard = ({ title, value, subtitle, icon: Icon, color }) => (
     <div className="bg-white rounded-lg border border-slate-200 p-4">
@@ -606,10 +625,31 @@ export default function NetworkGraph() {
                 Views
               </h2>
               <div className="space-y-1">
-                <MenuItem icon={Lightbulb} label="Video Insights" view="summary" badge="Start Here" />
-                <MenuItem icon={Activity} label="Channel Insights" view="channel-insights" />
-                <MenuItem icon={Network} label="Network Graph" view="network" />
-                <MenuItem icon={BarChart3} label="Charts" view="charts" />
+                <MenuItem 
+                  icon={Lightbulb} 
+                  label="Video Insights" 
+                  view="summary" 
+                  badge="Start Here"
+                  description="Discover your best performing videos and get actionable recommendations"
+                />
+                <MenuItem 
+                  icon={Activity} 
+                  label="Channel Insights" 
+                  view="channel-insights"
+                  description="Deep dive into channel-wide metrics and engagement patterns"
+                />
+                <MenuItem 
+                  icon={Network} 
+                  label="Network Graph" 
+                  view="network"
+                  description="Visualize how your videos connect based on similarity and performance"
+                />
+                <MenuItem 
+                  icon={BarChart3} 
+                  label="Charts" 
+                  view="charts"
+                  description="Detailed charts and data visualizations of your video metrics"
+                />
               </div>
             </div>
 

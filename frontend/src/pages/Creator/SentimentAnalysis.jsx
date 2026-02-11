@@ -344,21 +344,35 @@ export default function SentimentAnalysis() {
               onClick={() => setActiveView("charts")}
               className={`px-6 py-2 rounded-md text-sm font-medium transition ${
                 activeView === "charts"
-                  ? "bg-indigo-100 text-indigo-700 shadow-sm"
-                  : "text-slate-700 hover:bg-slate-100"
+                  ? "bg-indigo-50 border-2 border-indigo-200 text-indigo-700 shadow-sm"
+                  : "text-slate-700 hover:bg-slate-100 border-2 border-transparent"
               }`}
             >
-              Charts
+              <div>
+                <div className="font-medium">Charts</div>
+                {activeView === "charts" && (
+                  <div className="text-xs text-indigo-600 mt-0.5">
+                    Visual breakdown of sentiment data and trends
+                  </div>
+                )}
+              </div>
             </button>
             <button
               onClick={() => setActiveView("summary")}
               className={`px-6 py-2 rounded-md text-sm font-medium transition ${
                 activeView === "summary"
-                  ? "bg-indigo-100 text-indigo-700 shadow-sm"
-                  : "text-slate-700 hover:bg-slate-100"
+                  ? "bg-indigo-50 border-2 border-indigo-200 text-indigo-700 shadow-sm"
+                  : "text-slate-700 hover:bg-slate-100 border-2 border-transparent"
               }`}
             >
-              Summary
+              <div>
+                <div className="font-medium">Summary</div>
+                {activeView === "summary" && (
+                  <div className="text-xs text-indigo-600 mt-0.5">
+                    Key insights and actionable recommendations
+                  </div>
+                )}
+              </div>
             </button>
           </div>
         </div>

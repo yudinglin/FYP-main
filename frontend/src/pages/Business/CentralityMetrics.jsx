@@ -275,7 +275,7 @@ export default function EnhancedChannelAnalyzer() {
                 />
                 <TabButtonWithInfo
                   icon={Activity}
-                  label="Retention Heatmap"
+                  label="Estimated Audience Retention Heatmap"
                   description="See exactly where viewers drop off and find your optimal video length"
                   tab="retention"
                   activeTab={activeTab}
@@ -379,7 +379,7 @@ export default function EnhancedChannelAnalyzer() {
               </button>
 
               <p className="text-xs text-slate-500 mt-2 text-center">
-                Analyzes up to 100 most recent videos
+                Analyzes from the most recent videos
               </p>
 
               {error && (
@@ -660,7 +660,7 @@ function EngagementQualityView({ data, loading }) {
           {/* Quality Score Overview */}
           <QualityScoreSection channel={selectedChannel} />
 
-          {/* IMPROVED: Quality Metrics with clear bar charts */}
+          {/* Quality Metrics with clear bar charts */}
           <QualityMetricsBar metrics={selectedChannel.quality_metrics} />
 
           {/* Depth Distribution */}
@@ -997,7 +997,6 @@ function QualityScoreSection({ channel }) {
   );
 }
 
-// IMPROVED: Replaced radar chart with clear bar chart visualization
 function QualityMetricsBar({ metrics }) {
   const metricData = [
     { 
@@ -1183,7 +1182,7 @@ function TopQualityCommentsSection({ comments }) {
   );
 }
 
-// ==================== RETENTION HEATMAP VIEW ====================
+// ==================== ESTIMATED AUDIENCE RETENTION HEATMAP VIEW ====================
 function RetentionHeatmapView({ data, loading }) {
   const [selectedChannel, setSelectedChannel] = useState(null);
 
@@ -1197,7 +1196,7 @@ function RetentionHeatmapView({ data, loading }) {
     return (
       <EmptyState
         icon={Activity}
-        title="Audience Retention Heatmap"
+        title="Estimated Audience Retention Heatmap"
         description="Discover where viewers drop off and identify your golden retention window."
         features={[
           "See retention patterns across video sections",
@@ -1223,11 +1222,6 @@ function RetentionHeatmapView({ data, loading }) {
 
   return (
     <div className="space-y-6">
-      {/* Comparison Insights */}
-      {hasComparison && comparisonInsights.length > 0 && (
-        <ComparisonInsightsSection insights={comparisonInsights} />
-      )}
-
       {/* Channel Selector */}
       {channels.length > 1 && (
         <ChannelSelector
@@ -1239,16 +1233,25 @@ function RetentionHeatmapView({ data, loading }) {
 
       {selectedChannel && (
         <>
-          {/* IMPROVED: Retention Heatmap with confidence and metadata */}
+          {/* Estimated Audience Retention Heatmap with confidence and metadata */}
           <RetentionHeatmapSection 
             heatmap={selectedChannel.retention_heatmap} 
             confidence={selectedChannel.confidence}
             metadata={selectedChannel.metadata}
           />
 
+          {/* Comparison Insights */}
+          {hasComparison && comparisonInsights.length > 0 && (
+            <ComparisonInsightsSection insights={comparisonInsights} />
+          )}
+
           {/* Golden Window */}
           {selectedChannel.golden_window && selectedChannel.golden_window.metrics && (
-            <GoldenWindowSection golden={selectedChannel.golden_window} />
+            <GoldenWindowSection 
+              golden={selectedChannel.golden_window} 
+              channelName={selectedChannel.channel_name}
+              isPrimary={selectedChannel.is_primary}
+            />
           )}
 
           {/* Duration Performance */}
@@ -1266,7 +1269,6 @@ function RetentionHeatmapView({ data, loading }) {
   );
 }
 
-// IMPROVED: Better explanation of retention patterns with confidence indicator
 function RetentionHeatmapSection({ heatmap, confidence, metadata }) {
   const getZoneColor = (retention) => {
     if (retention >= 70) return "#10b981";
@@ -1305,7 +1307,7 @@ function RetentionHeatmapSection({ heatmap, confidence, metadata }) {
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Activity className="text-blue-600" size={20} />
-          <h2 className="text-lg font-semibold text-slate-900">Retention Heatmap</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Estimated Audience Retention Heatmap</h2>
         </div>
         {confidence && (
           <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${confidenceBadge.color}`}>
@@ -1370,7 +1372,7 @@ function RetentionHeatmapSection({ heatmap, confidence, metadata }) {
       {/* Zone Breakdown Cards */}
       <div className="mt-6">
         <div className="text-xs text-slate-600 mb-3 text-center">
-          💡 <strong>Tip:</strong> Think of this like a funnel - viewers drop off as the video progresses. 
+          Tip: Think of this like a funnel - viewers drop off as the video progresses. 
           Your goal is to keep the percentages as high as possible in each section.
         </div>
         <div className="grid grid-cols-5 gap-2">
@@ -1410,14 +1412,15 @@ function RetentionHeatmapSection({ heatmap, confidence, metadata }) {
   );
 }
 
-function GoldenWindowSection({ golden }) {
+function GoldenWindowSection({ golden, channelName, isPrimary }) {
   const metrics = golden.metrics || {};
+  const displayName = isPrimary ? "Your" : (channelName || "Channel");
   
   return (
     <section className="bg-gradient-to-br from-amber-50 to-yellow-50 rounded-2xl border-2 border-amber-300 p-6">
       <div className="flex items-center gap-2 mb-4">
         <Award className="text-amber-600" size={24} />
-        <h2 className="text-xl font-bold text-slate-900">Your Golden Retention Window</h2>
+        <h2 className="text-xl font-bold text-slate-900">{displayName} Golden Retention Window</h2>
       </div>
 
       <div className="text-center mb-4">
@@ -1535,7 +1538,7 @@ function DurationPerformanceSection({ performance }) {
   );
 }
 
-// ==================== COMPETITOR GAPS VIEW ====================
+
 function CompetitorGapsView({ data, loading }) {
   if (!data && !loading) {
     return (
@@ -1565,7 +1568,6 @@ function CompetitorGapsView({ data, loading }) {
   const competitors = data.competitors_summary || [];
   const contentGaps = data.content_gaps || [];
   const uniqueTopics = data.your_unique_topics || [];
-  const missingFormats = data.missing_content_types || [];
   const frequencyComparison = data.frequency_comparison;
   const performanceComparison = data.performance_comparison;
   const gapInsights = data.gap_insights || [];
@@ -1573,94 +1575,236 @@ function CompetitorGapsView({ data, loading }) {
 
   return (
     <div className="space-y-6">
-      {/* Gap Insights */}
-      {gapInsights.length > 0 && (
-        <section className="bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl border-2 border-red-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <AlertTriangle className="text-red-600" size={24} />
-            <h2 className="text-xl font-bold text-slate-900">Competitive Gaps & Threats</h2>
+      {/* Header with Overview */}
+      <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900 mb-1">Competitive Landscape Analysis</h1>
+            <p className="text-slate-600">Discover content opportunities and competitive advantages</p>
           </div>
-
-          <div className="space-y-3">
-            {gapInsights.map((insight, idx) => (
-              <GapInsightCard key={idx} insight={insight} />
-            ))}
+          <div className="flex items-center gap-2">
+            <div className="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full text-sm font-medium">
+              {competitors.length} Competitors
+            </div>
+            <div className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-sm font-medium">
+              {contentGaps.length} Opportunities
+            </div>
           </div>
-        </section>
-      )}
+        </div>
+      </div>
 
-      {/* Opportunities */}
-      {opportunities.length > 0 && (
-        <section className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border-2 border-green-200 p-6">
-          <div className="flex items-center gap-2 mb-4">
-            <CheckCircle className="text-green-600" size={24} />
-            <h2 className="text-xl font-bold text-slate-900">Your Competitive Advantages</h2>
-          </div>
+      {/* Two-Column Layout for Gaps and Advantages */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Left Column: Competitive Gaps */}
+        <div className="space-y-6">
+          {gapInsights.length > 0 && (
+            <section className="bg-gradient-to-br from-red-50 to-orange-50 rounded-2xl border-2 border-red-200 p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-red-100 rounded-lg">
+                  <AlertTriangle className="text-red-600" size={24} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">Competitive Gaps</h2>
+                  <p className="text-sm text-red-700">Areas where competitors are outperforming you</p>
+                </div>
+              </div>
 
-          <div className="space-y-3">
-            {opportunities.map((opp, idx) => (
-              <OpportunityCard key={idx} opportunity={opp} />
-            ))}
-          </div>
-        </section>
-      )}
+              <div className="space-y-4">
+                {gapInsights.map((insight, idx) => (
+                  <GapInsightCard key={idx} insight={insight} />
+                ))}
+              </div>
+            </section>
+          )}
 
-      {/* IMPROVED: Content Gaps with visual topic cards */}
-      {contentGaps.length > 0 && (
-        <ContentGapsSection gaps={contentGaps} />
-      )}
+          {/* Content Gaps Grid */}
+          {contentGaps.length > 0 && (
+            <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Search className="text-purple-600" size={20} />
+                <h2 className="text-lg font-semibold text-slate-900">High-Value Content Gaps</h2>
+              </div>
+              
+              <div className="space-y-3">
+                {contentGaps.map((gap, idx) => (
+                  <ContentGapCard key={idx} gap={gap} rank={idx + 1} />
+                ))}
+              </div>
 
-      {/* Your Unique Topics */}
-      {uniqueTopics.length > 0 && (
-        <UniqueTopicsSection topics={uniqueTopics} />
-      )}
+              <div className="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
+                <div className="flex items-start gap-2">
+                  <Lightbulb size={16} className="text-purple-600 flex-shrink-0 mt-0.5" />
+                  <div className="text-sm text-purple-900">
+                    <strong>Action Plan:</strong> Start with the top 3 gaps. Create 2-3 videos for each topic over 
+                    the next month to capture this proven audience demand.
+                  </div>
+                </div>
+              </div>
+            </section>
+          )}
+        </div>
 
-      {/* Performance Comparison */}
-      <PerformanceComparisonSection
+        {/* Right Column: Competitive Advantages */}
+        <div className="space-y-6">
+          {opportunities.length > 0 && (
+            <section className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl border-2 border-green-200 p-6">
+              <div className="flex items-center gap-3 mb-6">
+                <div className="p-2 bg-green-100 rounded-lg">
+                  <CheckCircle className="text-green-600" size={24} />
+                </div>
+                <div>
+                  <h2 className="text-xl font-bold text-slate-900">Your Competitive Advantages</h2>
+                  <p className="text-sm text-green-700">Areas where you outperform competitors</p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                {opportunities.map((opp, idx) => (
+                  <OpportunityCard key={idx} opportunity={opp} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Unique Topics */}
+          {uniqueTopics.length > 0 && (
+            <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Award className="text-amber-500" size={20} />
+                <h2 className="text-lg font-semibold text-slate-900">Your Unique Topics</h2>
+              </div>
+              <p className="text-sm text-slate-600 mb-4">
+                Content you cover that competitors ignore - your competitive moat
+              </p>
+
+              <div className="space-y-3">
+                {uniqueTopics.map((topic, idx) => (
+                  <UniqueTopicCard key={idx} topic={topic} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Performance Comparison */}
+          <PerformanceComparisonCard 
+            performanceComparison={performanceComparison}
+            frequencyComparison={frequencyComparison}
+          />
+        </div>
+      </div>
+
+      {/* Frequency Analysis */}
+      <FrequencyAnalysisCard 
         primary={primary}
         competitors={competitors}
-        performanceComparison={performanceComparison}
         frequencyComparison={frequencyComparison}
       />
     </div>
   );
 }
 
+// ==================== ENHANCED CARD COMPONENTS ====================
+
 function GapInsightCard({ insight }) {
   const impactColors = {
-    critical: { bg: "bg-red-50", border: "border-red-300", badge: "bg-red-600" },
-    high: { bg: "bg-orange-50", border: "border-orange-300", badge: "bg-orange-600" },
-    medium: { bg: "bg-amber-50", border: "border-amber-300", badge: "bg-amber-600" },
+    critical: { 
+      bg: "bg-red-50", 
+      border: "border-red-300", 
+      badge: "bg-red-600 text-white",
+      icon: AlertTriangle,
+      iconColor: "text-red-600"
+    },
+    high: { 
+      bg: "bg-orange-50", 
+      border: "border-orange-300", 
+      badge: "bg-orange-500 text-white",
+      icon: AlertTriangle,
+      iconColor: "text-orange-600"
+    },
+    medium: { 
+      bg: "bg-amber-50", 
+      border: "border-amber-200", 
+      badge: "bg-amber-400 text-white",
+      icon: Info,
+      iconColor: "text-amber-600"
+    },
   };
 
   const colors = impactColors[insight.impact] || impactColors.medium;
+  const Icon = colors.icon;
 
   return (
-    <div className={`p-5 rounded-xl border-2 ${colors.border} ${colors.bg}`}>
-      <div className="flex items-start justify-between mb-3">
-        <h3 className="font-bold text-slate-900 text-lg flex-1">{insight.title}</h3>
-        <span className={`text-xs px-3 py-1.5 rounded-full text-white font-semibold ${colors.badge}`}>
-          {insight.impact.toUpperCase()}
-        </span>
+    <div className={`p-5 rounded-xl border-2 ${colors.border} ${colors.bg} hover:shadow-lg transition-shadow`}>
+      <div className="flex items-start gap-4 mb-4">
+        <div className="p-2.5 bg-white rounded-lg border-2 border-red-100">
+          <Icon className={colors.iconColor} size={20} />
+        </div>
+        <div className="flex-1">
+          <div className="flex items-start justify-between mb-2">
+            <h3 className="font-bold text-slate-900 text-lg flex-1">{insight.title}</h3>
+            <span className={`text-xs px-3 py-1.5 rounded-full ${colors.badge} font-semibold`}>
+              {insight.impact.toUpperCase()}
+            </span>
+          </div>
+          <p className="text-slate-700">{insight.description}</p>
+        </div>
       </div>
 
-      <p className="text-slate-700 mb-3">{insight.description}</p>
-
-      {insight.opportunity_size && (
-        <div className="mb-3 p-3 bg-white rounded-lg border border-slate-200">
-          <p className="text-xs font-semibold text-slate-600 mb-1">Opportunity Size:</p>
-          <p className="text-sm font-bold text-slate-900">{insight.opportunity_size}</p>
-        </div>
-      )}
-
-      <div className="p-4 bg-white rounded-lg border-2 border-slate-200">
-        <div className="flex items-start gap-2">
-          <Target className="text-indigo-600 flex-shrink-0 mt-0.5" size={18} />
-          <div>
-            <p className="text-xs font-semibold text-slate-700 mb-1">Action Required:</p>
-            <p className="text-sm text-slate-700 font-medium">{insight.action}</p>
+      <div className="p-4 bg-white rounded-lg border-2 border-red-200">
+        <div className="flex items-start gap-3">
+          <Target className="text-red-600 flex-shrink-0 mt-0.5" size={20} />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-red-700 mb-1">Action Required</p>
+            <p className="text-slate-700 font-medium">{insight.action}</p>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function ContentGapCard({ gap, rank }) {
+  return (
+    <div className="group p-4 rounded-xl border-2 border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50 hover:shadow-xl hover:scale-[1.02] transition-all duration-200">
+      <div className="flex items-start justify-between mb-3">
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-2">
+            <div className="w-6 h-6 bg-purple-600 text-white rounded-full flex items-center justify-center text-xs font-bold">
+              {rank}
+            </div>
+            <h4 className="font-bold text-purple-900 capitalize">
+              {gap.topic}
+            </h4>
+          </div>
+          <div className="flex items-center gap-3 text-sm">
+            <span className="flex items-center gap-1">
+              <Video size={14} className="text-purple-600" />
+              <span className="text-purple-700 font-medium">{gap.frequency} videos</span>
+            </span>
+            <span className="flex items-center gap-1">
+              <TrendingUp size={14} className="text-purple-600" />
+              <span className="text-purple-700 font-medium">{(gap.engagement * 100).toFixed(1)}% engagement</span>
+            </span>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-xs text-purple-600 font-medium mb-1">Competitor</div>
+          <div className="text-sm font-semibold text-purple-900">{gap.competitor}</div>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between mt-4">
+        <div className="flex items-center gap-2">
+          <div className="px-3 py-1 bg-purple-600 text-white rounded-full text-xs font-semibold">
+            HIGH OPPORTUNITY
+          </div>
+          <div className="text-xs text-slate-600">
+            Untapped audience demand
+          </div>
+        </div>
+        <button className="px-4 py-2 bg-white text-purple-600 border-2 border-purple-300 rounded-lg text-sm font-medium hover:bg-purple-50 hover:border-purple-400 transition-colors">
+          Create Content
+        </button>
       </div>
     </div>
   );
@@ -1668,16 +1812,23 @@ function GapInsightCard({ insight }) {
 
 function OpportunityCard({ opportunity }) {
   return (
-    <div className="p-5 rounded-xl border-2 border-green-300 bg-green-50">
-      <h3 className="font-bold text-slate-900 text-lg mb-2">{opportunity.title}</h3>
-      <p className="text-slate-700 mb-3">{opportunity.description}</p>
+    <div className="p-5 rounded-xl border-2 border-green-300 bg-gradient-to-r from-green-50 to-emerald-50 hover:shadow-lg transition-shadow">
+      <div className="flex items-start gap-4 mb-4">
+        <div className="p-2.5 bg-white rounded-lg border-2 border-green-100">
+          <CheckCircle className="text-green-600" size={20} />
+        </div>
+        <div className="flex-1">
+          <h3 className="font-bold text-slate-900 text-lg mb-2">{opportunity.title}</h3>
+          <p className="text-slate-700">{opportunity.description}</p>
+        </div>
+      </div>
 
       <div className="p-4 bg-white rounded-lg border-2 border-green-200">
-        <div className="flex items-start gap-2">
-          <CheckCircle className="text-green-600 flex-shrink-0 mt-0.5" size={18} />
-          <div>
-            <p className="text-xs font-semibold text-green-700 mb-1">How to Leverage:</p>
-            <p className="text-sm text-slate-700 font-medium">{opportunity.action}</p>
+        <div className="flex items-start gap-3">
+          <Zap className="text-green-600 flex-shrink-0 mt-0.5" size={20} />
+          <div className="flex-1">
+            <p className="text-sm font-semibold text-green-700 mb-1">How to Leverage</p>
+            <p className="text-slate-700 font-medium">{opportunity.action}</p>
           </div>
         </div>
       </div>
@@ -1685,181 +1836,194 @@ function OpportunityCard({ opportunity }) {
   );
 }
 
-// IMPROVED: Visual topic cards instead of plain list
-function ContentGapsSection({ gaps }) {
+function UniqueTopicCard({ topic }) {
   return (
-    <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-      <div className="flex items-center gap-2 mb-3">
-        <Search className="text-purple-600" size={20} />
-        <h2 className="text-lg font-semibold text-slate-900">High-Value Content Gaps</h2>
-      </div>
-      <p className="text-sm text-slate-600 mb-4">
-        Topics competitors cover successfully that you're missing - ranked by opportunity size.
-      </p>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {gaps.map((gap, idx) => (
-          <div 
-            key={idx} 
-            className="group p-5 rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50 hover:shadow-xl hover:scale-105 transition-all duration-200"
-          >
-            {/* Topic Header */}
-            <div className="flex items-start justify-between mb-3">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <Tag size={16} className="text-purple-600" />
-                  <h4 className="font-bold text-purple-900 capitalize text-lg">
-                    {gap.topic}
-                  </h4>
-                </div>
-                <p className="text-xs text-purple-700 font-medium">
-                  Competitor: {gap.competitor}
-                </p>
-              </div>
-              <div className="text-right ml-2">
-                <div className="inline-flex items-center gap-1 px-2 py-1 bg-purple-600 text-white rounded-full text-xs font-bold">
-                  <Hash size={12} />
-                  {idx + 1}
-                </div>
-              </div>
-            </div>
-
-            {/* Metrics */}
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div className="p-3 bg-white rounded-lg border border-purple-200">
-                <div className="text-xs text-slate-600 mb-1">Videos</div>
-                <div className="text-xl font-bold text-purple-900">{gap.frequency}</div>
-              </div>
-              <div className="p-3 bg-white rounded-lg border border-purple-200">
-                <div className="text-xs text-slate-600 mb-1">Engagement</div>
-                <div className="text-xl font-bold text-purple-900">
-                  {(gap.engagement * 100).toFixed(1)}%
-                </div>
-              </div>
-            </div>
-
-            {/* Opportunity Indicator */}
-            <div className="flex items-center gap-2 p-2 bg-purple-600 text-white rounded-lg text-xs font-semibold">
-              <TrendingUpIcon size={14} />
-              <span>High Opportunity - Untapped Audience</span>
-            </div>
+    <div className="p-4 rounded-xl border-2 border-amber-200 bg-gradient-to-r from-amber-50 to-yellow-50">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-3">
+          <div className="p-2 bg-amber-100 rounded-lg">
+            <Award className="text-amber-600" size={18} />
           </div>
-        ))}
-      </div>
-
-      {/* Summary Action */}
-      <div className="mt-6 p-4 bg-purple-50 rounded-lg border border-purple-200">
-        <div className="flex items-start gap-2">
-          <Lightbulb size={16} className="text-purple-600 flex-shrink-0 mt-0.5" />
-          <div className="text-sm text-purple-900">
-            <strong>Action Plan:</strong> Start with the top 3 gaps. Create 2-3 videos for each topic over 
-            the next month to capture this proven audience demand.
+          <div>
+            <h4 className="font-semibold text-slate-900 capitalize">{topic.topic}</h4>
+            <p className="text-sm text-slate-600">{topic.frequency} videos published</p>
           </div>
         </div>
+        <div className="px-3 py-1 bg-amber-100 text-amber-700 rounded-full text-sm font-medium">
+          Unique Advantage
+        </div>
       </div>
-    </section>
+    </div>
   );
 }
 
-function UniqueTopicsSection({ topics }) {
+function PerformanceComparisonCard({ performanceComparison, frequencyComparison }) {
+  const getEngagementColor = (gap) => {
+    if (gap > 0.01) return "text-green-600 bg-green-100";
+    if (gap < -0.01) return "text-red-600 bg-red-100";
+    return "text-blue-600 bg-blue-100";
+  };
+
+  const getFrequencyColor = (gap) => {
+    if (gap < -1) return "text-green-600 bg-green-100";
+    if (gap > 1) return "text-red-600 bg-red-100";
+    return "text-blue-600 bg-blue-100";
+  };
+
+  const engagementColor = getEngagementColor(performanceComparison.engagement_gap);
+  const frequencyColor = getFrequencyColor(frequencyComparison.gap_days);
+
   return (
     <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
       <div className="flex items-center gap-2 mb-4">
-        <Award className="text-green-600" size={20} />
-        <h2 className="text-lg font-semibold text-slate-900">Your Unique Topics (Competitive Moat)</h2>
-      </div>
-      <p className="text-sm text-slate-600 mb-4">
-        Content you cover that competitors don't - your differentiation.
-      </p>
-
-      <div className="flex flex-wrap gap-2">
-        {topics.map((topic, idx) => (
-          <div key={idx} className="px-4 py-2 bg-green-100 text-green-800 rounded-full font-medium">
-            {topic.topic} <span className="text-green-600 ml-1">({topic.frequency})</span>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function PerformanceComparisonSection({ primary, competitors, performanceComparison, frequencyComparison }) {
-  return (
-    <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <BarChart3 className="text-blue-600" size={20} />
+        <BarChart3 className="text-indigo-600" size={20} />
         <h2 className="text-lg font-semibold text-slate-900">Performance Comparison</h2>
       </div>
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-        <ComparisonMetric
-          label="Your Engagement"
-          value={`${(performanceComparison.your_engagement * 100).toFixed(2)}%`}
-          comparison={performanceComparison.engagement_gap > 0 ? "ahead" : "behind"}
-          icon={TrendingUp}
-        />
-        <ComparisonMetric
-          label="Competitor Avg"
-          value={`${(performanceComparison.competitor_avg_engagement * 100).toFixed(2)}%`}
-          comparison="baseline"
-          icon={BarChart3}
-        />
-        <ComparisonMetric
-          label="Your Avg Views"
-          value={performanceComparison.your_views.toLocaleString()}
-          comparison={performanceComparison.views_gap > 0 ? "ahead" : "behind"}
-          icon={Eye}
-        />
-        <ComparisonMetric
-          label="Posting Frequency"
-          value={`${frequencyComparison.your_videos_per_month.toFixed(1)}/mo`}
-          comparison={frequencyComparison.gap_days < 0 ? "ahead" : "behind"}
-          icon={Calendar}
-        />
-      </div>
-
-      <div className="border-t border-slate-200 pt-4">
-        <h3 className="font-semibold text-slate-900 mb-3">Competitor Breakdown</h3>
-        <div className="space-y-2">
-          {competitors.map((comp, idx) => (
-            <div key={idx} className="flex items-center justify-between p-3 bg-slate-50 rounded-lg">
-              <span className="font-medium text-slate-900">{comp.name}</span>
-              <div className="flex items-center gap-4 text-sm">
-                <span className="text-slate-600">
-                  {(comp.avg_engagement * 100).toFixed(2)}% eng
-                </span>
-                <span className="text-slate-600">
-                  {comp.avg_views.toLocaleString()} views
-                </span>
-                <span className="text-slate-600">
-                  {comp.videos_per_month.toFixed(1)}/mo
-                </span>
-              </div>
+      <div className="space-y-4">
+        {/* Engagement Comparison */}
+        <div className="p-4 rounded-lg border border-slate-200">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <MessageCircle size={16} className="text-slate-600" />
+              <span className="text-sm font-medium text-slate-700">Audience Response</span>
             </div>
-          ))}
+            <span className={`text-sm font-bold px-3 py-1 rounded-full ${engagementColor}`}>
+              {performanceComparison.engagement_gap > 0.01 ? "Ahead" : 
+               performanceComparison.engagement_gap < -0.01 ? "Behind" : "On Par"}
+            </span>
+          </div>
+          <div className="text-sm text-slate-600">
+            {performanceComparison.engagement_gap > 0.01 
+              ? "Your content generates stronger viewer responses than competitors"
+              : performanceComparison.engagement_gap < -0.01
+              ? "Competitors generate stronger viewer responses"
+              : "Similar engagement levels to competitors"}
+          </div>
+        </div>
+
+        {/* Frequency Comparison */}
+        <div className="p-4 rounded-lg border border-slate-200">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <Calendar size={16} className="text-slate-600" />
+              <span className="text-sm font-medium text-slate-700">Posting Schedule</span>
+            </div>
+            <span className={`text-sm font-bold px-3 py-1 rounded-full ${frequencyColor}`}>
+              {frequencyComparison.gap_days < -1 ? "More Active" : 
+               frequencyComparison.gap_days > 1 ? "Less Active" : "Similar Pace"}
+            </span>
+          </div>
+          <div className="text-sm text-slate-600">
+            {frequencyComparison.gap_days < -1
+              ? "You post more frequently than competitors"
+              : frequencyComparison.gap_days > 1
+              ? "Competitors post more frequently than you"
+              : "Similar posting frequency to competitors"}
+          </div>
         </div>
       </div>
     </section>
   );
 }
 
-function ComparisonMetric({ label, value, comparison, icon: Icon }) {
-  const colors = {
-    ahead: { bg: "bg-green-50", text: "text-green-700", border: "border-green-200", icon: "text-green-600" },
-    behind: { bg: "bg-red-50", text: "text-red-700", border: "border-red-200", icon: "text-red-600" },
-    baseline: { bg: "bg-slate-50", text: "text-slate-700", border: "border-slate-200", icon: "text-slate-600" }
+function FrequencyAnalysisCard({ primary, competitors, frequencyComparison }) {
+  const yourFrequency = frequencyComparison.your_frequency_days;
+  const competitorFrequency = frequencyComparison.competitor_avg_days;
+  
+  const getFrequencyLabel = (days) => {
+    if (days < 2) return "Daily";
+    if (days < 4) return "Every few days";
+    if (days < 8) return "Weekly";
+    if (days < 15) return "Biweekly";
+    if (days < 31) return "Monthly";
+    return "Infrequent";
   };
 
-  const color = colors[comparison];
+  const getFrequencyIcon = (days) => {
+    if (days < 2) return Flame;
+    if (days < 4) return Zap;
+    if (days < 8) return Activity;
+    return Clock;
+  };
+
+  const YourIcon = getFrequencyIcon(yourFrequency);
+  const CompetitorIcon = getFrequencyIcon(competitorFrequency);
 
   return (
-    <div className={`p-4 rounded-lg border ${color.border} ${color.bg}`}>
-      <div className="flex items-center gap-2 mb-2">
-        <Icon size={16} className={color.icon} />
-        <span className="text-xs font-medium text-slate-600">{label}</span>
+    <section className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
+      <div className="flex items-center gap-2 mb-6">
+        <Calendar className="text-indigo-600" size={20} />
+        <h2 className="text-lg font-semibold text-slate-900">Publishing Frequency Analysis</h2>
       </div>
-      <div className={`text-2xl font-bold ${color.text}`}>{value}</div>
-    </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Your Frequency */}
+        <div className="p-6 rounded-xl border-2 border-indigo-200 bg-gradient-to-br from-indigo-50 to-blue-50">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 bg-white rounded-lg border-2 border-indigo-100">
+              <YourIcon className="text-indigo-600" size={24} />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-900">Your Schedule</h3>
+              <p className="text-sm text-slate-600">Based on recent posting patterns</p>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="p-4 bg-white rounded-lg border border-indigo-100">
+              <div className="text-3xl font-bold text-indigo-600 mb-1">
+                {getFrequencyLabel(yourFrequency)}
+              </div>
+              <p className="text-sm text-slate-600">
+                {frequencyComparison.your_videos_per_month.toFixed(1)} videos per month
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Competitor Frequency */}
+        <div className="p-6 rounded-xl border-2 border-purple-200 bg-gradient-to-br from-purple-50 to-pink-50">
+          <div className="flex items-center gap-3 mb-4">
+            <div className="p-3 bg-white rounded-lg border-2 border-purple-100">
+              <CompetitorIcon className="text-purple-600" size={24} />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-900">Competitor Average</h3>
+              <p className="text-sm text-slate-600">Across all analyzed competitors</p>
+            </div>
+          </div>
+          
+          <div className="space-y-4">
+            <div className="p-4 bg-white rounded-lg border border-purple-100">
+              <div className="text-3xl font-bold text-purple-600 mb-1">
+                {getFrequencyLabel(competitorFrequency)}
+              </div>
+              <p className="text-sm text-slate-600">
+                {frequencyComparison.competitor_videos_per_month.toFixed(1)} videos per month
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Recommendation */}
+      <div className="mt-6 p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-lg border border-indigo-200">
+        <div className="flex items-start gap-3">
+          <Info className="text-indigo-600 flex-shrink-0 mt-0.5" size={20} />
+          <div>
+            <p className="text-sm font-semibold text-indigo-900 mb-1">Recommendation</p>
+            <p className="text-sm text-indigo-800">
+              {Math.abs(frequencyComparison.gap_days) > 1
+                ? `Consider ${frequencyComparison.gap_days > 0 ? 'increasing' : 'maintaining'} your posting frequency to ${
+                    frequencyComparison.gap_days > 0 ? 'stay competitive' : 'capitalize on your advantage'
+                  }.`
+                : 'Your posting frequency aligns well with industry standards.'}
+            </p>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -1885,9 +2049,11 @@ function TabButtonWithInfo({ icon: Icon, label, description, tab, activeTab, onC
           <div className={`text-sm font-medium mb-1 ${isActive ? "text-indigo-700" : "text-slate-900"}`}>
             {label}
           </div>
-          <p className={`text-xs leading-relaxed ${isActive ? "text-indigo-600" : "text-slate-500"}`}>
-            {description}
-          </p>
+          {isActive && (
+            <p className="text-xs leading-relaxed text-indigo-600">
+              {description}
+            </p>
+          )}
         </div>
       </div>
     </button>
@@ -2018,34 +2184,135 @@ function SentimentComparisonChart({ channels }) {
                 </div>
 
                 <div className="space-y-3">
-                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-slate-600">Positive Sentiment</span>
-                      <span className={`text-xs font-bold ${positiveDiff > 0 ? 'text-green-600' : positiveDiff < 0 ? 'text-red-600' : 'text-slate-600'}`}>
-                        {positiveDiff > 0 ? '+' : ''}{positiveDiff.toFixed(1)}%
-                      </span>
+                  {/* Positive Sentiment Comparison */}
+                  <div className={`p-4 rounded-lg border ${positiveDiff > 0 ? 'bg-green-50 border-green-200' : positiveDiff < 0 ? 'bg-orange-50 border-orange-200' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Smile className={positiveDiff > 0 ? 'text-green-600' : positiveDiff < 0 ? 'text-orange-600' : 'text-slate-600'} size={20} />
+                      <span className="text-sm font-semibold text-slate-900">Positive Sentiment</span>
                     </div>
-                    <div className="flex gap-2 text-xs">
-                      <span className="text-slate-600">You: <span className="font-semibold text-slate-900">{primarySentiment.positive?.toFixed(1)}%</span></span>
-                      <span className="text-slate-400">|</span>
-                      <span className="text-slate-600">{competitor.channel_name}: <span className="font-semibold text-slate-900">{competitorSentiment.positive?.toFixed(1)}%</span></span>
+                    
+                    <div className="grid grid-cols-2 gap-4 mb-3">
+                      <div className="text-center">
+                        <p className="text-xs text-slate-600 mb-2">Your Channel</p>
+                        <div className="flex items-center justify-center gap-1">
+                          <span className="text-3xl font-bold text-indigo-600">
+                            {((primarySentiment.positive / 10) || 0).toFixed(1)}
+                          </span>
+                          <span className="text-sm text-slate-500 mt-2">/10</span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {primarySentiment.positive >= 80 ? 'Exceptional' : 
+                           primarySentiment.positive >= 60 ? 'Strong' :
+                           primarySentiment.positive >= 40 ? 'Good' :
+                           primarySentiment.positive >= 20 ? 'Fair' : 'Needs Work'}
+                        </p>
+                      </div>
+                      
+                      <div className="text-center">
+                        <p className="text-xs text-slate-600 mb-2">{competitor.channel_name}</p>
+                        <div className="flex items-center justify-center gap-1">
+                          <span className="text-3xl font-bold text-slate-400">
+                            {((competitorSentiment.positive / 10) || 0).toFixed(1)}
+                          </span>
+                          <span className="text-sm text-slate-400 mt-2">/10</span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {competitorSentiment.positive >= 80 ? 'Exceptional' : 
+                           competitorSentiment.positive >= 60 ? 'Strong' :
+                           competitorSentiment.positive >= 40 ? 'Good' :
+                           competitorSentiment.positive >= 20 ? 'Fair' : 'Needs Work'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className={`text-center py-2 px-3 rounded-lg ${
+                      positiveDiff > 5 ? 'bg-green-100' : 
+                      positiveDiff > 0 ? 'bg-green-50' : 
+                      positiveDiff < -5 ? 'bg-orange-100' : 
+                      positiveDiff < 0 ? 'bg-orange-50' : 'bg-slate-100'
+                    }`}>
+                      <p className={`text-xs font-medium ${
+                        positiveDiff > 5 ? 'text-green-800' : 
+                        positiveDiff > 0 ? 'text-green-700' : 
+                        positiveDiff < -5 ? 'text-orange-800' : 
+                        positiveDiff < 0 ? 'text-orange-700' : 'text-slate-700'
+                      }`}>
+                        {positiveDiff > 10 ? 'Your audience loves your content significantly more' :
+                         positiveDiff > 5 ? 'Your audience is noticeably more positive' :
+                         positiveDiff > 0 ? 'You have slightly better positive sentiment' :
+                         positiveDiff < -10 ? 'Competitor has much stronger positive sentiment' :
+                         positiveDiff < -5 ? 'Competitor has noticeably better positive sentiment' :
+                         positiveDiff < 0 ? 'Competitor has slightly more positive sentiment' :
+                         'Both channels have similar positive sentiment'}
+                      </p>
                     </div>
                   </div>
 
-                  <div className="p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-xs font-medium text-slate-600">Negative Sentiment</span>
-                      <span className={`text-xs font-bold ${negativeDiff < 0 ? 'text-green-600' : negativeDiff > 0 ? 'text-red-600' : 'text-slate-600'}`}>
-                        {negativeDiff > 0 ? '+' : ''}{negativeDiff.toFixed(1)}%
-                      </span>
+                  {/* Negative Sentiment Comparison */}
+                  <div className={`p-4 rounded-lg border ${negativeDiff < 0 ? 'bg-green-50 border-green-200' : negativeDiff > 0 ? 'bg-red-50 border-red-200' : 'bg-slate-50 border-slate-200'}`}>
+                    <div className="flex items-center gap-2 mb-3">
+                      <Frown className={negativeDiff < 0 ? 'text-green-600' : negativeDiff > 0 ? 'text-red-600' : 'text-slate-600'} size={20} />
+                      <span className="text-sm font-semibold text-slate-900">Negative Sentiment</span>
                     </div>
-                    <div className="flex gap-2 text-xs">
-                      <span className="text-slate-600">You: <span className="font-semibold text-slate-900">{primarySentiment.negative?.toFixed(1)}%</span></span>
-                      <span className="text-slate-400">|</span>
-                      <span className="text-slate-600">{competitor.channel_name}: <span className="font-semibold text-slate-900">{competitorSentiment.negative?.toFixed(1)}%</span></span>
+                    
+                    <div className="grid grid-cols-2 gap-4 mb-3">
+                      <div className="text-center">
+                        <p className="text-xs text-slate-600 mb-2">Your Channel</p>
+                        <div className="flex items-center justify-center gap-1">
+                          <span className="text-3xl font-bold text-indigo-600">
+                            {((primarySentiment.negative / 10) || 0).toFixed(1)}
+                          </span>
+                          <span className="text-sm text-slate-500 mt-2">/10</span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {primarySentiment.negative <= 5 ? 'Excellent' : 
+                           primarySentiment.negative <= 10 ? 'Good' :
+                           primarySentiment.negative <= 20 ? 'Fair' :
+                           primarySentiment.negative <= 30 ? 'Concerning' : 'Critical'}
+                        </p>
+                      </div>
+                      
+                      <div className="text-center">
+                        <p className="text-xs text-slate-600 mb-2">{competitor.channel_name}</p>
+                        <div className="flex items-center justify-center gap-1">
+                          <span className="text-3xl font-bold text-slate-400">
+                            {((competitorSentiment.negative / 10) || 0).toFixed(1)}
+                          </span>
+                          <span className="text-sm text-slate-400 mt-2">/10</span>
+                        </div>
+                        <p className="text-xs text-slate-500 mt-1">
+                          {competitorSentiment.negative <= 5 ? 'Excellent' : 
+                           competitorSentiment.negative <= 10 ? 'Good' :
+                           competitorSentiment.negative <= 20 ? 'Fair' :
+                           competitorSentiment.negative <= 30 ? 'Concerning' : 'Critical'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className={`text-center py-2 px-3 rounded-lg ${
+                      negativeDiff < -5 ? 'bg-green-100' : 
+                      negativeDiff < 0 ? 'bg-green-50' : 
+                      negativeDiff > 5 ? 'bg-red-100' : 
+                      negativeDiff > 0 ? 'bg-red-50' : 'bg-slate-100'
+                    }`}>
+                      <p className={`text-xs font-medium ${
+                        negativeDiff < -5 ? 'text-green-800' : 
+                        negativeDiff < 0 ? 'text-green-700' : 
+                        negativeDiff > 5 ? 'text-red-800' : 
+                        negativeDiff > 0 ? 'text-red-700' : 'text-slate-700'
+                      }`}>
+                        {negativeDiff < -10 ? 'You have significantly less negative feedback' :
+                         negativeDiff < -5 ? 'You have noticeably less negative sentiment' :
+                         negativeDiff < 0 ? 'You have slightly less negative sentiment' :
+                         negativeDiff > 10 ? 'You have much more negative sentiment than competitor' :
+                         negativeDiff > 5 ? 'You have noticeably more negative sentiment' :
+                         negativeDiff > 0 ? 'You have slightly more negative sentiment' :
+                         'Both channels have similar negative sentiment'}
+                      </p>
                     </div>
                   </div>
 
+                  {/* Action Step */}
                   <div className="p-4 bg-indigo-50 rounded-lg border border-indigo-200">
                     <div className="flex items-start gap-2">
                       <Target className="text-indigo-600 flex-shrink-0 mt-0.5" size={16} />
@@ -2112,8 +2379,50 @@ function ComparisonInsightCard({ insight }) {
     }
   };
 
+  // Convert metric to understandable text
+  const getMetricLabel = (metric, impact) => {
+    // If metric is already text (not a number or percentage), return as is
+    if (typeof metric === 'string' && !metric.includes('%') && isNaN(parseFloat(metric))) {
+      return metric;
+    }
+
+    // Parse percentage or number
+    const numericValue = parseFloat(metric);
+    
+    if (isNaN(numericValue)) {
+      return metric; // Return original if can't parse
+    }
+
+    // Convert to score out of 10 or descriptive text
+    if (metric.includes('%')) {
+      const score = (numericValue / 10).toFixed(1);
+      
+      if (impact === 'positive') {
+        if (numericValue >= 80) return 'Excellent';
+        if (numericValue >= 60) return 'Very Good';
+        if (numericValue >= 40) return 'Good';
+        if (numericValue >= 20) return 'Fair';
+        return 'Needs Work';
+      } else {
+        if (numericValue >= 80) return 'Critical';
+        if (numericValue >= 60) return 'Concerning';
+        if (numericValue >= 40) return 'Needs Attention';
+        if (numericValue >= 20) return 'Fair';
+        return 'Good';
+      }
+    }
+    
+    // For non-percentage numbers, convert to score
+    if (numericValue >= 8) return 'Excellent';
+    if (numericValue >= 6) return 'Very Good';
+    if (numericValue >= 4) return 'Good';
+    if (numericValue >= 2) return 'Fair';
+    return 'Needs Work';
+  };
+
   const style = impactStyles[insight.impact] || impactStyles.needs_improvement;
   const ArrowIcon = style.arrow;
+  const metricLabel = getMetricLabel(insight.metric, insight.impact);
 
   return (
     <div className={`p-5 rounded-xl border-2 ${style.border} ${style.bg}`}>
@@ -2121,7 +2430,7 @@ function ComparisonInsightCard({ insight }) {
         <h3 className="font-bold text-slate-900 text-lg flex-1">{insight.title}</h3>
         <span className={`text-xs px-3 py-1.5 rounded-full ${style.badge} font-semibold flex items-center gap-1`}>
           <ArrowIcon size={14} />
-          {insight.metric}
+          {metricLabel}
         </span>
       </div>
 
@@ -2157,7 +2466,7 @@ function ChannelSelector({ channels, selectedChannel, onSelect }) {
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"
             }`}
           >
-            {channel.is_primary && <span className="mr-1.5">👤</span>}
+            {channel.is_primary && <span className="mr-1.5"></span>}
             {channel.channel_name || `Channel ${idx + 1}`}
             {channel.is_primary && <span className="text-xs ml-1.5 opacity-75">(Primary)</span>}
           </button>
@@ -2192,7 +2501,47 @@ function InsightCard({ insight }) {
     positive: { border: "border-green-300", bg: "bg-green-50", badge: "bg-green-100 text-green-700" },
   };
 
+  // Convert percentages in description to understandable text
+  const convertPercentagesToText = (text) => {
+    if (!text) return text;
+    
+    // Pattern to match percentage comparisons like "57.0% from intro to outro vs 74.5% average"
+    return text.replace(/(\d+\.?\d*)%\s+from\s+intro\s+to\s+outro\s+vs\s+(\d+\.?\d*)%\s+average/gi, (match, yourPercent, avgPercent) => {
+      const yourValue = parseFloat(yourPercent);
+      const avgValue = parseFloat(avgPercent);
+      
+      const getRetentionLabel = (percent) => {
+        if (percent >= 80) return 'excellent retention';
+        if (percent >= 60) return 'strong retention';
+        if (percent >= 40) return 'moderate retention';
+        if (percent >= 20) return 'weak retention';
+        return 'very weak retention';
+      };
+      
+      const yourLabel = getRetentionLabel(100 - yourValue);
+      const avgLabel = getRetentionLabel(100 - avgValue);
+      
+      if (yourValue > avgValue) {
+        return `${yourLabel} (below average compared to ${avgLabel})`;
+      } else if (yourValue < avgValue) {
+        return `${yourLabel} (above average compared to ${avgLabel})`;
+      } else {
+        return `${yourLabel} (similar to average)`;
+      }
+    })
+    // Pattern for general percentage values
+    .replace(/(\d+\.?\d*)%/g, (match, percent) => {
+      const value = parseFloat(percent);
+      if (value >= 80) return 'excellent';
+      if (value >= 60) return 'very good';
+      if (value >= 40) return 'good';
+      if (value >= 20) return 'fair';
+      return 'needs improvement';
+    });
+  };
+
   const colors = impactColors[insight.impact] || impactColors.medium;
+  const processedDescription = convertPercentagesToText(insight.description);
 
   return (
     <div className={`p-4 rounded-xl border ${colors.border} ${colors.bg}`}>
@@ -2204,7 +2553,7 @@ function InsightCard({ insight }) {
           </span>
         )}
       </div>
-      <p className="text-sm text-slate-700 mb-3">{insight.description}</p>
+      <p className="text-sm text-slate-700 mb-3">{processedDescription}</p>
       <div className="p-3 bg-white rounded-lg border border-slate-200">
         <div className="flex items-center gap-1.5 mb-1">
           <CheckCircle size={14} className="text-green-600" />

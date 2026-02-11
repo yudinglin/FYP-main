@@ -500,24 +500,43 @@ export default function NetworkGraphBusiness() {
 
   const formatNum = (n) => (Number(n) || 0).toLocaleString();
 
-  const MenuItem = ({ icon: Icon, label, view, badge }) => (
-    <button
-      onClick={() => setActiveView(view)}
-      className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all ${
-        activeView === view
-          ? "bg-indigo-50 text-indigo-700 font-medium"
-          : "text-slate-600 hover:bg-slate-50"
-      }`}
-    >
-      <Icon size={20} />
-      <span className="flex-1 text-left">{label}</span>
-      {badge && (
-        <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">
-          {badge}
-        </span>
-      )}
-    </button>
-  );
+  const MenuItem = ({ icon: Icon, label, view, badge, description }) => {
+    const isActive = activeView === view;
+    return (
+      <button
+        onClick={() => setActiveView(view)}
+        className={`w-full text-left px-4 py-3 rounded-lg transition-all ${
+          isActive
+            ? "bg-indigo-50 border-2 border-indigo-200"
+            : "border-2 border-transparent hover:bg-slate-50"
+        }`}
+      >
+        <div className="flex items-start gap-3">
+          <Icon 
+            size={18} 
+            className={`flex-shrink-0 mt-0.5 ${isActive ? "text-indigo-700" : "text-slate-600"}`}
+          />
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1">
+              <span className={`text-sm font-medium ${isActive ? "text-indigo-700" : "text-slate-900"}`}>
+                {label}
+              </span>
+              {badge && (
+                <span className="bg-indigo-100 text-indigo-700 text-xs px-2 py-0.5 rounded-full">
+                  {badge}
+                </span>
+              )}
+            </div>
+            {isActive && description && (
+              <p className="text-xs leading-relaxed text-indigo-600">
+                {description}
+              </p>
+            )}
+          </div>
+        </div>
+      </button>
+    );
+  };
 
   const getNodeColor = (engagement) => {
     if (engagement > 0.05) return "#4f46e5";
@@ -682,8 +701,7 @@ export default function NetworkGraphBusiness() {
         <div className="mb-6">
           <h1 className="text-3xl font-bold text-slate-900 mb-2">Industry Network Graph</h1>
           <p className="text-slate-600">
-            Visualize how videos relate based on correlation of metrics. Business user supports up
-            to 3 linked channels.
+            Visualize how videos relate based on correlation of metrics.
           </p>
         </div>
 
@@ -694,10 +712,32 @@ export default function NetworkGraphBusiness() {
             <div className="bg-white rounded-xl shadow-sm border border-slate-200 p-3">
               <h2 className="text-sm font-semibold text-slate-700 px-4 py-2 mb-2">Views</h2>
               <div className="space-y-1">
-                <MenuItem icon={BarChart3} label="Summary" view="summary" badge="Default" />
-                <MenuItem icon={Network} label="Network Graph" view="graph" badge="Start Here" />
-                <MenuItem icon={BarChart3} label="Charts" view="charts" />
-                <MenuItem icon={Lightbulb} label="Performance Insights" view="insights" />
+                <MenuItem 
+                  icon={BarChart3} 
+                  label="Summary" 
+                  view="summary" 
+                  badge="Default"
+                  description="Quick overview of your network analysis with key metrics and insights"
+                />
+                <MenuItem 
+                  icon={Network} 
+                  label="Network Graph" 
+                  view="graph" 
+                  badge="Start Here"
+                  description="Interactive visualization showing how videos connect based on similarity and engagement patterns"
+                />
+                <MenuItem 
+                  icon={BarChart3} 
+                  label="Charts" 
+                  view="charts"
+                  description="Detailed charts and data visualizations of video performance metrics"
+                />
+                <MenuItem 
+                  icon={Lightbulb} 
+                  label="Performance Insights" 
+                  view="insights"
+                  description="AI-powered recommendations and actionable insights to improve your content strategy"
+                />
               </div>
             </div>
 
