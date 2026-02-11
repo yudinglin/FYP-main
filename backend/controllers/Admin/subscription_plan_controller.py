@@ -1,6 +1,7 @@
 from flask_jwt_extended import get_jwt_identity, verify_jwt_in_request
 from models.SubscriptionPlan import SubscriptionPlan
 from models.UserAccount import UserAccount
+import json
 
 
 def get_all_plans():
@@ -15,8 +16,8 @@ def get_all_plans_admin():
         verify_jwt_in_request()
         identity = get_jwt_identity()
         user = UserAccount.find_by_email(identity)
-        
-        if not user or user.role.lower() != 'admin':
+
+        if not user or user.role.lower() != "admin":
             return {"message": "Admin access required"}, 403
 
         plans = SubscriptionPlan.get_all()
@@ -31,12 +32,12 @@ def update_plan(request, plan_id):
         verify_jwt_in_request()
         identity = get_jwt_identity()
         user = UserAccount.find_by_email(identity)
-        
-        if not user or user.role.lower() != 'admin':
+
+        if not user or user.role.lower() != "admin":
             return {"message": "Admin access required"}, 403
 
         data = request.get_json() or {}
-        
+
         # Check if plan exists
         plan = SubscriptionPlan.find_by_id(plan_id)
         if not plan:
@@ -44,48 +45,70 @@ def update_plan(request, plan_id):
             from db import get_connection
             conn = get_connection()
             cursor = conn.cursor(dictionary=True)
-            cursor.execute("""
-                SELECT plan_id, name, description, target_role, price_monthly, 
+            cursor.execute(
+                """
+                SELECT plan_id, name, description, features, target_role, price_monthly,
                        max_channels, max_saved_graphs, is_active
                 FROM SubscriptionPlan
                 WHERE plan_id = %s
-            """, (plan_id,))
+                """,
+                (plan_id,),
+            )
             row = cursor.fetchone()
             cursor.close()
             conn.close()
-            
+
             if not row:
                 return {"message": "Plan not found"}, 404
 
-        # Extract update fields
-        name = data.get("name")
-        description = data.get("description")
-        target_role = data.get("target_role")
-        price_monthly = data.get("price_monthly")
-        max_channels = data.get("max_channels")
-        max_saved_graphs = data.get("max_saved_graphs")
-        is_active = data.get("is_active")
+        updates = {}
 
-        # Validate price_monthly if provided
-        if price_monthly is not None:
-            try:
-                price_monthly = float(price_monthly)
-                if price_monthly < 0:
-                    return {"message": "Price must be non-negative"}, 400
-            except (ValueError, TypeError):
-                return {"message": "Invalid price format"}, 400
+        if "name" in data:
+            updates["name"] = data.get("name")
 
-        # Update the plan
-        updated_plan = SubscriptionPlan.update(
-            plan_id=plan_id,
-            name=name,
-            description=description,
-            target_role=target_role,
-            price_monthly=price_monthly,
-            max_channels=max_channels,
-            max_saved_graphs=max_saved_graphs,
-            is_active=is_active
-        )
+        if "description" in data:
+            desc = data.get("description")
+
+            # Safety net: if desc is a JSON string like {"description":"...","features":[]}
+            if isinstance(desc, str):
+                s = desc.strip()
+                if s.startswith("{") and '"description"' in s:
+                    try:
+                        obj = json.loads(s)
+                        if isinstance(obj, dict) and "description" in obj:
+                            desc = obj.get("description")
+                    except Exception:
+                        pass
+
+            updates["description"] = desc
+
+        if "target_role" in data:
+            updates["target_role"] = data.get("target_role")
+
+        if "price_monthly" in data:
+            price_monthly = data.get("price_monthly")
+            if price_monthly is not None:
+                try:
+                    price_monthly = float(price_monthly)
+                    if price_monthly < 0:
+                        return {"message": "Price must be non-negative"}, 400
+                except (ValueError, TypeError):
+                    return {"message": "Invalid price format"}, 400
+            updates["price_monthly"] = price_monthly
+
+        if "max_channels" in data:
+            updates["max_channels"] = data.get("max_channels")
+
+        if "max_saved_graphs" in data:
+            updates["max_saved_graphs"] = data.get("max_saved_graphs")
+
+        if "is_active" in data:
+            updates["is_active"] = data.get("is_active")
+
+        if not updates:
+            return {"message": "No valid fields to update"}, 400
+
+        updated_plan = SubscriptionPlan.update(plan_id=plan_id, **updates)
 
         if not updated_plan:
             return {"message": "Failed to update plan"}, 500
@@ -94,4 +117,3 @@ def update_plan(request, plan_id):
 
     except Exception as e:
         return {"message": f"Error updating plan: {str(e)}"}, 500
-

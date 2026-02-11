@@ -2,10 +2,11 @@ from db import get_connection
 
 
 class SubscriptionPlan:
-    def __init__(self, plan_id, name, description, target_role, price_monthly, max_channels, max_saved_graphs, is_active):
+    def __init__(self, plan_id, name, description, features, target_role, price_monthly, max_channels, max_saved_graphs, is_active):
         self.plan_id = plan_id
         self.name = name
         self.description = description
+        self.features = features
         self.target_role = target_role
         self.price_monthly = price_monthly
         self.max_channels = max_channels
@@ -20,6 +21,7 @@ class SubscriptionPlan:
             plan_id=row["plan_id"],
             name=row["name"],
             description=row.get("description"),
+            features=row.get("features"),
             target_role=row.get("target_role", "BOTH"),
             price_monthly=float(row["price_monthly"]),
             max_channels=row.get("max_channels", 1),
@@ -32,6 +34,7 @@ class SubscriptionPlan:
             "plan_id": self.plan_id,
             "name": self.name,
             "description": self.description,
+            "features": self.features.split("\n") if self.features else [],
             "target_role": self.target_role,
             "price_monthly": self.price_monthly,
             "max_channels": self.max_channels,
@@ -46,7 +49,7 @@ class SubscriptionPlan:
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute("""
-            SELECT plan_id, name, description, target_role, price_monthly, 
+            SELECT plan_id, name, description, features, target_role, price_monthly,
                    max_channels, max_saved_graphs, is_active
             FROM SubscriptionPlan
             WHERE name = %s AND is_active = TRUE
@@ -64,7 +67,7 @@ class SubscriptionPlan:
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute("""
-            SELECT plan_id, name, description, target_role, price_monthly, 
+            SELECT plan_id, name, description, features, target_role, price_monthly,
                    max_channels, max_saved_graphs, is_active
             FROM SubscriptionPlan
             WHERE plan_id = %s AND is_active = TRUE
@@ -82,11 +85,11 @@ class SubscriptionPlan:
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute("""
-            SELECT plan_id, name, description, target_role, price_monthly, 
+            SELECT plan_id, name, description, features, target_role, price_monthly,
                    max_channels, max_saved_graphs, is_active
             FROM SubscriptionPlan
-            WHERE (target_role = %s OR target_role = 'BOTH') 
-            AND is_active = TRUE
+            WHERE (target_role = %s OR target_role = 'BOTH')
+              AND is_active = TRUE
             ORDER BY price_monthly ASC
         """, (role.upper(),))
         rows = cursor.fetchall()
@@ -102,7 +105,7 @@ class SubscriptionPlan:
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute("""
-            SELECT plan_id, name, description, target_role, price_monthly, 
+            SELECT plan_id, name, description, features, target_role, price_monthly,
                    max_channels, max_saved_graphs, is_active
             FROM SubscriptionPlan
             WHERE is_active = TRUE
@@ -121,7 +124,7 @@ class SubscriptionPlan:
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute("""
-            SELECT plan_id, name, description, target_role, price_monthly, 
+            SELECT plan_id, name, description, features, target_role, price_monthly,
                    max_channels, max_saved_graphs, is_active
             FROM SubscriptionPlan
             ORDER BY price_monthly ASC
@@ -133,34 +136,53 @@ class SubscriptionPlan:
         return [cls.from_row(row) for row in rows]
 
     @classmethod
-    def update(cls, plan_id, name=None, description=None, target_role=None, 
-               price_monthly=None, max_channels=None, max_saved_graphs=None, is_active=None):
+    def update(
+        cls,
+        plan_id,
+        name=None,
+        description=None,
+        features=None,
+        target_role=None,
+        price_monthly=None,
+        max_channels=None,
+        max_saved_graphs=None,
+        is_active=None
+    ):
         """Update a subscription plan"""
         conn = get_connection()
         cursor = conn.cursor(dictionary=True)
 
-        # Build dynamic update query
         updates = []
         params = []
 
         if name is not None:
             updates.append("name = %s")
             params.append(name)
+
         if description is not None:
             updates.append("description = %s")
             params.append(description)
+
+        if features is not None:
+            updates.append("features = %s")
+            params.append(features)
+
         if target_role is not None:
             updates.append("target_role = %s")
             params.append(target_role.upper())
+
         if price_monthly is not None:
             updates.append("price_monthly = %s")
             params.append(price_monthly)
+
         if max_channels is not None:
             updates.append("max_channels = %s")
             params.append(max_channels)
+
         if max_saved_graphs is not None:
             updates.append("max_saved_graphs = %s")
             params.append(max_saved_graphs)
+
         if is_active is not None:
             updates.append("is_active = %s")
             params.append(bool(is_active))
@@ -179,9 +201,8 @@ class SubscriptionPlan:
         cursor.execute(query, params)
         conn.commit()
 
-        # Fetch and return updated plan
         cursor.execute("""
-            SELECT plan_id, name, description, target_role, price_monthly, 
+            SELECT plan_id, name, description, features, target_role, price_monthly,
                    max_channels, max_saved_graphs, is_active
             FROM SubscriptionPlan
             WHERE plan_id = %s
@@ -191,4 +212,3 @@ class SubscriptionPlan:
         cursor.close()
         conn.close()
         return cls.from_row(row)
-

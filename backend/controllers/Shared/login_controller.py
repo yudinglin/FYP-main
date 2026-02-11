@@ -18,14 +18,17 @@ def login_user(request):
 
     # Check status
     if user.status != "ACTIVE":
-        return {"message": "Account is not active"}, 403
+        return {"message": "Account is not active, please contact support if this is an error"}, 403
 
     # Check password
     if not user.check_password(password):
         return {"message": "Invalid email or password"}, 401
 
     # Create JWT
-    token = create_access_token(identity=user.email)
+    token = create_access_token(
+    identity=user.email,
+    additional_claims={"role": user.role}
+)
 
     return {
         "message": "Login successful",

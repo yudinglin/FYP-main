@@ -9,63 +9,51 @@ export default function PlansPage() {
   useEffect(() => {
     async function fetchPlans() {
       try {
-        const res = await fetch("http://localhost:5000/api/pricing");
+        const res = await fetch("/api/pricing");
         if (!res.ok) {
           throw new Error("Failed to fetch plans");
         }
+
         const data = await res.json();
-        if (data.plans) {
-          setPlans(data.plans);
-        }
+        setPlans(data.plans);
       } catch (err) {
         console.error("Failed to fetch plans:", err);
-        setError(err.message);
+        setError(err.message || "Failed to load plans");
       } finally {
         setLoading(false);
       }
     }
+
     fetchPlans();
   }, []);
 
-  // Helper function to get plan identifier for URL (creator/business based on name or target_role)
   const getPlanIdentifier = (plan) => {
-    const nameLower = plan.name.toLowerCase();
-    if (nameLower.includes("creator") || plan.target_role === "creator") {
+    const nameLower = (plan.name || "").toLowerCase();
+    const roleLower = (plan.target_role || "").toLowerCase();
+
+    if (nameLower.includes("creator") || roleLower === "creator") {
       return "creator";
-    } else if (nameLower.includes("business") || plan.target_role === "business") {
+    }
+
+    if (nameLower.includes("business") || roleLower === "business") {
       return "business";
     }
-    // Fallback: use plan_id or name as identifier
-    return plan.plan_id || plan.name.toLowerCase().replace(/\s+/g, "-");
+
+    return plan.plan_id;
   };
 
-  // Helper function to parse description and features from JSON if stored as JSON
-  const parsePlanDescription = (description) => {
-    if (!description) return { descriptionText: "", features: [] };
-    
-    try {
-      const parsed = JSON.parse(description);
-      if (parsed.features && Array.isArray(parsed.features)) {
-        return {
-          descriptionText: parsed.description || "",
-          features: parsed.features
-        };
-      } else if (Array.isArray(parsed)) {
-        // If it's just an array, treat as features
-        return {
-          descriptionText: "",
-          features: parsed
-        };
-      }
-    } catch (e) {
-      // If not JSON, treat as plain text description
-      return {
-        descriptionText: description,
-        features: []
-      };
-    }
-    return { descriptionText: "", features: [] };
-  };
+  const sortedPlans = [...plans].sort((a, b) => {
+    const aRole = (a.target_role || "").toLowerCase();
+    const bRole = (b.target_role || "").toLowerCase();
+
+    const order = { creator: 0, business: 1 };
+    const aKey = order[aRole] ?? 99;
+    const bKey = order[bRole] ?? 99;
+
+    if (aKey !== bKey) return aKey - bKey;
+
+    return (a.plan_id ?? 0) - (b.plan_id ?? 0);
+  });
 
   if (loading) {
     return (
@@ -96,9 +84,7 @@ export default function PlansPage() {
 
   return (
     <div className="pt-28 px-6 pb-20 bg-gray-50 min-h-screen">
-      <h1 className="text-4xl font-bold text-center mb-12">
-        Choose Your Plan
-      </h1>
+      <h1 className="text-4xl font-bold text-center mb-12">Choose Your Plan</h1>
 
       {plans.length === 0 ? (
         <div className="text-center py-12">
@@ -106,10 +92,10 @@ export default function PlansPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
-          {plans.map((plan) => {
-            const { descriptionText, features } = parsePlanDescription(plan.description);
+          {sortedPlans.map((plan) => {
+            const features = plan.features;
             const planId = getPlanIdentifier(plan);
-            
+
             return (
               <div
                 key={plan.plan_id}
@@ -117,13 +103,16 @@ export default function PlansPage() {
               >
                 <div>
                   <h2 className="text-2xl font-bold mb-2">{plan.name}</h2>
-                  {descriptionText && (
-                    <p className="text-gray-600 mb-6">{descriptionText}</p>
+
+                  {plan.description && (
+                    <p className="text-gray-600 mb-6">{plan.description}</p>
                   )}
+
                   <div className="text-3xl font-extrabold mb-6">
                     ${plan.price_monthly}
                     <span className="text-base font-normal">/mo</span>
                   </div>
+
                   {features.length > 0 && (
                     <ul className="text-gray-700 mb-6 space-y-2">
                       {features.map((feature, index) => (
@@ -132,6 +121,7 @@ export default function PlansPage() {
                     </ul>
                   )}
                 </div>
+
                 <Link
                   to={`/payment?plan=${planId}&plan_id=${plan.plan_id}`}
                   className="block text-center bg-red-600 text-white py-3 rounded-full font-medium hover:bg-red-700 transition"

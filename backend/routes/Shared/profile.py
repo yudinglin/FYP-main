@@ -1,5 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
+from db import get_connection
 from models.UserAccount import UserAccount
 from controllers.Shared.profile_controller import (
     get_profile,
@@ -37,18 +38,56 @@ def update_profile_route():
 
     first_name = (data.get("first_name") or "").strip()
     last_name = (data.get("last_name") or "").strip()
+    industry = (data.get("industry") or "").strip()
 
     if not first_name or not last_name:
         return jsonify({"message": "First name and last name are required"}), 400
 
     email = get_jwt_identity()
-    updated_user = UserAccount.update_name(email, first_name, last_name)
+    user = UserAccount.find_by_email(email)
+    if not user:
+        return jsonify({"message": "User not found"}), 404
 
-    if not updated_user:
-        return jsonify({"message": "Update failed"}), 400
+    # update name
+    UserAccount.update_name(email, first_name, last_name)
 
-    return jsonify({"user": updated_user.to_dict()}), 200
+    # update industry (persist) for business users
+    if user.role == "business":
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
 
+        # "Gaming" -> industry_id (case-insensitive)
+        industry_id = None
+        if industry:
+            cursor.execute(
+                "SELECT industry_id FROM Industry WHERE LOWER(name) = LOWER(%s) LIMIT 1",
+                (industry,),
+            )
+            row = cursor.fetchone()
+            if row:
+                industry_id = row["industry_id"]
+
+        # UPSERT BusinessProfile so it works even if the row doesn't exist yet
+        cursor.execute(
+            """
+            INSERT INTO BusinessProfile (user_id, company_name, industry_id)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE industry_id = VALUES(industry_id)
+            """,
+            (user.user_id, f"{first_name} {last_name}", industry_id),
+        )
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+
+    # reload and return fresh user (your UserAccount.find_by_email JOIN will include industry)
+    fresh_user = UserAccount.find_by_email(email)
+    return jsonify({"user": fresh_user.to_dict()}), 200
+
+    # reload and return fresh user (includes industry via your JOIN in UserAccount.find_by_email)
+    fresh_user = UserAccount.find_by_email(email)
+    return jsonify({"user": fresh_user.to_dict()}), 200
 
 # -------------------------------------------------------------------------
 # SAVE YOUTUBE CHANNELS (CREATOR + BUSINESS)
