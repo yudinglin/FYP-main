@@ -3,6 +3,8 @@ from flask import Flask
 from flask_jwt_extended import JWTManager
 from flask_cors import CORS
 from dotenv import load_dotenv
+import mysql.connector
+from db import get_connection
 import os
 
 # import blueprint
@@ -81,3 +83,21 @@ def ping():
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
+
+
+def init_db():
+    conn = get_connection()
+    cursor = conn.cursor()
+
+    with open("schema.sql", "r", encoding="utf-8") as f:
+        sql = f.read()
+
+    for statement in sql.split(";"):
+        if statement.strip():
+            cursor.execute(statement)
+
+    conn.commit()
+    cursor.close()
+    conn.close()
+
+init_db()
