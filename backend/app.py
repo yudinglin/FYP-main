@@ -89,7 +89,7 @@ def init_db():
     conn = get_connection()
     cursor = conn.cursor()
 
-    with open("schema.sql", "r", encoding="utf-8") as f:
+    with open("backend/schema.sql", "r", encoding="utf-8") as f:
         sql = f.read()
 
     for statement in sql.split(";"):
