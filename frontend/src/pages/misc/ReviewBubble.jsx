@@ -11,6 +11,7 @@ export default function ReviewBubble() {
   const [comment, setComment] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [success, setSuccess] = useState(false);
 
   if (!user) return null;
 
@@ -29,10 +30,14 @@ export default function ReviewBubble() {
       const res = await submitReview(rating, comment);
 
       if (res.ok) {
-        setOpen(false);
+        setSuccess(true);
         setRating(0);
         setComment("");
-        alert("Thank you for your feedback!");
+        // Close modal after showing success message
+        setTimeout(() => {
+          setOpen(false);
+          setSuccess(false);
+        }, 2000);
       } else {
         setError(res.error || "Failed to submit feedback.");
       }
@@ -72,6 +77,18 @@ export default function ReviewBubble() {
             </p>
 
             <form onSubmit={handleSubmitReview} className="space-y-4">
+              {/* Success Message */}
+              {success && (
+                <div className="rounded-lg bg-green-50 border border-green-200 px-4 py-3 flex items-center gap-2">
+                  <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                  <span className="text-sm text-green-700 font-medium">
+                    Thank you for your feedback!
+                  </span>
+                </div>
+              )}
+
               {/* Rating */}
               <div>
                 <label className="block text-sm text-slate-600 mb-1">
@@ -127,6 +144,7 @@ export default function ReviewBubble() {
                   onClick={() => {
                     setOpen(false);
                     setError(null);
+                    setSuccess(false);
                   }}
                   className="px-4 py-2 text-sm rounded-lg
                              bg-slate-100 text-slate-700
