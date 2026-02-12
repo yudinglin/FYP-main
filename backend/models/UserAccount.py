@@ -14,6 +14,7 @@ class UserAccount:
         status,
         youtube_channel=None,
         youtube_channels=None,
+        industry=None,
     ):
         self.user_id = user_id
         self.email = email
@@ -22,6 +23,7 @@ class UserAccount:
         self.last_name = last_name
         self.role = role
         self.status = status
+        self.industry = industry
 
         # creator primary channel (single)
         self.youtube_channel = youtube_channel
@@ -71,8 +73,12 @@ class UserAccount:
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute("""
-            SELECT user_id, email, password_hash, first_name, last_name, role, status
-            FROM User
+            SELECT
+                u.user_id, u.email, u.password_hash, u.first_name, u.last_name, u.role, u.status,
+                i.name AS industry
+            FROM User u
+            LEFT JOIN BusinessProfile bp ON bp.user_id = u.user_id
+            LEFT JOIN Industry i ON i.industry_id = bp.industry_id
         """)
         rows = cursor.fetchall() or []
 
@@ -103,6 +109,7 @@ class UserAccount:
             status=row.get("status"),
             youtube_channel=row.get("youtube_channel"),
             youtube_channels=row.get("youtube_channels"),
+            industry=row.get("industry"),
         )
 
     def to_dict(self):
@@ -115,6 +122,7 @@ class UserAccount:
             "status": self.status,
             "youtube_channel": self.youtube_channel,
             "youtube_channels": self.youtube_channels,
+            "industry": getattr(self, "industry", None),
         }
 
     # -------------------------------------------------------------------------
@@ -126,9 +134,13 @@ class UserAccount:
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute("""
-            SELECT user_id, email, password_hash, first_name, last_name, role, status
-            FROM User
-            WHERE email = %s
+            SELECT
+                u.user_id, u.email, u.password_hash, u.first_name, u.last_name, u.role, u.status,
+                i.name AS industry
+            FROM User u
+            LEFT JOIN BusinessProfile bp ON bp.user_id = u.user_id
+            LEFT JOIN Industry i ON i.industry_id = bp.industry_id
+            WHERE u.email = %s
         """, (email,))
         row = cursor.fetchone()
 
@@ -155,9 +167,13 @@ class UserAccount:
         cursor = conn.cursor(dictionary=True)
 
         cursor.execute("""
-            SELECT user_id, email, password_hash, first_name, last_name, role, status
-            FROM User
-            WHERE user_id = %s
+            SELECT
+                u.user_id, u.email, u.password_hash, u.first_name, u.last_name, u.role, u.status,
+                i.name AS industry
+            FROM User u
+            LEFT JOIN BusinessProfile bp ON bp.user_id = u.user_id
+            LEFT JOIN Industry i ON i.industry_id = bp.industry_id
+            WHERE u.user_id = %s
         """, (user_id,))
         row = cursor.fetchone()
 
@@ -173,6 +189,79 @@ class UserAccount:
         cursor.close()
         conn.close()
         return user
+
+    # -------------------------------------------------------------------------
+    # Industry helpers + update
+    # -------------------------------------------------------------------------
+    @classmethod
+    def get_industry_id_by_name(cls, industry_name):
+        if not industry_name:
+            return None
+
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("""
+            SELECT industry_id
+            FROM Industry
+            WHERE name = %s
+            LIMIT 1
+        """, (industry_name,))
+        row = cursor.fetchone()
+
+        cursor.close()
+        conn.close()
+        return (row.get("industry_id") if row else None)
+
+    @classmethod
+    def update_business_industry(cls, user_id, industry_name):
+        """
+        Saves selected industry for business users by updating BusinessProfile.industry_id.
+        Pass industry_name as the Industry.name string (e.g. "Education").
+        """
+        industry_name = (industry_name or "").strip()
+        industry_id = cls.get_industry_id_by_name(industry_name) if industry_name else None
+
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("""
+            UPDATE BusinessProfile
+            SET industry_id = %s
+            WHERE user_id = %s
+        """, (industry_id, user_id))
+
+        conn.commit()
+        cursor.close()
+        conn.close()
+        return True
+
+    @classmethod
+    def update_profile(cls, email, first_name, last_name, industry_name=None):
+        """
+        Updates base user fields, and if the user is business, also updates industry.
+        Returns the refreshed user object.
+        """
+        conn = get_connection()
+        cursor = conn.cursor(dictionary=True)
+
+        cursor.execute("""
+            UPDATE User
+            SET first_name = %s, last_name = %s
+            WHERE email = %s
+        """, (first_name, last_name, email))
+        conn.commit()
+
+        cursor.execute("SELECT user_id, role FROM User WHERE email = %s", (email,))
+        urow = cursor.fetchone()
+
+        cursor.close()
+        conn.close()
+
+        if urow and urow.get("role") == "business" and industry_name is not None:
+            cls.update_business_industry(urow.get("user_id"), industry_name)
+
+        return cls.find_by_email(email)
 
     # -------------------------------------------------------------------------
     # YouTube channel helpers

@@ -3,16 +3,18 @@ from controllers.Admin.subscription_management_controller import (
     get_all_subscriptions_admin,
     update_subscription_status_admin
 )
+from utils.auth import require_admin
 
 subscription_admin_bp = Blueprint("subscription_admin_bp", __name__)
 
 @subscription_admin_bp.get("/subscriptions")
+@require_admin
 def admin_get_subscriptions():
     data, status = get_all_subscriptions_admin()
     return jsonify(data), status
 
-
 @subscription_admin_bp.put("/subscriptions/<int:subscription_id>/status")
+@require_admin
 def admin_update_subscription(subscription_id):
     body = request.get_json() or {}
     new_status = (body.get("status") or "").upper().strip()

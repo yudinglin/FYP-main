@@ -1,16 +1,8 @@
 from flask import Blueprint, jsonify, request
-from flask_jwt_extended import verify_jwt_in_request, get_jwt_identity
 from models.UserAccount import UserAccount
+from utils.auth import require_admin
 
 manage_users_bp = Blueprint("manage_users_bp", __name__)
-
-def require_admin():
-    verify_jwt_in_request()
-    identity = get_jwt_identity()  # your identity is email
-    admin = UserAccount.find_by_email(identity)
-    if not admin or (admin.role or "").lower() != "admin":
-        return None
-    return admin
 
 def normalize_status(value):
     status = (value or "").upper().strip()
@@ -18,30 +10,20 @@ def normalize_status(value):
         return None
     return status
 
-
-
-@manage_users_bp.get("/api/admin/users")
+@manage_users_bp.get("/users")
+@require_admin
 def get_users_admin():
-    admin = require_admin()
-    if not admin:
-        return jsonify({"message": "Admin access required"}), 403
-
     try:
         users = UserAccount.get_all()
         return jsonify({"users": [u.to_dict() for u in users]}), 200
     except Exception as e:
         return jsonify({"message": str(e)}), 500
 
-
 @manage_users_bp.put("/users/<int:user_id>/status")
+@require_admin
 def update_user_status(user_id):
-    admin = require_admin()
-    if not admin:
-        return jsonify({"message": "Admin access required"}), 403
-
     data = request.get_json() or {}
     status = normalize_status(data.get("status"))
-    reason = data.get("reason")  # optional (not stored yet)
 
     if not status:
         return jsonify({"message": "Invalid status. Use ACTIVE or SUSPENDED."}), 400
@@ -50,7 +32,6 @@ def update_user_status(user_id):
     if not target:
         return jsonify({"message": "User not found"}), 404
 
-    # Safety: do not allow suspending admin accounts
     if (target.role or "").lower() == "admin" and status == "SUSPENDED":
         return jsonify({"message": "Admin accounts cannot be suspended"}), 403
 
@@ -61,23 +42,17 @@ def update_user_status(user_id):
     except Exception as e:
         return jsonify({"message": str(e)}), 400
 
-
 @manage_users_bp.put("/users/status")
+@require_admin
 def update_users_status_bulk():
-    admin = require_admin()
-    if not admin:
-        return jsonify({"message": "Admin access required"}), 403
-
     data = request.get_json() or {}
     status = normalize_status(data.get("status"))
     user_ids = data.get("user_ids") or []
-    reason = data.get("reason")  # optional (not stored yet)
 
     if not status:
         return jsonify({"message": "Invalid status. Use ACTIVE or SUSPENDED."}), 400
 
     try:
-        # Normalize IDs and remove duplicates
         ids = []
         for x in user_ids:
             try:
@@ -89,7 +64,6 @@ def update_users_status_bulk():
         if not ids:
             return jsonify({"message": "No valid user_ids provided", "updated": 0, "skipped_admin": 0, "updated_user_ids": []}), 200
 
-        # Skip admin accounts (protected)
         eligible_ids = []
         skipped_admin = 0
         for uid in ids:

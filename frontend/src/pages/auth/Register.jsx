@@ -127,7 +127,7 @@ export default function Register() {
           >
             <option value="creator">Content Creator</option>
             <option value="business">Business / Brand</option>
-            <option value="admin">System Admin</option>
+            
           </select>
         </div>
 
