@@ -1,6 +1,0 @@
-{
-  "dependencies": {
-    "react-force-graph-2d": "^1.29.0",
-    "react-select": "^5.10.2"
-  }
-}
