@@ -373,12 +373,6 @@ function ProfileAvatar({ name }) {
       </div>
       <div className="space-y-1">
         <p className="text-sm font-medium text-slate-900">{name}</p>
-        <button className="text-xs text-sky-600 hover:text-sky-700 font-medium">
-          Upload new
-        </button>
-        <button className="ml-3 text-xs text-slate-400 hover:text-slate-600">
-          Remove avatar
-        </button>
       </div>
     </div>
   );
