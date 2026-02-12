@@ -13,10 +13,10 @@ def get_profile():
     email = get_jwt_identity()
     return UserAccount.find_by_email(email)
 
-def update_profile(first_name: str, last_name: str):
+def update_profile(first_name: str, last_name: str, industry: str):
     """Update the logged-in user's profile."""
     email = get_jwt_identity()
-    return UserAccount.update_name(email, first_name, last_name)
+    return UserAccount.update_name(email, first_name, last_name,industry)
 
 def update_creator_youtube_channel(youtube_channel: str):
     email = get_jwt_identity()

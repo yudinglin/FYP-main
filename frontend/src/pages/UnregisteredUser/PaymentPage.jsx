@@ -1,26 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../core/hooks/useAuth.js";
-
-/**
- * Parse plan description (JSON or plain text)
- */
-function parsePlanDescription(description) {
-  if (!description) return { descriptionText: "", features: [] };
-
-  try {
-    const parsed = JSON.parse(description);
-    return {
-      descriptionText: parsed.description || "",
-      features: parsed.features || [],
-    };
-  } catch {
-    return {
-      descriptionText: description,
-      features: [],
-    };
-  }
-}
 
 export default function PaymentPage() {
   const navigate = useNavigate();
@@ -31,9 +11,11 @@ export default function PaymentPage() {
   const planParam = searchParams.get("plan"); // creator | business
   const planIdParam = searchParams.get("plan_id");
 
-  // Plan state (REPLACES hardcoded planDetails)
+  const role = useMemo(() => planParam || "creator", [planParam]);
+
+  // Plan state
   const [selectedPlan, setSelectedPlan] = useState(null);
-  const role = planParam || "creator";
+  const [loading, setLoading] = useState(true);
 
   // Form state
   const [email, setEmail] = useState("");
@@ -44,71 +26,43 @@ export default function PaymentPage() {
   // UI state
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [paymentSuccess, setPaymentSuccess] = useState(false);
-  const [loading, setLoading] = useState(false);
 
-  /**
-   * Navigate to card payment (UNCHANGED)
-   */
-  const handlePayAndRegister = () => {
-    navigate("/card-payment", {
-      state: {
-        email,
-        password,
-        firstName,
-        lastName,
-        role,
-        selectedPlan,
-      },
-    });
-  };
-
-  /**
-   * Fetch plan from backend
-   */
+  // Fetch plan from backend
   useEffect(() => {
     async function fetchPlanDetails() {
       setLoading(true);
+      setError("");
+
       try {
-        const res = await fetch("http://localhost:5000/api/pricing");
+        const res = await fetch("/api/pricing");
         if (!res.ok) throw new Error("Failed to fetch plans");
 
         const data = await res.json();
-        if (!data.plans) throw new Error("No plans found");
+        const plans = Array.isArray(data?.plans) ? data.plans : [];
 
         let plan = null;
 
-        // 1️⃣ Prefer plan_id
+        // Prefer plan_id
         if (planIdParam) {
-          plan = data.plans.find(
-            (p) => String(p.plan_id) === String(planIdParam)
-          );
+          plan = plans.find((p) => String(p.plan_id) === String(planIdParam));
         }
 
-        // 2️⃣ Fallback to role
-        if (!plan && role) {
-          plan = data.plans.find(
-            (p) =>
-              p.target_role === role ||
-              p.name.toLowerCase().includes(role)
-          );
+        // Fallback to role match
+        if (!plan) {
+          plan = plans.find((p) => {
+            const target = String(p?.target_role || "").toLowerCase();
+            const name = String(p?.name || "").toLowerCase();
+            return target === role || name.includes(role);
+          });
         }
 
         if (!plan) throw new Error("Invalid plan");
 
-        const { descriptionText, features } =
-          parsePlanDescription(plan.description);
-
-        setSelectedPlan({
-          plan_id: plan.plan_id,
-          name: plan.name,
-          price: plan.price_monthly,
-          description: descriptionText,
-          features,
-        });
+        setSelectedPlan(plan);
       } catch (err) {
         console.error("Failed to fetch plan details:", err);
         setSelectedPlan(null);
+        setError("Failed to load plan");
       } finally {
         setLoading(false);
       }
@@ -117,87 +71,54 @@ export default function PaymentPage() {
     fetchPlanDetails();
   }, [role, planIdParam]);
 
-  /**
-   * Handle payment (UNCHANGED LOGIC)
-   */
-  async function handlePayment(e) {
-    e.preventDefault();
-    setError("");
-    setBusy(true);
+  // helpers
+  const price = Number(selectedPlan?.price_monthly ?? selectedPlan?.price ?? 0);
 
-    try {
-      const resp = await fetch("http://localhost:5000/api/payment/process", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          email,
-          password,
-          first_name: firstName,
-          last_name: lastName,
-          role,
-          plan_name: selectedPlan.name,
-          plan_id: selectedPlan.plan_id,
-        }),
-      });
+  const features = Array.isArray(selectedPlan?.features)
+    ? selectedPlan.features
+    : typeof selectedPlan?.features === "string"
+      ? selectedPlan.features.split("\n").filter((f) => f.trim() !== "")
+      : [];
 
-      const data = await resp.json().catch(() => ({}));
-      if (!resp.ok) throw new Error(data.message || "Payment failed");
+  function validateForm() {
+    if (!email.trim()) return "Email is required";
+    if (!/^\S+@\S+\.\S+$/.test(email.trim())) return "Please enter a valid email";
+    if (!firstName.trim()) return "First name is required";
+    if (!lastName.trim()) return "Last name is required";
+    if (!password) return "Password is required";
+    if (password.length < 8) return "Password must be at least 8 characters";
+    return "";
+  }
 
-      setPaymentSuccess(true);
-
-      setTimeout(async () => {
-        try {
-          await login(email, password);
-          navigate(
-            role === "business"
-              ? "/dashboard/business"
-              : "/dashboard"
-          );
-        } catch {
-          navigate("/login");
-        }
-      }, 2000);
-    } catch (err) {
-      setError(err.message || "Payment failed");
-    } finally {
-      setBusy(false);
+  // Continue to card payment (DO NOT process payment here)
+  function handleContinueToPayment() {
+    const msg = validateForm();
+    if (msg) {
+      setError(msg);
+      return;
     }
+    setError("");
+
+    navigate("/card-payment", {
+      state: {
+        email: email.trim(),
+        password,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        role, // IMPORTANT: keep role from URL, not target_role
+        selectedPlan, // includes price_monthly + features array
+      },
+    });
   }
 
-  // ---------------- UI STATES ----------------
-
-  if (paymentSuccess) {
-    return (
-      <div className="pt-28 px-6 pb-20 bg-gray-50 min-h-screen flex items-center justify-center">
-        <div className="max-w-md w-full bg-white rounded-2xl shadow-xl p-8 text-center">
-          <div className="mb-6">
-            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
-              <svg
-                className="w-10 h-10 text-green-600"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-              >
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
-            </div>
-          </div>
-          <h2 className="text-3xl font-bold mb-4">Payment Successful!</h2>
-          <p className="text-gray-500">Redirecting you to your dashboard...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!planParam || loading || !selectedPlan) {
+  // UI states
+  if (loading || !selectedPlan) {
     return (
       <div className="pt-28 min-h-screen flex items-center justify-center">
-        <p className="text-gray-600">Loading plan...</p>
+        <p className="text-gray-600">{error ? error : "Loading plan..."}</p>
       </div>
     );
   }
-
-  // ---------------- MAIN UI ----------------
 
   return (
     <div className="pt-28 px-6 pb-20 bg-gray-50 min-h-screen">
@@ -212,55 +133,58 @@ export default function PaymentPage() {
             <h2 className="text-2xl font-bold mb-4">Plan Summary</h2>
 
             <h3 className="text-xl font-semibold">{selectedPlan.name}</h3>
-            <p className="text-gray-600 mt-2">{selectedPlan.description}</p>
+            {selectedPlan.description && (
+              <p className="text-gray-600 mt-2">{selectedPlan.description}</p>
+            )}
 
             <div className="text-4xl font-extrabold my-6">
-              ${selectedPlan.price}
+              ${price.toFixed(2)}
               <span className="text-lg font-normal text-gray-600">/mo</span>
             </div>
 
-          {/* Free Trial Notice - Neutral Theme */}
-          <div className="flex items-start bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-2xl p-5 mb-6 shadow-sm">
-            {/* Icon */}
-            <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-gray-200 rounded-full mr-4">
-              <svg
-                className="w-6 h-6 text-gray-700"
-                fill="none"
-                stroke="currentColor"
-                viewBox="0 0 24 24"
-                aria-hidden="true"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
+            {/* Free Trial Notice */}
+            <div className="flex items-start bg-gradient-to-r from-gray-50 to-gray-100 border border-gray-200 rounded-2xl p-5 mb-6 shadow-sm">
+              <div className="flex-shrink-0 w-12 h-12 flex items-center justify-center bg-gray-200 rounded-full mr-4">
+                <svg
+                  className="w-6 h-6 text-gray-700"
+                  fill="none"
+                  stroke="currentColor"
+                  viewBox="0 0 24 24"
+                  aria-hidden="true"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={2}
+                    d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"
+                  />
+                </svg>
+              </div>
 
-            {/* Text Content */}
-            <div>
-              <p className="text-lg font-semibold text-gray-900 mb-1">
-                Free Trial Offer
-              </p>
-              <p className="text-sm text-gray-700">
-                Enjoy your first <span className="font-medium">30 days completely free</span>. 
-                Billing starts on day 31. Cancel anytime before then with no charges.
-              </p>
+              <div>
+                <p className="text-lg font-semibold text-gray-900 mb-1">
+                  Free Trial Offer
+                </p>
+                <p className="text-sm text-gray-700">
+                  Enjoy your first <span className="font-medium">30 days completely free</span>.
+                  Billing starts on day 31. Cancel anytime before then with no charges.
+                </p>
+              </div>
             </div>
-          </div>
-
 
             <h4 className="font-semibold mb-3">Features:</h4>
-            <ul className="space-y-2">
-              {selectedPlan.features.map((feature, index) => (
-                <li key={index} className="flex items-center text-gray-700">
-                  <span className="text-green-500 mr-2">✔</span>
-                  {feature}
-                </li>
-              ))}
-            </ul>
+            {features.length === 0 ? (
+              <p className="text-gray-500">No features listed for this plan.</p>
+            ) : (
+              <ul className="space-y-2">
+                {features.map((feature, index) => (
+                  <li key={index} className="flex items-center text-gray-700">
+                    <span className="text-green-500 mr-2">✔</span>
+                    {feature}
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
 
           {/* Registration Form */}
@@ -273,56 +197,55 @@ export default function PaymentPage() {
               </div>
             )}
 
-            <form className="space-y-4" onSubmit={handlePayment}>
+            <div className="space-y-4">
               <input
                 type="email"
-                required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="Email"
                 className="w-full border rounded-lg px-4 py-2"
+                disabled={busy}
               />
 
               <input
                 type="text"
-                required
                 value={firstName}
                 onChange={(e) => setFirstName(e.target.value)}
                 placeholder="First name"
                 className="w-full border rounded-lg px-4 py-2"
+                disabled={busy}
               />
 
               <input
                 type="text"
-                required
                 value={lastName}
                 onChange={(e) => setLastName(e.target.value)}
                 placeholder="Last name"
                 className="w-full border rounded-lg px-4 py-2"
+                disabled={busy}
               />
 
               <input
                 type="password"
-                required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Password"
+                placeholder="Password (min 8 characters)"
                 className="w-full border rounded-lg px-4 py-2"
+                disabled={busy}
               />
 
               <button
                 type="button"
-                onClick={handlePayAndRegister}
+                onClick={handleContinueToPayment}
                 disabled={busy}
                 className="w-full py-3 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:opacity-60"
               >
                 Continue to Payment
               </button>
-            </form>
+            </div>
           </div>
         </div>
       </div>
     </div>
   );
 }
-

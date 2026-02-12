@@ -12,8 +12,8 @@ export default function BusinessProfile() {
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [industry, setIndustry] = useState("");
-  const [youtubeChannels, setYoutubeChannels] = useState([""]); // Changed to array for multiple channels
-  const [channelNames, setChannelNames] = useState([""]); // For channel names/titles
+  const [youtubeChannels, setYoutubeChannels] = useState([""]);
+  const [channelNames, setChannelNames] = useState([""]);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -38,21 +38,40 @@ export default function BusinessProfile() {
     "Music",
     "Travel",
     "Food & Cooking",
-    "Other"
+    "Other",
   ];
+
+  // Ensure industry (and latest user profile) is always loaded on refresh
+  useEffect(() => {
+    async function refreshProfile() {
+      if (!token) return;
+
+      try {
+        const resp = await fetch("http://localhost:5000/api/profile", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const data = await resp.json();
+        if (resp.ok && data.user) setUser(data.user);
+      } catch (err) {
+        console.error("Failed to refresh profile:", err);
+      }
+    }
+
+    refreshProfile();
+  }, [token, setUser]);
 
   useEffect(() => {
     if (user) {
       setFirstName(user.first_name || "");
       setLastName(user.last_name || "");
-      setIndustry(user.industry || "");
-      
-      // Initialize channels from user data
+      setIndustry((prev) =>
+        user.industry?.trim() ? user.industry.trim() : prev
+      );
+
       if (user.youtube_channels && user.youtube_channels.length > 0) {
-        setYoutubeChannels(user.youtube_channels.map(ch => ch.url || ""));
-        setChannelNames(user.youtube_channels.map(ch => ch.name || ""));
+        setYoutubeChannels(user.youtube_channels.map((ch) => ch.url || ""));
+        setChannelNames(user.youtube_channels.map((ch) => ch.name || ""));
       } else {
-        // If no channels in user data, initialize with empty array
         setYoutubeChannels([""]);
         setChannelNames([""]);
       }
@@ -68,14 +87,17 @@ export default function BusinessProfile() {
 
   async function fetchSubscriptionInfo() {
     if (!token) return;
-    
+
     setLoadingSubscription(true);
     try {
-      const resp = await fetch("http://localhost:5000/api/profile/subscription", {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const resp = await fetch(
+        "http://localhost:5000/api/profile/subscription",
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
       const data = await resp.json();
       if (resp.ok) {
         setSubscription(data.subscription);
@@ -146,9 +168,9 @@ export default function BusinessProfile() {
         .map((url, index) => ({
           url: url.trim(),
           name: channelNames[index]?.trim() || `Channel ${index + 1}`,
-          is_primary: index === 0, // ✅ PRIMARY FLAG
+          is_primary: index === 0,
         }))
-        .filter(channel => channel.url !== "");
+        .filter((channel) => channel.url !== "");
 
       const resp = await fetch(
         "http://localhost:5000/api/profile/youtube-channels",
@@ -174,17 +196,14 @@ export default function BusinessProfile() {
     }
   }
 
-  // Function to add a new channel input
   const addChannel = () => {
     if (youtubeChannels.length >= MAX_CHANNELS) return;
     setYoutubeChannels([...youtubeChannels, ""]);
     setChannelNames([...channelNames, ""]);
   };
 
-  // Function to remove a channel input
   const removeChannel = (index) => {
     if (youtubeChannels.length <= 1) {
-      // Don't remove the last one, just clear it
       const newChannels = [...youtubeChannels];
       const newNames = [...channelNames];
       newChannels[index] = "";
@@ -199,14 +218,12 @@ export default function BusinessProfile() {
     }
   };
 
-  // Function to update a specific channel URL
   const updateChannelUrl = (index, value) => {
     const newChannels = [...youtubeChannels];
     newChannels[index] = value;
     setYoutubeChannels(newChannels);
   };
 
-  // Function to update a specific channel name
   const updateChannelName = (index, value) => {
     const newNames = [...channelNames];
     newNames[index] = value;
@@ -340,6 +357,9 @@ function ProfileSection({
   saving,
   onSave,
 }) {
+  const selectedIndustry =
+    user?.industry?.trim() || (industry || "").trim() || "";
+
   return (
     <>
       <h1 className="text-xl font-semibold text-slate-900 mb-4">
@@ -376,25 +396,42 @@ function ProfileSection({
           />
         </div>
 
-        {/* Industry Dropdown Section - Added below first name */}
+        {/* Industry Dropdown Section */}
         <div className="text-sm">
           <label className="block text-xs mb-1">
             <span className="text-slate-500">Specify your industry</span>
             <select
               className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-              value={industry}
-              onChange={(e) => setIndustry(e.target.value)}
+              value={(industry || "").trim()}
+              onChange={(e) => setIndustry(e.target.value.trim())}
             >
-              {industryOptions.map((option, index) => (
-                <option key={index} value={index === 0 ? "" : option}>
-                  {option}
-                </option>
-              ))}
+              {industryOptions.map((option, index) => {
+                const isPlaceholder = index === 0;
+                return (
+                  <option
+                    key={index}
+                    value={isPlaceholder ? "" : option}
+                    disabled={isPlaceholder}
+                    hidden={isPlaceholder && !!industry}
+                  >
+                    {option}
+                  </option>
+                );
+              })}
             </select>
             <p className="mt-1 text-xs text-slate-400">
               This helps us customize your experience
             </p>
           </label>
+        </div>
+
+        {/* Selected Industry Display Section */}
+        <div className="text-sm">
+          <div className="text-xs text-slate-500 mb-1">Selected industry</div>
+          <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-900 flex items-center justify-between">
+            <span>{selectedIndustry || "Not set"}</span>
+            <span className="text-xs text-slate-400">Saved on your profile</span>
+          </div>
         </div>
 
         {error && <Message type="error" text={error} />}
@@ -429,35 +466,38 @@ function LinkChannelSection({
   onSave,
 }) {
   const MAX_CHANNELS = 5;
-  
+
   return (
     <>
       <h1 className="text-xl font-semibold text-slate-900 mb-4">
-        Link YouTube channels 
+        Link YouTube channels
       </h1>
 
       <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-6 space-y-6">
         <p className="text-sm text-slate-600">
-          Add multiple YouTube channels by clicking the + button. Enter channel IDs and optional names.
+          Add multiple YouTube channels by clicking the + button. Enter channel
+          IDs and optional names.
         </p>
 
         {youtubeChannels.map((url, index) => (
-          <div key={index} className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
+          <div
+            key={index}
+            className="space-y-4 p-4 bg-slate-50 rounded-lg border border-slate-200"
+          >
             <div className="flex justify-between items-center">
               <h3 className="text-sm font-medium flex items-center gap-2">
-                  <span className="text-slate-700">
-                    Channel {index + 1}
-                  </span>
+                <span className="text-slate-700">Channel {index + 1}</span>
 
-                  {index === 0 && (
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 font-semibold">
-                      Primary
-                    </span>
-                  )}
-                </h3>
                 {index === 0 && (
+                  <span className="text-xs px-2 py-0.5 rounded-full bg-sky-100 text-sky-700 font-semibold">
+                    Primary
+                  </span>
+                )}
+              </h3>
+              {index === 0 && (
                 <p className="text-xs text-slate-400">
-                  This channel will be used as your primary channel across the platform.
+                  This channel will be used as your primary channel across the
+                  platform.
                 </p>
               )}
               {youtubeChannels.length > 1 && index !== 0 && (
@@ -484,7 +524,7 @@ function LinkChannelSection({
                   onChange={(e) => updateChannelName(index, e.target.value)}
                 />
               </div>
-              
+
               <div>
                 <label className="block text-xs text-slate-500 mb-1">
                   YouTube ID
@@ -502,37 +542,44 @@ function LinkChannelSection({
 
             <p className="text-xs text-slate-400">
               Example ID format:{" "}
-              <span className="text-sky-600">
-                UCxYpJqNzKfLmWvB8T9zRwS2g
-              </span>
+              <span className="text-sky-600">UCxYpJqNzKfLmWvB8T9zRwS2g</span>
             </p>
           </div>
         ))}
 
         {/* Add Channel Button */}
         <button
-            type="button"
-            onClick={addChannel}
-            disabled={youtubeChannels.length >= MAX_CHANNELS}
-            className={`flex items-center justify-center gap-2 w-full py-3 rounded-lg border-2 border-dashed transition-colors
+          type="button"
+          onClick={addChannel}
+          disabled={youtubeChannels.length >= MAX_CHANNELS}
+          className={`flex items-center justify-center gap-2 w-full py-3 rounded-lg border-2 border-dashed transition-colors
               ${
                 youtubeChannels.length >= MAX_CHANNELS
                   ? "border-slate-200 text-slate-400 cursor-not-allowed bg-slate-50"
                   : "border-slate-300 hover:border-sky-400 hover:bg-sky-50 text-slate-500 hover:text-sky-600"
               }`}
         >
-
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          <svg
+            className="w-5 h-5"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M12 4v16m8-8H4"
+            />
           </svg>
           <span className="text-sm font-medium">Add Another Channel</span>
         </button>
 
         {youtubeChannels.length >= MAX_CHANNELS && (
-        <p className="text-xs text-red-500 mt-2">
-           You can link up to 3 YouTube channels only.
-        </p>
-         )}
+          <p className="text-xs text-red-500 mt-2">
+            You can link up to 3 YouTube channels only.
+          </p>
+        )}
 
         {error && <Message type="error" text={error} />}
         {success && <Message type="success" text={success} />}
@@ -566,23 +613,22 @@ function ProfileAvatar({ name }) {
   );
 }
 
-function ProfileField({
-  label,
-  value,
-  onChange,
-  placeholder,
-  readOnly = false,
-}) {
+function ProfileField({ label, value, onChange, placeholder, readOnly = false }) {
   return (
     <label className="block text-xs">
       <span className="text-slate-500">{label}</span>
       <input
         type="text"
-        className="mt-1 block w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+        className={`mt-1 block w-full rounded-lg border px-3 py-2 text-sm ${
+          readOnly
+            ? "border-slate-200 bg-slate-100 text-slate-600 cursor-not-allowed"
+            : "border-slate-200 bg-slate-50 text-slate-900"
+        }`}
         value={value ?? ""}
-        onChange={onChange}
+        onChange={readOnly ? undefined : onChange}
         placeholder={placeholder}
         readOnly={readOnly}
+        tabIndex={readOnly ? -1 : 0}
       />
     </label>
   );
@@ -621,10 +667,7 @@ function SubscriptionSection({
   const [success, setSuccess] = useState("");
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
 
-  // Filter available plans - show both creator and business plans for switching
-  // Both creator and business users can switch to either plan
   const filteredPlans = availablePlans.filter((p) => {
-    // Show plans that match the user's role OR are available to both
     if (user?.role === "creator") {
       return p.target_role === "creator" || p.target_role === "BOTH";
     } else if (user?.role === "business") {
@@ -633,7 +676,6 @@ function SubscriptionSection({
     return true;
   });
 
-  // Get all alternative plans (excluding current plan)
   const alternativePlans = filteredPlans.filter(
     (p) => p.plan_id !== plan?.plan_id
   );
@@ -649,21 +691,27 @@ function SubscriptionSection({
     setSuccess("");
 
     try {
-      const resp = await fetch("http://localhost:5000/api/profile/subscription", {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          plan_name: planName,
-        }),
-      });
+      const resp = await fetch(
+        "http://localhost:5000/api/profile/subscription",
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            plan_name: planName,
+          }),
+        }
+      );
 
       const data = await resp.json();
-      if (!resp.ok) throw new Error(data.message || "Failed to update subscription");
+      if (!resp.ok)
+        throw new Error(data.message || "Failed to update subscription");
 
-      setSuccess("Subscription updated successfully! Check your email for confirmation.");
+      setSuccess(
+        "Subscription updated successfully! Check your email for confirmation."
+      );
       onUpdate();
     } catch (err) {
       setError(err.message);
@@ -680,19 +728,21 @@ function SubscriptionSection({
     setSuccess("");
 
     try {
-      const resp = await fetch("http://localhost:5000/api/profile/subscription", {
-        method: "DELETE",
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      const resp = await fetch(
+        "http://localhost:5000/api/profile/subscription",
+        {
+          method: "DELETE",
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       const data = await resp.json();
-      if (!resp.ok) throw new Error(data.message || "Failed to cancel subscription");
+      if (!resp.ok)
+        throw new Error(data.message || "Failed to cancel subscription");
 
-      // Subscription cancelled - log out user and redirect
       setShowCancelConfirm(false);
-      // Small delay to show success message, then logout
       setTimeout(() => {
         onCancel();
       }, 1500);
@@ -709,7 +759,9 @@ function SubscriptionSection({
           Subscription Management
         </h1>
         <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-6">
-          <p className="text-sm text-slate-600">Loading subscription information...</p>
+          <p className="text-sm text-slate-600">
+            Loading subscription information...
+          </p>
         </section>
       </>
     );
@@ -739,7 +791,9 @@ function SubscriptionSection({
       {/* Current Subscription */}
       <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-6 space-y-4 mb-6">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-slate-900">Current Subscription</h2>
+          <h2 className="text-lg font-semibold text-slate-900">
+            Current Subscription
+          </h2>
           <span
             className={`px-3 py-1 rounded-full text-xs font-semibold ${
               isCancelled
@@ -755,7 +809,9 @@ function SubscriptionSection({
           <div className="space-y-2">
             <div className="flex justify-between items-center py-2 border-b border-slate-100">
               <span className="text-sm text-slate-600">Plan Name:</span>
-              <span className="text-sm font-semibold text-slate-900">{plan.name}</span>
+              <span className="text-sm font-semibold text-slate-900">
+                {plan.name}
+              </span>
             </div>
             <div className="flex justify-between items-center py-2 border-b border-slate-100">
               <span className="text-sm text-slate-600">Monthly Price:</span>
@@ -763,14 +819,6 @@ function SubscriptionSection({
                 ${plan.price_monthly.toFixed(2)}
               </span>
             </div>
-            {/* <div className="flex justify-between items-center py-2 border-b border-slate-100">
-              <span className="text-sm text-slate-600">Max Channels:</span>
-              <span className="text-sm font-semibold text-slate-900">{plan.max_channels}</span>
-            </div>
-            <div className="flex justify-between items-center py-2 border-b border-slate-100">
-              <span className="text-sm text-slate-600">Max Saved Graphs:</span>
-              <span className="text-sm font-semibold text-slate-900">{plan.max_saved_graphs}</span>
-            </div> */}
             <div className="flex justify-between items-center py-2">
               <span className="text-sm text-slate-600">Subscription Start:</span>
               <span className="text-sm font-semibold text-slate-900">
@@ -807,7 +855,8 @@ function SubscriptionSection({
         <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-6 space-y-4 mb-6">
           <h2 className="text-lg font-semibold text-slate-900">Change Plan</h2>
           <p className="text-sm text-slate-600">
-            Switch to a different subscription plan. You can change from {plan?.name} to any of the available plans below.
+            Switch to a different subscription plan. You can change from{" "}
+            {plan?.name} to any of the available plans below.
           </p>
 
           <div className="space-y-4">
@@ -818,9 +867,13 @@ function SubscriptionSection({
               >
                 <div className="flex justify-between items-start">
                   <div className="flex-1">
-                    <h3 className="text-base font-semibold text-slate-900">{altPlan.name}</h3>
+                    <h3 className="text-base font-semibold text-slate-900">
+                      {altPlan.name}
+                    </h3>
                     {altPlan.description && (
-                      <p className="text-xs text-slate-500 mt-1">{altPlan.description}</p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        {altPlan.description}
+                      </p>
                     )}
                   </div>
                   <div className="text-right">
@@ -834,11 +887,15 @@ function SubscriptionSection({
                 <div className="grid grid-cols-2 gap-4 text-sm pt-2 border-t border-slate-100">
                   <div>
                     <span className="text-slate-600">Max Channels:</span>
-                    <span className="ml-2 font-semibold text-slate-900">{altPlan.max_channels}</span>
+                    <span className="ml-2 font-semibold text-slate-900">
+                      {altPlan.max_channels}
+                    </span>
                   </div>
                   <div>
                     <span className="text-slate-600">Max Saved Graphs:</span>
-                    <span className="ml-2 font-semibold text-slate-900">{altPlan.max_saved_graphs}</span>
+                    <span className="ml-2 font-semibold text-slate-900">
+                      {altPlan.max_saved_graphs}
+                    </span>
                   </div>
                 </div>
 
@@ -858,9 +915,12 @@ function SubscriptionSection({
       {/* Cancel Subscription */}
       {!isCancelled && (
         <section className="rounded-2xl bg-white shadow-sm border border-red-200 p-6 space-y-4 mb-6">
-          <h2 className="text-lg font-semibold text-red-700">Cancel Subscription</h2>
+          <h2 className="text-lg font-semibold text-red-700">
+            Cancel Subscription
+          </h2>
           <p className="text-sm text-slate-600">
-            Cancelling your subscription will end your access to premium features. You will be logged out.
+            Cancelling your subscription will end your access to premium
+            features. You will be logged out.
           </p>
 
           {!showCancelConfirm ? (
@@ -873,7 +933,8 @@ function SubscriptionSection({
           ) : (
             <div className="space-y-3">
               <p className="text-sm font-semibold text-red-700">
-                Are you sure you want to cancel your subscription? You will be logged out immediately.
+                Are you sure you want to cancel your subscription? You will be
+                logged out immediately.
               </p>
               <div className="flex gap-3">
                 <button
@@ -899,14 +960,17 @@ function SubscriptionSection({
       {/* Upcoming Billing */}
       {!isCancelled && plan && (
         <section className="rounded-2xl bg-white shadow-sm border border-slate-100 p-6 space-y-4">
-          <h2 className="text-lg font-semibold text-slate-900">Upcoming Billing</h2>
+          <h2 className="text-lg font-semibold text-slate-900">
+            Upcoming Billing
+          </h2>
           <div className="flex justify-between items-center py-3 border border-slate-200 rounded-lg px-4 bg-slate-50">
             <div>
               <p className="text-sm font-semibold text-slate-900">
                 {plan.name} Plan
               </p>
               <p className="text-xs text-slate-500">
-                Next billing: {(() => {
+                Next billing:{" "}
+                {(() => {
                   const startDate = new Date(subscription.start_date);
                   const nextBilling = new Date(startDate);
                   nextBilling.setDate(startDate.getDate() + 30);
