@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { apiRequest } from "../../core/api/client";
 
 export default function PlansPage() {
   const [plans, setPlans] = useState([]);
