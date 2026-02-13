@@ -65,7 +65,7 @@ export default function CreatorDashboard() {
       setTotalComments(d2.totalComments ?? 0);
 
       const r3 = await fetch(
-        `(${API_BASE}/api/youtube/videos.correlationNetwork?url=${q}&maxVideos=50`
+        `${API_BASE}/api/youtube/videos.correlationNetwork?url=${q}&maxVideos=50`
       );
       if (!r3.ok) {
         const txt = await r3.text();
@@ -100,8 +100,8 @@ export default function CreatorDashboard() {
         .sort((a, b) => new Date(b.publishedAt) - new Date(a.publishedAt));
       setLatestVideo(sortedByDate.length > 0 ? sortedByDate[0] : null);
 
-      const r4 = await fetch(
-        `(${API_BASE}/api/youtube/videos.latestComments?url=${q}&maxResults=5`
+       const r4 = await fetch(
+        `${API_BASE}/api/youtube/videos.latestComments?url=${q}&maxResults=5`
       );
       if (!r4.ok) setLatestComments([]);
       else {
