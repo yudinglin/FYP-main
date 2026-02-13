@@ -28,7 +28,7 @@ export default function Register() {
     setError("");
     setBusy(true);
     try {
-      const resp = await fetch("http://localhost:5000/api/register", {
+      const resp = await fetch(`${API_BASE}/api/register`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

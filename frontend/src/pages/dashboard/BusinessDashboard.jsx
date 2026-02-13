@@ -105,7 +105,7 @@ export default function BusinessDashboard() {
         const q = encodeURIComponent(url);
 
         // channel stats
-        const r1 = await fetch(`http://localhost:5000/api/youtube/channels.list?url=${q}`);
+        const r1 = await fetch(`${API_BASE}/api/youtube/channels.list?url=${q}`);
         if (!r1.ok) throw new Error(`channels.list failed for ${url}`);
         const d1 = await r1.json();
         setSubscriberCount(Number(d1.subscriberCount || 0));
@@ -113,15 +113,14 @@ export default function BusinessDashboard() {
         setChannelName(d1.channelName || "");
 
         // total likes/comments
-        const r2 = await fetch(`http://localhost:5000/api/youtube/videos.list?url=${q}`);
+        const r2 = await fetch(`${API_BASE}/api/youtube/videos.list?url=${q}`);
         if (!r2.ok) throw new Error(`videos.list failed for ${url}`);
         const d2 = await r2.json();
         setTotalLikes(Number(d2.totalLikes || 0));
         setTotalComments(Number(d2.totalComments || 0));
 
         // top videos ranking (use correlationNetwork of rawMetrics)
-        const r3 = await fetch(
-          `http://localhost:5000/api/youtube/videos.correlationNetwork?url=${q}&maxVideos=50`
+        const r3 = await fetch(`${API_BASE}/api/youtube/videos.correlationNetwork?url=${q}&maxVideos=50`
         );
         if (r3.ok) {
           const d3 = await r3.json();
@@ -163,8 +162,7 @@ export default function BusinessDashboard() {
         }
 
         // Latest comments: 5 comments from the channel
-        const r4 = await fetch(
-          `http://localhost:5000/api/youtube/videos.latestComments?url=${q}&maxResults=5`
+        const r4 = await fetch(`${API_BASE}/api/youtube/videos.latestComments?url=${q}&maxResults=5`
         );
         if (r4.ok) {
           const d4 = await r4.json();

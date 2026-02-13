@@ -50,21 +50,21 @@ export default function CreatorDashboard() {
       const channelUrl = user.youtube_channel;
       const q = encodeURIComponent(channelUrl);
 
-      const r1 = await fetch(`http://localhost:5000/api/youtube/channels.list?url=${q}`);
+      const r1 = await fetch(`${API_BASE}/api/youtube/channels.list?url=${q}`);
       if (!r1.ok) throw new Error("channels.list request failed");
       const d1 = await r1.json();
       setSubscribers(d1.subscriberCount ?? 0);
       setViewCount(d1.viewCount ?? 0);
       setChannelName(d1.channelName || "");
 
-      const r2 = await fetch(`http://localhost:5000/api/youtube/videos.list?url=${q}`);
+      const r2 = await fetch(`${API_BASE}/api/youtube/videos.list?url=${q}`);
       if (!r2.ok) throw new Error("videos.list request failed");
       const d2 = await r2.json();
       setTotalLikes(d2.totalLikes ?? 0);
       setTotalComments(d2.totalComments ?? 0);
 
       const r3 = await fetch(
-        `http://localhost:5000/api/youtube/videos.correlationNetwork?url=${q}&maxVideos=50`
+        `(${API_BASE}/api/youtube/videos.correlationNetwork?url=${q}&maxVideos=50`
       );
       if (!r3.ok) {
         const txt = await r3.text();
@@ -100,7 +100,7 @@ export default function CreatorDashboard() {
       setLatestVideo(sortedByDate.length > 0 ? sortedByDate[0] : null);
 
       const r4 = await fetch(
-        `http://localhost:5000/api/youtube/videos.latestComments?url=${q}&maxResults=5`
+        `(${API_BASE}/api/youtube/videos.latestComments?url=${q}&maxResults=5`
       );
       if (!r4.ok) setLatestComments([]);
       else {

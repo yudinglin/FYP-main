@@ -1,7 +1,8 @@
 import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { useAuth } from "../../core/context/AuthContext";
 
-const API_BASE = "http://localhost:5000";
+const API_BASE = import.meta.env.VITE_API_BASE;
+
 
 export default function AdminDashboard() {
   const { token } = useAuth();

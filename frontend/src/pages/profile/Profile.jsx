@@ -53,7 +53,7 @@ export default function Profile() {
 
     setLoadingSubscription(true);
     try {
-      const resp = await fetch("http://localhost:5000/api/profile/subscription", {
+      const resp = await fetch(`${API_BASE}/api/profile/subscription`, {
         headers: {
           Authorization: authHeader,
         },
@@ -73,7 +73,7 @@ export default function Profile() {
 
   async function fetchAvailablePlans() {
     try {
-      const resp = await fetch("http://localhost:5000/api/pricing");
+      const resp = await fetch(`${API_BASE}/api/pricing`);
       const data = await resp.json();
       if (resp.ok) {
         setAvailablePlans(data.plans || []);
@@ -91,7 +91,7 @@ export default function Profile() {
     setSuccess("");
 
     try {
-      const resp = await fetch("http://localhost:5000/api/profile", {
+      const resp = await fetch(`${API_BASE}/api/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -124,7 +124,7 @@ export default function Profile() {
 
     try {
       const resp = await fetch(
-        "http://localhost:5000/api/profile/youtube-channels",
+        (`${API_BASE}/api/profile/youtube-channels`),
         {
           method: "PUT",
           headers: {
@@ -451,7 +451,7 @@ function SubscriptionSection({
     setSuccess("");
 
     try {
-      const resp = await fetch("http://localhost:5000/api/profile/subscription", {
+      const resp = await fetch(`${API_BASE}/api/profile/subscription`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -482,7 +482,7 @@ function SubscriptionSection({
     setSuccess("");
 
     try {
-      const resp = await fetch("http://localhost:5000/api/profile/subscription", {
+      const resp = await fetch(`${API_BASE}/api/profile/subscription`, {
         method: "DELETE",
         headers: {
           Authorization: `Bearer ${token}`,

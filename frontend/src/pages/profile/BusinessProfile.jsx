@@ -47,7 +47,7 @@ export default function BusinessProfile() {
       if (!token) return;
 
       try {
-        const resp = await fetch("http://localhost:5000/api/profile", {
+        const resp = await fetch(`${API_BASE}/api/profile`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         const data = await resp.json();
@@ -90,8 +90,8 @@ export default function BusinessProfile() {
 
     setLoadingSubscription(true);
     try {
-      const resp = await fetch(
-        "http://localhost:5000/api/profile/subscription",
+      const resp = await fetch
+        (`${API_BASE}/api/profile/subscription`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -113,7 +113,7 @@ export default function BusinessProfile() {
 
   async function fetchAvailablePlans() {
     try {
-      const resp = await fetch("http://localhost:5000/api/pricing");
+      const resp = await fetch(`${API_BASE}/api/pricing`);
       const data = await resp.json();
       if (resp.ok) {
         setAvailablePlans(data.plans || []);
@@ -131,7 +131,7 @@ export default function BusinessProfile() {
     setSuccess("");
 
     try {
-      const resp = await fetch("http://localhost:5000/api/profile", {
+      const resp = await fetch(`${API_BASE}/api/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",
@@ -172,8 +172,8 @@ export default function BusinessProfile() {
         }))
         .filter((channel) => channel.url !== "");
 
-      const resp = await fetch(
-        "http://localhost:5000/api/profile/youtube-channels",
+      const resp = await fetch
+        (`${API_BASE}/api/profile/youtube-channels`,
         {
           method: "PUT",
           headers: {
@@ -691,8 +691,8 @@ function SubscriptionSection({
     setSuccess("");
 
     try {
-      const resp = await fetch(
-        "http://localhost:5000/api/profile/subscription",
+      const resp = await fetch
+        (`${API_BASE}/api/profile/subscription`,
         {
           method: "PUT",
           headers: {
@@ -729,7 +729,7 @@ function SubscriptionSection({
 
     try {
       const resp = await fetch(
-        "http://localhost:5000/api/profile/subscription",
+        (`${API_BASE}/api/profile/subscription`),
         {
           method: "DELETE",
           headers: {

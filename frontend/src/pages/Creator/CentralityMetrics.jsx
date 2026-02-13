@@ -38,7 +38,7 @@
 
 //         const encodedUrl = encodeURIComponent(channelUrl);
 //         const response = await fetch(
-//           `http://localhost:5000/api/youtube/videos.centralityMetrics?url=${encodedUrl}`
+//           `(${API_BASE/api/youtube/videos.centralityMetrics?url=${encodedUrl}`
 //         );
 
 //         if (!response.ok) throw new Error("Failed to fetch performance insights");

@@ -6,7 +6,7 @@ export default function Landing() {
   const [showDemo, setShowDemo] = useState(false);
 
   useEffect(() => {
-    fetch("http://localhost:5000/api/reviews")
+    fetch(`${API_BASE}/api/reviews`)
       .then((res) => res.json())
       .then((data) => setReviews(Array.isArray(data) ? data : data.reviews))
       .catch((err) => console.error("Review fetch error:", err));

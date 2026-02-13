@@ -27,7 +27,7 @@ export default function AdminProfile() {
     setSuccess("");
 
     try {
-      const resp = await fetch("http://localhost:5000/api/profile", {
+      const resp = await fetch(`${API_BASE}/api/profile`, {
         method: "PUT",
         headers: {
           "Content-Type": "application/json",

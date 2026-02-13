@@ -61,8 +61,8 @@ export default function ContactSupport() {
     const fetchTickets = async () => {
       setLoadingTickets(true);
       try {
-        const resp = await fetch(
-          "http://localhost:5000/api/support/my-tickets",
+        const resp = await fetch
+          (`${API_BASE}/api/support/my-tickets`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -107,7 +107,7 @@ export default function ContactSupport() {
     };
 
     try {
-      const resp = await fetch("http://localhost:5000/api/support", {
+      const resp = await fetch(`${API_BASE}/api/support`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

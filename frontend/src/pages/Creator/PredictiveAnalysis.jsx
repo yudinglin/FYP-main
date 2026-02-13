@@ -17,7 +17,8 @@ import {
 } from "recharts";
 import { useAuth } from "../../core/context/AuthContext";
 
-const API_BASE = "http://localhost:5000";
+const API_BASE = import.meta.env.VITE_API_BASE;
+
 
 /**
  * PredictiveAnalysis - Predicts future subscriber growth using linear regression
