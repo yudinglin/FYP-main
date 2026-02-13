@@ -10,12 +10,12 @@ export default function PlansPage() {
   useEffect(() => {
     async function fetchPlans() {
       try {
-        const res = await fetch("/api/pricing");
-        if (!res.ok) {
+        const r = await apiRequest("/api/pricing");
+        if (!r.ok) {
           throw new Error("Failed to fetch plans");
         }
 
-        const data = await res.json();
+        const data = r.data;
         setPlans(data.plans);
       } catch (err) {
         console.error("Failed to fetch plans:", err);
