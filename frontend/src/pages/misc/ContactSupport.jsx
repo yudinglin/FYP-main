@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../core/context/AuthContext";
+import { API_BASE } from "../../core/api/client";
 
 export default function ContactSupport() {
   const { user, token } = useAuth();
