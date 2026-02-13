@@ -1,6 +1,7 @@
 // src/pages/admin/AdminProfile.jsx
 import { useState, useEffect } from "react";
 import { useAuth } from "../../core/context/AuthContext";
+import { API_BASE } from "../../core/api/client";
 
 export default function AdminProfile() {
   const { user, token, setUser } = useAuth();
