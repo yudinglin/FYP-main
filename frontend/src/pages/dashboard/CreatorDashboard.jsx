@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../core/context/AuthContext";
+import { API_BASE } from "../../core/api/client";
 import ReviewBubble from "../../pages/misc/ReviewBubble.jsx";
 import {
   LineChart,
