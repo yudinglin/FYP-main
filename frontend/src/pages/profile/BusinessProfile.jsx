@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../core/context/AuthContext";
+import { API_BASE } from "../../core/api/client";
 
 export default function BusinessProfile() {
   const { user, token, setUser, logout } = useAuth();
