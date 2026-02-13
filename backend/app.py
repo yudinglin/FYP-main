@@ -128,7 +128,10 @@ def init_db():
 
 
 # Run after app is created and routes are registered (gunicorn import will execute this)
-init_db()
+RUN_DB_INIT = os.getenv("RUN_DB_INIT", "0").lower() in ("1", "true", "yes")
+
+if RUN_DB_INIT:
+    init_db()
 
 
 if __name__ == "__main__":
