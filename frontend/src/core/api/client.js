@@ -1,4 +1,5 @@
-export const API_BASE = import.meta.env.VITE_API_BASE;
+export const API_BASE =
+  import.meta.env.VITE_API_BASE || "https://fyp-main.onrender.com";
  
 //ignore unless set revoke to admin
 export async function apiRequest(path, options = {}) {
