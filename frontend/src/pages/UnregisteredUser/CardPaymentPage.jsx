@@ -2,6 +2,7 @@ import React, { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { CreditCard, Lock, HelpCircle, Check } from "lucide-react";
 import { useAuth } from "../../core/hooks/useAuth.js";
+import { apiRequest } from "../../core/api/client";
 
 export default function CardPaymentPage() {
   const navigate = useNavigate();
@@ -61,7 +62,7 @@ export default function CardPaymentPage() {
       if (expiryDate.replace(/\D/g, "").length !== 4) throw new Error("Expiry date must be MM / YY");
       if (cvv.length !== 3) throw new Error("CVV must be 3 digits");
 
-      const response = await fetch("/api/payment/process", {
+      const r = await apiRequest("/api/payment/process", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -75,8 +76,8 @@ export default function CardPaymentPage() {
         }),
       });
 
-      const data = await response.json().catch(() => ({}));
-      if (!response.ok) throw new Error(data.message || "Payment failed");
+      const data = r.data;
+      if (!r.ok) throw new Error(data.message || "Payment failed");
 
       setPaymentSuccess(true);
 
