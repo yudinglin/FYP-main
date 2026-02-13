@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../core/hooks/useAuth.js";
+import { apiRequest } from "../../core/api/client";
 
 export default function PaymentPage() {
   const navigate = useNavigate();
@@ -34,10 +35,10 @@ export default function PaymentPage() {
       setError("");
 
       try {
-        const res = await fetch("/api/pricing");
-        if (!res.ok) throw new Error("Failed to fetch plans");
+        const r = await apiRequest("/api/pricing");
+        if (!r.ok) throw new Error("Failed to fetch plans");
 
-        const data = await res.json();
+        const data = r.data;
         const plans = Array.isArray(data?.plans) ? data.plans : [];
 
         let plan = null;
