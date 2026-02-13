@@ -76,8 +76,8 @@ export default function CardPaymentPage() {
         }),
       });
 
-      const data = r.data;
-      if (!r.ok) throw new Error(data.message || "Payment failed");
+    if (!r.ok) throw new Error(r.error || "Payment failed");
+    const data = r.data;
 
       setPaymentSuccess(true);
 
