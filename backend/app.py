@@ -44,16 +44,7 @@ origins = ["http://localhost:5173", "http://127.0.0.1:5173", "https://fyp-main.o
 if frontend_origin:
     origins.append(frontend_origin)
 
-CORS(
-    app,
-    resources={
-        r"/api/*": {
-            "origins": origins,
-            "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-            "allow_headers": ["Content-Type", "Authorization"],
-        }
-    },
-)
+CORS(app)
 
 # --- JWT ---
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET", "change-me-in-env")
