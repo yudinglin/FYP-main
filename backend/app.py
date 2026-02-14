@@ -46,12 +46,11 @@ if frontend_origin:
 
 CORS(
     app,
-    resources={r"/api/*": {"origins": origins}},
+    origins=origins,
     supports_credentials=True,
     allow_headers=["Content-Type", "Authorization"],
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 )
-
 # --- JWT ---
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET", "change-me-in-env")
 jwt = JWTManager(app)
