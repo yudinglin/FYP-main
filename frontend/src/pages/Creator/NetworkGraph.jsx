@@ -190,6 +190,11 @@ export default function NetworkGraph() {
 
   useEffect(() => {
     if (activeView !== "network") return;
+    setGraphMountKey((k) => k + 1);
+  }, [activeView]);
+
+  useEffect(() => {
+    if (activeView !== "network") return;
     if (!containerRef.current) return;
   
     const el = containerRef.current;
@@ -303,6 +308,30 @@ export default function NetworkGraph() {
       fg.d3ReheatSimulation();
     }
   }, [graphData, containerSize]);
+
+  useEffect(() => {
+    if (activeView !== "network") return;
+    if (!fgRef.current) return;
+    if (!graphData.nodes?.length) return;
+  
+    let raf1 = 0;
+    let raf2 = 0;
+  
+    raf1 = requestAnimationFrame(() => {
+      raf2 = requestAnimationFrame(() => {
+        const fg = fgRef.current;
+        if (!fg) return;
+  
+        fg.d3ReheatSimulation();
+        fg.zoomToFit(400, 60);
+      });
+    });
+  
+    return () => {
+      cancelAnimationFrame(raf1);
+      cancelAnimationFrame(raf2);
+    };
+  }, [activeView, graphMountKey, graphData.nodes.length, containerSize.width, containerSize.height]);
 
   const getNodeColor = (engagement) => {
     if (engagement > 0.05) return "#4f46e5";
@@ -872,6 +901,7 @@ export default function NetworkGraph() {
                         </div>
 
                         <ForceGraph2D
+                          key={graphMountKey}
                           ref={fgRef}
                           graphData={graphData}
                           width={containerSize.width}
