@@ -57,8 +57,7 @@ import {
   Tag,
   TrendingUpIcon,
 } from "lucide-react";
-
-const API_BASE = "http://127.0.0.1:5000";
+import { API_BASE } from "../../core/api/client";
 
 // Helper function to convert engagement rate to understandable text
 const getEngagementInsight = (engagementRate) => {
