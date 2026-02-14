@@ -40,7 +40,7 @@ app = Flask(__name__)
 # Local dev + (optional) Netlify prod domain
 # If you haven't set FRONTEND_ORIGIN in Render yet, it will still allow localhost only.
 frontend_origin = os.getenv("FRONTEND_ORIGIN", "").strip()
-origins = ["http://localhost:5173", "http://127.0.0.1:5173","https://thunderous-dodol-5dc18c.netlify.app",]
+origins = ["http://localhost:5173", "http://127.0.0.1:5173","https://thunderous-dodol-5dc18c.netlify.app", "https://thunderous-dodol-5dc18c.netlify.app"]
 if frontend_origin:
     origins.append(frontend_origin)
 
