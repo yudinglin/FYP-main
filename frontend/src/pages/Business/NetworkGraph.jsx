@@ -435,7 +435,7 @@ export default function NetworkGraphBusiness() {
       const topK = Math.max(1, Math.min(500, Number(maxVideos) || 25));
 
       const res = await fetch(
-        `${API_BASE}/api/youtube/videos.similarityNetwork?url=${q}&videoId=${vid}&topK=${topK}&poolMax=2000`
+        `${API_BASE}/api/youtube/videos.similarityNetwork?url=${q}&videoId=${vid}&topK=${topK}&poolMax=300`
       );
 
       if (!res.ok) {
