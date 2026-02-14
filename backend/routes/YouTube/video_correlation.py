@@ -104,19 +104,20 @@ def video_similarity_network():
     if not channel_id:
         return jsonify({"error": "Invalid channel URL or ID"}), 400
 
+    # --- params ---
     try:
         top_k = int(request.args.get("topK", "25"))
     except ValueError:
         top_k = 25
-    top_k = max(1, min(top_k, 500))
+    top_k = max(1, min(top_k, 200))
 
     try:
-        pool_max = int(request.args.get("poolMax", "500"))
+        pool_max = int(request.args.get("poolMax", "300"))
     except ValueError:
-        pool_max = 500
-    pool_max = max(2, min(pool_max, 2000))
+        pool_max = 300
+    # set to low one local can run 2000 but web cannot run
+    pool_max = max(2, min(pool_max, 800))
 
-    # Optional threshold
     try:
         threshold = float(request.args.get("threshold", "-1"))
     except ValueError:
@@ -131,8 +132,13 @@ def video_similarity_network():
     if not video_ids:
         return jsonify({"nodes": [], "edges": [], "rawMetrics": []}), 200
 
+    # ensure center included + unique + keep size bounded
     if center_video_id not in video_ids:
         video_ids = [center_video_id] + video_ids
+    # Remove duplicates while maintaining order
+    seen = set()
+    video_ids = [x for x in video_ids if x and (x not in seen and not seen.add(x))]
+    video_ids = video_ids[: pool_max + 1]
 
     videos = fetch_video_stats(video_ids, with_snippet=True)
     df = pd.DataFrame(videos)
@@ -140,7 +146,10 @@ def video_similarity_network():
         return jsonify({"nodes": [], "edges": [], "rawMetrics": []}), 200
 
     metric_cols = ["views", "likes", "comments"]
-    df[metric_cols] = df[metric_cols].astype(float)
+
+    # --- key fix: tolerate missing/dirty numeric fields ---
+    for c in metric_cols:
+        df[c] = pd.to_numeric(df.get(c), errors="coerce").fillna(0.0)
 
     center_rows = df[df["id"] == center_video_id]
     if center_rows.empty:
@@ -148,29 +157,27 @@ def video_similarity_network():
 
     center_vec = center_rows.iloc[0][metric_cols]
 
-    similarities = []
-    for _, row in df.iterrows():
-        vid = row.get("id")
-        if not vid or vid == center_video_id:
-            continue
-        r = pd.Series(row[metric_cols]).corr(pd.Series(center_vec), method="pearson")
-        if pd.isna(r):
-            continue
-        r = float(r)
-        if threshold >= 0 and r < threshold:
-            continue
-        similarities.append((vid, r))
+    # --- vectorized similarity (much faster than iterrows loop) ---
+    df_metrics = df[metric_cols]
+    sim = df_metrics.corrwith(center_vec, axis=1, method="pearson").fillna(-9999.0)
 
-    similarities.sort(key=lambda x: x[1], reverse=True)
-    top = similarities[:top_k]
+    # drop center itself
+    sim[df["id"] == center_video_id] = -9999.0
 
-    top_ids = [center_video_id] + [vid for vid, _ in top]
+    if threshold >= 0:
+        sim = sim.where(sim >= threshold, other=-9999.0)
+
+    # pick topK
+    top_idx = sim.nlargest(top_k).index
+    top_pairs = [(df.loc[i, "id"], float(sim.loc[i])) for i in top_idx if sim.loc[i] > -9999.0]
+
+    top_ids = [center_video_id] + [vid for vid, _ in top_pairs]
     df_sub = df[df["id"].isin(top_ids)].copy()
     df_sub["isCenter"] = df_sub["id"] == center_video_id
 
     edges = [
-        {"source": center_video_id, "target": vid, "weight": round(weight, 3)}
-        for vid, weight in top
+        {"source": center_video_id, "target": vid, "weight": round(w, 3)}
+        for vid, w in top_pairs
     ]
 
     nodes = df_sub[
