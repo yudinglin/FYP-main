@@ -34,7 +34,7 @@ import {
   TrendingDown,
   Flame,
 } from "lucide-react";
-import { API_BASE } from "../../core/lib/client";
+import { API_BASE } from "../../core/api/client";
 
 
 
