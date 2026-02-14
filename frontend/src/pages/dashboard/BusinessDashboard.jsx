@@ -3,8 +3,8 @@ import { Link, useNavigate } from "react-router-dom";
 import { Download, FileChartLine, FileText, SlidersHorizontal, X, TrendingUp, ExternalLink, Award, Zap } from "lucide-react";
 import ReviewBubble from "../../pages/misc/ReviewBubble.jsx";
 import { useAuth } from "../../core/context/AuthContext";
+import { API_BASE } from "../../core/api/client";
 
-const API_BASE = "http://127.0.0.1:5000";
 
 export default function BusinessDashboard() {
   const { user } = useAuth();
