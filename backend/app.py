@@ -37,22 +37,27 @@ load_dotenv()
 app = Flask(__name__)
 
 # --- CORS ---
-# Local dev + (optional) Netlify prod domain
-# If you haven't set FRONTEND_ORIGIN in Render yet, it will still allow localhost only.
+# Allow Netlify prod + local dev. Add preview domains here if you use them.
 frontend_origin = os.getenv("FRONTEND_ORIGIN", "").strip()
-origins = ["http://localhost:5173", "http://127.0.0.1:5173","https://thunderous-dodol-5dc18c.netlify.app", "https://fyp-main.onrender.com"]
-if frontend_origin:
+
+origins = [
+    "https://thunderous-dodol-5dc18c.netlify.app",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+]
+
+if frontend_origin and frontend_origin not in origins:
     origins.append(frontend_origin)
 
 CORS(
     app,
-    resources={r"/api/*": {"origins": [
-        "https://thunderous-dodol-5dc18c.netlify.app",
-        "http://localhost:5173",
-        "http://127.0.0.1:5173",
-    ]}},
+    resources={r"/api/*": {"origins": origins}},
     supports_credentials=True,
+    allow_headers=["Content-Type", "Authorization"],
+    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    max_age=86400,
 )
+
 # --- JWT ---
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET", "change-me-in-env")
 jwt = JWTManager(app)
