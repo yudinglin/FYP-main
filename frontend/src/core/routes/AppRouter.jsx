@@ -10,7 +10,6 @@ import ContactSupport from "../../pages/misc/ContactSupport";
 import ReviewBubble from "../../pages/misc/ReviewBubble.jsx";
 
 import Login from "../../pages/auth/Login.jsx";
-import Register from "../../pages/auth/Register.jsx";
 import PlansPage from "../../pages/UnregisteredUser/PlansPage.jsx";
 import PaymentPage from "../../pages/UnregisteredUser/PaymentPage.jsx";
 import CardPaymentPage from "../../pages/UnregisteredUser/CardPaymentPage.jsx";
@@ -106,6 +105,13 @@ export default function AppRouter() {
           </AuthLayout>
         }
       />
+
+      <Route 
+        path="/register" 
+        element={
+        <Navigate to="/plans" replace />
+        } />
+      
       <Route
         path="/register"
         element={
