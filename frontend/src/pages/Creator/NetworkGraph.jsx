@@ -85,7 +85,7 @@ export default function NetworkGraph() {
       const q = encodeURIComponent(channelUrl);
       const vid = encodeURIComponent(centerVideoId);
       const res = await fetch(
-        `${API_BASE}/api/youtube/videos.similarityNetwork?url=${q}&videoId=${vid}&topK=${maxVideos}&poolMax=2000`
+        `${API_BASE}/api/youtube/videos.similarityNetwork?url=${q}&videoId=${vid}&topK=${maxVideos}&poolMax=300`
       );
 
       if (!res.ok) {
