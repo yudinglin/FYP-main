@@ -47,10 +47,12 @@ if frontend_origin:
 
 CORS(
     app,
-    origins=origins,
+    resources={r"/api/*": {"origins": [
+        "https://thunderous-dodol-5dc18c.netlify.app",
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ]}},
     supports_credentials=True,
-    allow_headers=["Content-Type", "Authorization"],
-    methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
 )
 # --- JWT ---
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET", "change-me-in-env")
