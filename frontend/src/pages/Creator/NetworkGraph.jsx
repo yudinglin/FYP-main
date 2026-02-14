@@ -64,6 +64,8 @@ export default function NetworkGraph() {
   const [centerInput, setCenterInput] = useState("");
   const [centerVideoId, setCenterVideoId] = useState("");
 
+  const [graphMountKey, setGraphMountKey] = useState(0);
+
   const handleFetchGraph = async () => {
     setLoading(true);
     setError("");
