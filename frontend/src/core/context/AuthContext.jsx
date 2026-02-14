@@ -1,23 +1,20 @@
-import React, { createContext, useContext, useEffect, useState } from "react";
+// src/context/AuthContext.jsx
+import { createContext, useContext, useEffect, useState } from "react";
 import { API_BASE } from "../api/client";
 
+// Context
 export const AuthContext = createContext(null);
+
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    // Prevent "auto login" on a fresh visit.
-    // Only restore auth from sessionStorage (tab/session scoped).
-    // Also clear any legacy localStorage token/user from older deployments.
-    try {
-      localStorage.removeItem("ya_token");
-      localStorage.removeItem("ya_user");
-    } catch {}
 
-    const savedToken = sessionStorage.getItem("ya_token");
-    const savedUser = sessionStorage.getItem("ya_user");
+  useEffect(() => {
+    const savedToken = localStorage.getItem("ya_token");
+    const savedUser = localStorage.getItem("ya_user");
 
     if (savedToken && savedUser) {
       setToken(savedToken);
@@ -29,48 +26,53 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+
   async function login(email, password) {
     setLoading(true);
-    try {
-      const res = await fetch(`${API_BASE}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
 
-      const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Login failed");
+    const resp = await fetch(`${API_BASE}/api/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
 
-      setUser(data.user);
-      setToken(data.token);
+    const data = await resp.json();
 
-      // Store in sessionStorage so it won't auto-login next time the user visits.
-      sessionStorage.setItem("ya_token", data.token);
-      sessionStorage.setItem("ya_user", JSON.stringify(data.user));
-
-      return { ok: true, user: data.user };
-    } catch (err) {
-      return { ok: false, error: err.message };
-    } finally {
+    if (!resp.ok) {
       setLoading(false);
+      throw new Error(data.message || "Login failed");
     }
+
+
+    setUser(data.user);
+    setToken(data.token);
+    localStorage.setItem("ya_token", data.token);
+    localStorage.setItem("ya_user", JSON.stringify(data.user));
+
+    setLoading(false);
+    return data.user;
   }
+
 
   function logout() {
     setUser(null);
     setToken(null);
-
-    try {
-      localStorage.removeItem("ya_token");
-      localStorage.removeItem("ya_user");
-    } catch {}
-
-    sessionStorage.removeItem("ya_token");
-    sessionStorage.removeItem("ya_user");
+    localStorage.removeItem("ya_token");
+    localStorage.removeItem("ya_user");
   }
 
+
+  const value = {
+    user,
+    token,
+    loading,
+    login,
+    logout,
+    setUser,
+  };
+
   return (
-    <AuthContext.Provider value={{ user, token, loading, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
@@ -79,3 +81,4 @@ export function AuthProvider({ children }) {
 export function useAuth() {
   return useContext(AuthContext);
 }
+
