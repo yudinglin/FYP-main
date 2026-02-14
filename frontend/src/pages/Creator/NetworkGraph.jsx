@@ -187,18 +187,40 @@ export default function NetworkGraph() {
   };
 
   useEffect(() => {
+    if (activeView !== "network") return;
+    if (!containerRef.current) return;
+  
+    const el = containerRef.current;
+    let raf = 0;
+  
     const updateSize = () => {
-      if (containerRef.current) {
-        setContainerSize({
-          width: containerRef.current.clientWidth,
-          height: containerRef.current.clientHeight
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const w = el.clientWidth || 0;
+        const h = el.clientHeight || 0;
+  
+        // ignore unstable/zero sizes when tab just switched back
+        if (w < 300 || h < 300) return;
+  
+        setContainerSize((prev) => {
+          if (prev.width === w && prev.height === h) return prev;
+          return { width: w, height: h };
         });
-      }
+      });
     };
+  
     updateSize();
+  
+    const ro = new ResizeObserver(updateSize);
+    ro.observe(el);
+  
     window.addEventListener("resize", updateSize);
-    return () => window.removeEventListener("resize", updateSize);
-  }, []);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", updateSize);
+      ro.disconnect();
+    };
+  }, [activeView]);
 
   useEffect(() => {
     if (activeView !== "network") return;
