@@ -36,8 +36,7 @@ import {
   Trophy,
   ArrowUp,
 } from "lucide-react";
-
-const API_BASE = "http://127.0.0.1:5000";
+import { API_BASE } from "../../core/api/client";
 
 export default function NetworkGraphBusiness() {
   const { user } = useAuth();
