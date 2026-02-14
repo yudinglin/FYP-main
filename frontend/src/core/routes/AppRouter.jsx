@@ -106,7 +106,6 @@ export default function AppRouter() {
           </AuthLayout>
         }
       />
-
       <Route
         path="/register"
         element={
