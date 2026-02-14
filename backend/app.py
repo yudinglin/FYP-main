@@ -86,6 +86,12 @@ app.register_blueprint(manage_users_bp, url_prefix="/api/admin")
 def ping():
     return {"message": "Backend is running"}
 
+@app.after_request
+def add_cors_headers(resp):
+    resp.headers["Access-Control-Allow-Origin"] = "https://thunderous-dodol-5dc18c.netlify.app"
+    resp.headers["Access-Control-Allow-Methods"] = "GET,POST,OPTIONS"
+    resp.headers["Access-Control-Allow-Headers"] = "Content-Type,Authorization"
+    return resp
 
 # --- DB init (auto create tables once) ---
 def init_db():
