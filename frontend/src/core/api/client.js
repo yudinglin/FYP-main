@@ -3,7 +3,7 @@ export const API_BASE =
  
 //ignore unless set revoke to admin
 export async function apiRequest(path, options = {}) {
-  const token = sessionStorage.getItem("ya_token");
+  const token = localStorage.getItem("ya_token");
 
   const headers = {
     "Content-Type": "application/json",
@@ -19,18 +19,16 @@ export async function apiRequest(path, options = {}) {
     headers,
   });
 
-  const contentType = res.headers.get("content-type") || "";
-  const isJson = contentType.includes("application/json");
+  let data = null;
+  try {
+    data = await res.json();
+  } catch (_) {
 
-  const data = isJson ? await res.json().catch(() => null) : await res.text().catch(() => null);
-
-  if (!res.ok) {
-    const msg =
-      (data && typeof data === "object" && (data.error || data.message)) ||
-      (typeof data === "string" && data) ||
-      "Request failed";
-    throw new Error(msg);
   }
 
-  return data;
+  if (!res.ok) {
+    return { ok: false, status: res.status, error: data?.error || data?.message || "An error occurred" };
+  }
+
+  return { ok: true, status: res.status, data };
 }
