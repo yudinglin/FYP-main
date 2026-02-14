@@ -50,8 +50,10 @@ class EmailService:
             msg.attach(part2)
 
             # Send email
-            with smtplib.SMTP(self.smtp_server, self.smtp_port) as server:
+            with smtplib.SMTP(self.smtp_server, self.smtp_port, timeout=10) as server:
+                server.ehlo()
                 server.starttls()
+                server.ehlo()
                 server.login(self.smtp_username, self.smtp_password)
                 server.send_message(msg)
 
