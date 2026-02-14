@@ -193,7 +193,7 @@ export default function NetworkGraph() {
     setGraphMountKey((k) => k + 1);
   }, [activeView]);
 
-  useEffect(() => {
+   useEffect(() => {
     if (activeView !== "network") return;
     if (!containerRef.current) return;
   
@@ -206,12 +206,12 @@ export default function NetworkGraph() {
         const w = el.clientWidth || 0;
         const h = el.clientHeight || 0;
   
-        // ignore unstable/zero sizes when tab just switched back
-        if (w < 300 || h < 300) return;
+        const safeW = Math.max(1, w);
+        const safeH = Math.max(1, h);
   
         setContainerSize((prev) => {
-          if (prev.width === w && prev.height === h) return prev;
-          return { width: w, height: h };
+          if (prev.width === safeW && prev.height === safeH) return prev;
+          return { width: safeW, height: safeH };
         });
       });
     };
@@ -266,24 +266,17 @@ export default function NetworkGraph() {
 
   // Auto-fetch channel insights when switching to that tab
   useEffect(() => {
-    if (activeView !== "channel-insights") return;
-    if (channelData !== null || channelLoading) return;
-    fetchChannelInsights();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeView]);
-
-  useEffect(() => {
     if (!fgRef.current) return;
     const fg = fgRef.current;
-
+  
     fg.d3Force("charge").strength(-1200);
-    
+  
     fg.d3Force("link").distance((link) => {
       const baseDistance = 450;
       const weight = link.weight || 0;
-      return baseDistance - (weight * 80);
+      return baseDistance - weight * 80;
     });
-
+  
     const collideForce = fg.d3Force("collide");
     if (collideForce) {
       collideForce
@@ -294,44 +287,34 @@ export default function NetworkGraph() {
         })
         .strength(0.7);
     }
-
-    fg.d3Force("center")
-      .x(containerSize.width / 2)
-      .y(containerSize.height / 2);
-
+  
+    const centerForce = fg.d3Force("center");
+    if (centerForce) centerForce.x(0).y(0);
+  
     if (graphData.nodes.length > 0) {
       const center = graphData.nodes.find((n) => n.isCenter);
       if (center) {
-        center.fx = containerSize.width / 2;
-        center.fy = containerSize.height / 2;
+        center.fx = 0;
+        center.fy = 0;
       }
       fg.d3ReheatSimulation();
     }
-  }, [graphData, containerSize]);
+  }, [graphData]);
 
   useEffect(() => {
     if (activeView !== "network") return;
     if (!fgRef.current) return;
     if (!graphData.nodes?.length) return;
+    if (containerSize.width < 10 || containerSize.height < 10) return;
   
-    let raf1 = 0;
-    let raf2 = 0;
+    const t = setTimeout(() => {
+      const fg = fgRef.current;
+      if (!fg) return;
+      fg.zoomToFit(350, 60);
+    }, 60);
   
-    raf1 = requestAnimationFrame(() => {
-      raf2 = requestAnimationFrame(() => {
-        const fg = fgRef.current;
-        if (!fg) return;
-  
-        fg.d3ReheatSimulation();
-        fg.zoomToFit(400, 60);
-      });
-    });
-  
-    return () => {
-      cancelAnimationFrame(raf1);
-      cancelAnimationFrame(raf2);
-    };
-  }, [activeView, graphMountKey, graphData.nodes.length, containerSize.width, containerSize.height]);
+    return () => clearTimeout(t);
+  }, [activeView, graphData.nodes.length, containerSize.width, containerSize.height, graphMountKey]);
 
   const getNodeColor = (engagement) => {
     if (engagement > 0.05) return "#4f46e5";
