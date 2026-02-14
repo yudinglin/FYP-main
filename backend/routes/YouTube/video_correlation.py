@@ -116,7 +116,7 @@ def video_similarity_network():
     except ValueError:
         pool_max = 300
     # set to low one local can run 2000 but web cannot run
-    pool_max = max(2, min(pool_max, 800))
+    pool_max = max(2, min(pool_max, 300))
 
     try:
         threshold = float(request.args.get("threshold", "-1"))
