@@ -107,12 +107,6 @@ export default function AppRouter() {
         }
       />
 
-      <Route 
-        path="/register" 
-        element={
-        <Navigate to="/plans" replace />
-        } />
-      
       <Route
         path="/register"
         element={
