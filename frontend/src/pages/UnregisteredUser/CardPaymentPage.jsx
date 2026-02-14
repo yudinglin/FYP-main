@@ -75,9 +75,12 @@ export default function CardPaymentPage() {
           plan_id: selectedPlan.plan_id,
         }),
       });
-
-    if (!r.ok) throw new Error(r.error || "Payment failed");
-    const data = r.data;
+      
+      if (!r.ok) {
+        throw new Error(r.data?.message || "Payment failed");
+      }
+      
+      const data = r.data;
 
       setPaymentSuccess(true);
 
