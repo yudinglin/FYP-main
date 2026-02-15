@@ -8,42 +8,37 @@ export default function EditPricing() {
   const [error, setError] = useState(null);
 
   // Helper function to parse description to extract description text and features
-  const parsePlanData = (plan) => {
-    let description = plan.description || "";
-    let features = [];
+    const parsePlanData = (plan) => {
+      let description = plan.description || "";
+      let features = Array.isArray(plan.features) ? plan.features : [];
 
-    if (description) {
-      try {
-        const parsed = JSON.parse(description);
-        if (parsed.features && Array.isArray(parsed.features)) {
-          features = parsed.features;
-          description = parsed.description || "";
-        } else if (Array.isArray(parsed)) {
-          features = parsed;
-          description = "";
-        }
-      } catch (e) {
-        // Not JSON, use description as-is
+      if (description) {
+        try {
+          const parsed = JSON.parse(description);
+          if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+            if (typeof parsed.description === "string") description = parsed.description;
+            if (Array.isArray(parsed.features)) features = parsed.features;
+          } else if (Array.isArray(parsed)) {
+            features = parsed;
+            description = "";
+          }
+        } catch (e) {}
       }
-    }
 
-    return {
-      ...plan,
-      description: description,
-      features: features,
-      price: plan.price_monthly || plan.price || 0,
-    };
-  };
+      return {
+          ...plan,
+          description,
+          features,
+          price: plan.price_monthly || plan.price || 0,
+        };
+      };
 
   // Helper function to format plan data for saving (combine description and features as JSON)
   const formatPlanForSave = (plan) => {
-    const descriptionJson = JSON.stringify({
-      description: plan.description || "",
-      features: plan.features || [],
-    });
     return {
       name: plan.name,
-      description: descriptionJson,
+      description: plan.description || "",
+      features: plan.features || [],
       price_monthly: plan.price,
       target_role: plan.target_role || "BOTH",
       max_channels: plan.max_channels || 1,
