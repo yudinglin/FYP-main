@@ -5,7 +5,7 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 import re
 import numpy as np
-from .youtube_utils import (
+from ..utils.youtube_utils import (
     extract_channel_id,
     fetch_basic_channel_stats,
     fetch_video_ids,
