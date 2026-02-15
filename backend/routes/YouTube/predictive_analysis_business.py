@@ -3,7 +3,7 @@
 from flask import Blueprint, request, jsonify
 import math
 from datetime import datetime, timedelta
-from ..utils.youtube_utils import (
+from utils.youtube_utils import (
     extract_channel_id,
     fetch_basic_channel_stats,
     fetch_video_ids,
