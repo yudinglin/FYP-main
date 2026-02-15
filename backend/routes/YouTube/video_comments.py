@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from .youtube_utils import extract_channel_id, youtube_get, fetch_basic_channel_stats
+from ..utils.youtube_utils import extract_channel_id, youtube_get, fetch_basic_channel_stats
 
 comments_bp = Blueprint("video_comments", __name__, url_prefix="/api/youtube")
 
