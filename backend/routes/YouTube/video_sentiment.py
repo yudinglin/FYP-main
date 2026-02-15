@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from .youtube_utils import (
+from ..utils.youtube_utils import (
     extract_channel_id,
     fetch_video_ids,
     fetch_video_comments,
