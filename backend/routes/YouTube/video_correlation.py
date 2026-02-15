@@ -1,7 +1,7 @@
 # backend/routes/YouTube/video_correlation.py
 
 from flask import Blueprint, request, jsonify
-from .youtube_utils import (
+from ..utils.youtube_utils import (
     extract_channel_id,
     fetch_basic_channel_stats,
     fetch_video_ids,
