@@ -37,54 +37,52 @@ def update_plan(request, plan_id):
             return {"message": "Admin access required"}, 403
 
         data = request.get_json() or {}
-
-        # Check if plan exists
-        plan = SubscriptionPlan.find_by_id(plan_id)
-        if not plan:
-            # Try to find even if inactive for admin
-            from db import get_connection
-            conn = get_connection()
-            cursor = conn.cursor(dictionary=True)
-            cursor.execute(
-                """
-                SELECT plan_id, name, description, features, target_role, price_monthly,
-                       max_channels, max_saved_graphs, is_active
-                FROM SubscriptionPlan
-                WHERE plan_id = %s
-                """,
-                (plan_id,),
-            )
-            row = cursor.fetchone()
-            cursor.close()
-            conn.close()
-
-            if not row:
-                return {"message": "Plan not found"}, 404
-
+        
         updates = {}
-
+        
+        # ---- description + features (Compatible with older front-end syntax: JSON included in the description) ----
+        incoming_desc = data.get("description", None)
+        incoming_features = data.get("features", None)
+        
+        # if description is JSON string：{"description":"...","features":[...]}
+        if isinstance(incoming_desc, str):
+            s = incoming_desc.strip()
+            if s.startswith("{") or s.startswith("["):
+                try:
+                    obj = json.loads(s)
+                    if isinstance(obj, dict):
+                        if "description" in obj:
+                            incoming_desc = obj.get("description")
+                        if incoming_features is None and "features" in obj:
+                            incoming_features = obj.get("features")
+                    elif isinstance(obj, list):
+                        # The compatible description is directly ["f1","f2"]
+                        if incoming_features is None:
+                            incoming_features = obj
+                        incoming_desc = ""
+                except Exception:
+                    pass
+        
+        # write back description（text only）
+        if incoming_desc is not None:
+            updates["description"] = incoming_desc
+        
+        # write back features（DB store as \n concatenated string）
+        if incoming_features is not None:
+            if isinstance(incoming_features, list):
+                cleaned = [str(x).strip() for x in incoming_features if str(x).strip()]
+                updates["features"] = "\n".join(cleaned)
+            else:
+                # Compatible with the frontend directly passing a string
+                updates["features"] = str(incoming_features)
+        
+        # ---- Other fields remain the same ----
         if "name" in data:
             updates["name"] = data.get("name")
-
-        if "description" in data:
-            desc = data.get("description")
-
-            # Safety net: if desc is a JSON string like {"description":"...","features":[]}
-            if isinstance(desc, str):
-                s = desc.strip()
-                if s.startswith("{") and '"description"' in s:
-                    try:
-                        obj = json.loads(s)
-                        if isinstance(obj, dict) and "description" in obj:
-                            desc = obj.get("description")
-                    except Exception:
-                        pass
-
-            updates["description"] = desc
-
+        
         if "target_role" in data:
             updates["target_role"] = data.get("target_role")
-
+        
         if "price_monthly" in data:
             price_monthly = data.get("price_monthly")
             if price_monthly is not None:
@@ -95,19 +93,19 @@ def update_plan(request, plan_id):
                 except (ValueError, TypeError):
                     return {"message": "Invalid price format"}, 400
             updates["price_monthly"] = price_monthly
-
+        
         if "max_channels" in data:
             updates["max_channels"] = data.get("max_channels")
-
+        
         if "max_saved_graphs" in data:
             updates["max_saved_graphs"] = data.get("max_saved_graphs")
-
+        
         if "is_active" in data:
             updates["is_active"] = data.get("is_active")
-
+        
         if not updates:
             return {"message": "No valid fields to update"}, 400
-
+        
         updated_plan = SubscriptionPlan.update(plan_id=plan_id, **updates)
 
         if not updated_plan:
